@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="c4af3f9a-42ff-4c4e-bff4-a8bd3cf99a76" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/../LICENSE" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/.gitattributes" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/build.gradle" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/gradle/wrapper/gradle-wrapper.jar" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/gradle/wrapper/gradle-wrapper.properties" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/gradlew" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/gradlew.bat" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/settings.gradle" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/ChoonsApplication.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/config/SecurityConfig.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/controller/AdminController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/controller/AuthController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/controller/MusicController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/controller/PlaylistController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/controller/StreamController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/AddTrackToPlaylistRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/AlbumResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/ArtistResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/AuthResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/CreateAlbumRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/CreateArtistRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/CreatePlaylistRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/LoginRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/PlaylistResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/PlaylistSummaryResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/ReorderPlaylistRequest.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/TrackResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/dto/UserResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/exception/GlobalExceptionHandler.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/model/music/Album.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/model/music/Artist.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/model/music/Playlist.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/model/music/PlaylistTrack.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/model/music/Track.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/model/user/User.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/model/user/UserRole.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/repository/AlbumRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/repository/ArtistRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/repository/PlaylistRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/repository/PlaylistTrackRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/repository/TrackRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/repository/UserRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/AlbumService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/ArtistService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/CustomUserDetailsService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/JwtAuthenticationFilter.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/JwtService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/PlaylistService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/R2Service.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/StreamingService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/java/dev/odysseia/choons/service/TrackService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/main/resources/application.properties" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../back/src/test/java/dev/odysseia/choons/ChoonsApplicationTests.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/.env" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/.prettierrc.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/.vite/deps/_metadata.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/.vite/deps/package.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/.vscode/extensions.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/bun.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/env.d.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/index.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/package.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/public/_redirects" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/public/favicon.ico" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/App.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/api/albums.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/api/artists.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/api/auth.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/api/client.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/api/playlists.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/api/tracks.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/api/types.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/assets/main.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/icons/IconCommunity.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/icons/IconDocumentation.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/icons/IconEcosystem.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/icons/IconSupport.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/icons/IconTooling.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/layout/AppLayout.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/layout/AppSidebar.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/layout/MusicPlayer.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/components/music/TrackRow.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/main.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/router/index.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/stores/auth.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/stores/music.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/stores/player.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/stores/playlists.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/AlbumView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/ArtistView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/LibraryView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/LoginView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/PlaylistDetailView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/PlaylistsView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/admin/AdminAlbumsView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/admin/AdminArtistsView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/admin/AdminListenersView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/src/views/admin/AdminTracksView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/tsconfig.app.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/tsconfig.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/tsconfig.node.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../front/vite.config.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../netlify.toml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ExternalProjectsData">
+    <projectState path="$PROJECT_DIR$">
+      <ProjectState />
+    </projectState>
+  </component>
+  <component name="ExternalProjectsManager">
+    <system id="GRADLE">
+      <state>
+        <task path="$PROJECT_DIR$">
+          <activation />
+        </task>
+        <projects_view>
+          <tree_state>
+            <expand>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="choons" type="f1a62948:ProjectNode" />
+              </path>
+            </expand>
+            <select />
+          </tree_state>
+        </projects_view>
+      </state>
+    </system>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Enum" />
+        <option value="Interface" />
+        <option value="Record" />
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Nyffi&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;git@github.com:Team-Odysseia/choons.git&quot;,
+    &quot;accountId&quot;: &quot;85d3540f-48e0-4738-bd21-528f7a0677a6&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="38xFFjGEAsHVDOGgWNtJ5zXF5is" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Gradle.Build back-java.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Build back.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Download Sources.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
+    &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
+    &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
+    &quot;RequestMappingsPanelWidth1&quot;: &quot;75&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;Spring Boot.ChoonsApplication.executor&quot;: &quot;Run&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;temp&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/nyffi/Projects/MonoRepos/choons/back-java&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RunManager">
+    <configuration name="ChoonsApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+      <option name="ALTERNATIVE_JRE_PATH" value="25" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <envs>
+        <env name="POSTGRES_PASS" value="Choons(123)" />
+        <env name="POSTGRES_URI" value="jdbc:postgresql://db.mynqejreuwrpptltpcif.supabase.co:5432/postgres" />
+        <env name="POSTGRES_USER" value="postgres" />
+        <env name="R2_ACCESS_KEY" value="5225986ac248936419d17899e5284fd9" />
+        <env name="R2_SECRET_KEY" value="d05898d51383184a88a07c2605c24cd730eef033feddff69ce27fc4f5ff7c718" />
+        <env name="R2_TOKEN" value="WoAJbUvGi5ucf8KNoCzQc2HeO3xHju_sDEd8cENF" />
+        <env name="R2_ENDPOINT" value="https://e3f4cb7133481466fcd4d8f89f377173.r2.cloudflarestorage.com" />
+      </envs>
+      <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
+      <module name="choons.main" />
+      <option name="SPRING_BOOT_MAIN_CLASS" value="dev.odysseia.choons.ChoonsApplication" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-26cb7f24e5b0-intellij.indexing.shared.core-IU-253.29346.138" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.29346.138" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="c4af3f9a-42ff-4c4e-bff4-a8bd3cf99a76" name="Changes" comment="" />
+      <created>1769733214234</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1769733214234</updated>
+      <workItem from="1769733217820" duration="624000" />
+      <workItem from="1769735792950" duration="3212000" />
+      <workItem from="1769808771518" duration="6498000" />
+      <workItem from="1770067799158" duration="606000" />
+      <workItem from="1770761827057" duration="561000" />
+      <workItem from="1774389560703" duration="1081000" />
+      <workItem from="1774393045622" duration="1464000" />
+      <workItem from="1774394522105" duration="6534000" />
+      <workItem from="1774404458550" duration="197000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

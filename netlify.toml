@@ -1,0 +1,4 @@
+[build]
+  base    = "front"
+  command = "bun run build-only"
+  publish = "dist"

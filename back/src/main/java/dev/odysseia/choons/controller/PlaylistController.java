@@ -1,0 +1,72 @@
+package dev.odysseia.choons.controller;
+
+import dev.odysseia.choons.dto.*;
+import dev.odysseia.choons.model.user.User;
+import dev.odysseia.choons.service.PlaylistService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.nio.file.AccessDeniedException;
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/playlists")
+public class PlaylistController {
+
+  @Autowired private PlaylistService playlistService;
+
+  @PostMapping
+  public ResponseEntity<PlaylistResponse> create(
+          @RequestBody CreatePlaylistRequest request,
+          @AuthenticationPrincipal User user) throws AccessDeniedException {
+    return ResponseEntity.status(HttpStatus.CREATED).body(playlistService.create(request, user));
+  }
+
+  @GetMapping
+  public ResponseEntity<List<PlaylistSummaryResponse>> list(@AuthenticationPrincipal User user) {
+    return ResponseEntity.ok(playlistService.findByOwner(user));
+  }
+
+  @GetMapping("/{id}")
+  public ResponseEntity<PlaylistResponse> get(
+          @PathVariable UUID id,
+          @AuthenticationPrincipal User user) throws AccessDeniedException {
+    return ResponseEntity.ok(playlistService.findById(id, user));
+  }
+
+  @DeleteMapping("/{id}")
+  public ResponseEntity<Void> delete(
+          @PathVariable UUID id,
+          @AuthenticationPrincipal User user) throws AccessDeniedException {
+    playlistService.delete(id, user);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PostMapping("/{id}/tracks")
+  public ResponseEntity<PlaylistResponse> addTrack(
+          @PathVariable UUID id,
+          @RequestBody AddTrackToPlaylistRequest request,
+          @AuthenticationPrincipal User user) throws AccessDeniedException {
+    return ResponseEntity.ok(playlistService.addTrack(id, request, user));
+  }
+
+  @DeleteMapping("/{id}/tracks/{trackId}")
+  public ResponseEntity<PlaylistResponse> removeTrack(
+          @PathVariable UUID id,
+          @PathVariable UUID trackId,
+          @AuthenticationPrincipal User user) throws AccessDeniedException {
+    return ResponseEntity.ok(playlistService.removeTrack(id, trackId, user));
+  }
+
+  @PutMapping("/{id}/tracks/order")
+  public ResponseEntity<PlaylistResponse> reorder(
+          @PathVariable UUID id,
+          @RequestBody ReorderPlaylistRequest request,
+          @AuthenticationPrincipal User user) throws AccessDeniedException {
+    return ResponseEntity.ok(playlistService.reorder(id, request, user));
+  }
+}
