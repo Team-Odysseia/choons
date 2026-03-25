@@ -4,36 +4,15 @@ import MusicPlayer from './MusicPlayer.vue'
 </script>
 
 <template>
-  <div class="app-layout">
+  <div
+    class="grid h-screen [grid-template-columns:var(--sidebar-w)_1fr] [grid-template-rows:1fr_var(--player-h)]"
+  >
     <AppSidebar />
-    <main class="app-main">
-      <div class="app-content">
+    <main class="col-start-2 row-start-1 overflow-hidden flex flex-col">
+      <div class="flex-1 overflow-y-auto p-8">
         <RouterView />
       </div>
     </main>
     <MusicPlayer />
   </div>
 </template>
-
-<style scoped>
-.app-layout {
-  display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: 1fr var(--player-h);
-  height: 100vh;
-}
-
-.app-main {
-  grid-column: 2;
-  grid-row: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.app-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 32px;
-}
-</style>

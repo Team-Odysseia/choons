@@ -12,81 +12,40 @@ onMounted(() => music.fetchArtist(route.params.id as string))
 
 <template>
   <div v-if="!music.loading && music.currentArtist">
-    <div class="artist-header">
-      <div class="artist-avatar-lg">{{ music.currentArtist.name[0]?.toUpperCase() }}</div>
+    <div class="flex items-center gap-6 mb-8">
+      <div
+        class="size-[120px] rounded-full bg-muted flex items-center justify-center text-[56px] font-extrabold text-muted-foreground shrink-0"
+      >
+        {{ music.currentArtist.name[0]?.toUpperCase() }}
+      </div>
       <div>
-        <div class="artist-label">Artist</div>
-        <h1 class="page-title" style="margin-bottom: 8px">{{ music.currentArtist.name }}</h1>
-        <p v-if="music.currentArtist.bio" class="artist-bio">{{ music.currentArtist.bio }}</p>
+        <div class="text-xs font-bold uppercase tracking-widest text-dimmed mb-1">Artist</div>
+        <h1 class="text-[28px] font-extrabold mb-2">{{ music.currentArtist.name }}</h1>
+        <p v-if="music.currentArtist.bio" class="text-[13px] text-muted-foreground max-w-[500px] mt-2">
+          {{ music.currentArtist.bio }}
+        </p>
       </div>
     </div>
 
-    <h2 class="section-title">Albums</h2>
+    <h2 class="text-lg font-bold mb-4">Albums</h2>
 
-    <div v-if="music.albums.length === 0" class="text-muted">No albums yet.</div>
-    <div v-else class="grid-cards">
+    <div v-if="music.albums.length === 0" class="text-[13px] text-dimmed">No albums yet.</div>
+    <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
       <div
         v-for="album in music.albums"
         :key="album.id"
-        class="card"
+        class="bg-card rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted"
         @click="router.push(`/library/albums/${album.id}`)"
       >
-        <div class="album-cover">♪</div>
-        <div class="card-title">{{ album.title }}</div>
-        <div class="card-sub">{{ album.releaseYear }}</div>
+        <div
+          class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[40px] mb-3"
+        >
+          ♪
+        </div>
+        <div class="font-bold text-sm mb-1 truncate">{{ album.title }}</div>
+        <div class="text-xs text-muted-foreground truncate">{{ album.releaseYear }}</div>
       </div>
     </div>
   </div>
-  <div v-else class="text-muted">Loading…</div>
+  <div v-else class="text-[13px] text-dimmed">Loading…</div>
 </template>
-
-<style scoped>
-.artist-header {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.artist-avatar-lg {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 56px;
-  font-weight: 800;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.artist-label {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.artist-bio {
-  font-size: 13px;
-  color: var(--text-secondary);
-  max-width: 500px;
-  margin-top: 8px;
-}
-
-.album-cover {
-  width: 100%;
-  aspect-ratio: 1;
-  background: var(--bg-elevated);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  margin-bottom: 12px;
-}
-</style>
