@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
 const router = useRouter()
+const appVersion = __APP_VERSION__
 
 function logout() {
   auth.logout()
@@ -12,7 +13,7 @@ function logout() {
 </script>
 
 <template>
-  <nav class="col-start-1 [grid-row:1/3] bg-black flex flex-col overflow-hidden border-r border-border">
+  <nav class="col-start-1 row-start-1 bg-black flex flex-col overflow-hidden border-r border-border">
     <div class="flex-1 overflow-y-auto px-2 py-4">
       <div class="text-[22px] font-black tracking-tight text-primary px-3 pb-5">choons</div>
 
@@ -70,14 +71,24 @@ function logout() {
         {{ auth.user?.username }}
       </span>
       <button
-        class="size-8 rounded-full flex items-center justify-center text-dimmed hover:text-destructive transition-colors shrink-0"
-        title="Log out"
+        class="flex items-center gap-1.5 text-[12px] font-semibold text-dimmed hover:text-destructive transition-colors shrink-0"
         @click="logout"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
           <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zm5-9H11v2h10v14H11v2h12V4z" />
         </svg>
+        Log out
       </button>
+    </div>
+
+    <div class="px-4 py-3 border-t border-border flex flex-col gap-1 items-center">
+      <span class="text-[11px] text-dimmed">{{ appVersion }}</span>
+      <a
+        href="https://www.odysseia.dev/"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-[11px] text-dimmed hover:text-muted-foreground transition-colors"
+      >Made by Odysseia</a>
     </div>
   </nav>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 
 const player = usePlayerStore()
@@ -7,6 +7,9 @@ const player = usePlayerStore()
 const progressPercent = computed(() =>
   player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0,
 )
+const volumePercent = computed(() => Math.round(player.volume * 100))
+
+const showVolumeLabel = ref(false)
 
 function formatTime(secs: number) {
   if (!secs || isNaN(secs)) return '0:00'
@@ -90,8 +93,12 @@ function onVolume(e: Event) {
     </div>
 
     <!-- Volume -->
-    <div class="flex items-center gap-2 justify-end">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-dimmed">
+    <div
+      class="flex items-center gap-2 justify-end"
+      @mouseenter="showVolumeLabel = true"
+      @mouseleave="showVolumeLabel = false"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-dimmed shrink-0">
         <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
       </svg>
       <input
@@ -103,6 +110,10 @@ function onVolume(e: Event) {
         :value="player.volume"
         @input="onVolume"
       />
+      <span
+        class="text-[11px] text-dimmed min-w-[30px] transition-opacity"
+        :class="showVolumeLabel ? 'opacity-100' : 'opacity-0'"
+      >{{ volumePercent }}%</span>
     </div>
   </footer>
 </template>
