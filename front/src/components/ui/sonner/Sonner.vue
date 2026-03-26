@@ -4,6 +4,7 @@ import { Toaster } from 'vue-sonner'
 
 <template>
   <Toaster
+    position="top-right"
     theme="dark"
     rich-colors
     :toast-options="{

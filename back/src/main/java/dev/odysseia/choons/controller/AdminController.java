@@ -25,7 +25,8 @@ public class AdminController {
   @Autowired private AlbumService albumService;
   @Autowired private TrackService trackService;
 
-  // Artists
+  // ─── Artists ─────────────────────────────────────────────────────────────────
+
   @PostMapping("/artists")
   public ResponseEntity<ArtistResponse> createArtist(@RequestBody CreateArtistRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED).body(artistService.create(request));
@@ -36,7 +37,28 @@ public class AdminController {
     return ResponseEntity.ok(artistService.findAll());
   }
 
-  // Albums
+  @GetMapping("/artists/{id}")
+  public ResponseEntity<ArtistResponse> getArtist(@PathVariable UUID id) {
+    return ResponseEntity.ok(artistService.findById(id));
+  }
+
+  @PutMapping(value = "/artists/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ArtistResponse> updateArtist(
+          @PathVariable UUID id,
+          @RequestParam String name,
+          @RequestParam(required = false) String bio,
+          @RequestPart(value = "avatarFile", required = false) MultipartFile avatarFile) throws IOException {
+    return ResponseEntity.ok(artistService.update(id, name, bio, avatarFile));
+  }
+
+  @DeleteMapping("/artists/{id}/avatar")
+  public ResponseEntity<Void> deleteArtistAvatar(@PathVariable UUID id) {
+    artistService.deleteAvatar(id);
+    return ResponseEntity.noContent().build();
+  }
+
+  // ─── Albums ──────────────────────────────────────────────────────────────────
+
   @PostMapping("/albums")
   public ResponseEntity<AlbumResponse> createAlbum(@RequestBody CreateAlbumRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED).body(albumService.create(request));
@@ -50,7 +72,36 @@ public class AdminController {
     return ResponseEntity.ok(albums);
   }
 
-  // Tracks
+  @GetMapping("/albums/{id}")
+  public ResponseEntity<AlbumResponse> getAlbum(@PathVariable UUID id) {
+    return ResponseEntity.ok(albumService.findById(id));
+  }
+
+  @PutMapping(value = "/albums/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<AlbumResponse> updateAlbum(
+          @PathVariable UUID id,
+          @RequestParam String title,
+          @RequestParam UUID artistId,
+          @RequestParam int releaseYear,
+          @RequestPart(value = "coverFile", required = false) MultipartFile coverFile) throws IOException {
+    return ResponseEntity.ok(albumService.update(id, title, artistId, releaseYear, coverFile));
+  }
+
+  @DeleteMapping("/albums/{id}/cover")
+  public ResponseEntity<Void> deleteAlbumCover(@PathVariable UUID id) {
+    albumService.deleteCover(id);
+    return ResponseEntity.noContent().build();
+  }
+
+  @PutMapping("/albums/{albumId}/tracks")
+  public ResponseEntity<List<TrackResponse>> updateAlbumTracks(
+          @PathVariable UUID albumId,
+          @RequestBody List<UpdateTrackRequest> tracks) {
+    return ResponseEntity.ok(trackService.updateAll(albumId, tracks));
+  }
+
+  // ─── Tracks ──────────────────────────────────────────────────────────────────
+
   @PostMapping(value = "/tracks", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<TrackResponse> uploadTrack(
           @RequestParam String title,
@@ -80,5 +131,18 @@ public class AdminController {
             ? trackService.findByAlbum(albumId)
             : trackService.findAll();
     return ResponseEntity.ok(tracks);
+  }
+
+  @PutMapping("/tracks/{id}")
+  public ResponseEntity<TrackResponse> updateTrack(
+          @PathVariable UUID id,
+          @RequestBody UpdateTrackRequest request) {
+    return ResponseEntity.ok(trackService.update(id, request.title(), request.trackNumber()));
+  }
+
+  @DeleteMapping("/tracks/{id}")
+  public ResponseEntity<Void> deleteTrack(@PathVariable UUID id) {
+    trackService.delete(id);
+    return ResponseEntity.noContent().build();
   }
 }

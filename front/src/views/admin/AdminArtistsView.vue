@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getArtists, createArtist } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Pencil } from 'lucide-vue-next'
 
+const router = useRouter()
 const artists = ref<ArtistResponse[]>([])
 const name = ref('')
 const bio = ref('')
@@ -62,7 +65,16 @@ async function submit() {
       <div v-if="artists.length === 0" class="text-[13px] text-dimmed">No artists yet.</div>
       <div v-else class="item-list">
         <div v-for="a in artists" :key="a.id" class="list-item">
-          <span class="item-name">{{ a.name }}</span>
+          <div class="flex items-center justify-between gap-3">
+            <span class="item-name">{{ a.name }}</span>
+            <button
+              class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
+              title="Edit"
+              @click="router.push(`/admin/artists/${a.id}/edit`)"
+            >
+              <Pencil :size="14" />
+            </button>
+          </div>
           <span class="text-[13px] text-dimmed">{{ a.bio?.slice(0, 60) }}{{ (a.bio?.length ?? 0) > 60 ? '…' : '' }}</span>
         </div>
       </div>

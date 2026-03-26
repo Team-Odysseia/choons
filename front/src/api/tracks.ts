@@ -39,6 +39,14 @@ export const uploadTracks = (
     })
     .then((r) => r.data)
 
+export const updateAlbumTracks = (
+  albumId: string,
+  tracks: Array<{ id: string; title: string; trackNumber: number }>,
+) =>
+  client.put<TrackResponse[]>(`/admin/albums/${albumId}/tracks`, tracks).then((r) => r.data)
+
+export const deleteTrack = (id: string) => client.delete(`/admin/tracks/${id}`)
+
 export const streamUrl = (trackId: string) => {
   const token = localStorage.getItem('token')
   return `${import.meta.env.VITE_API_URL}/stream/${trackId}?token=${token}`

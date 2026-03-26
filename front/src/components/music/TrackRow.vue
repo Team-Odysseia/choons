@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { usePlaylistsStore } from '@/stores/playlists'
 import type { TrackResponse } from '@/api/types'
 import { Play, Plus } from 'lucide-vue-next'
+import AddToPlaylistDialog from './AddToPlaylistDialog.vue'
 
 const props = defineProps<{
   track: TrackResponse
@@ -13,8 +13,7 @@ const props = defineProps<{
 }>()
 
 const player = usePlayerStore()
-const playlists = usePlaylistsStore()
-const showMenu = ref(false)
+const dialogOpen = ref(false)
 
 function play() {
   player.playTrack(props.track, props.queue ?? [props.track], props.index ?? 0)
@@ -24,22 +23,6 @@ function formatDuration(secs: number) {
   const m = Math.floor(secs / 60)
   const s = secs % 60
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function openMenu() {
-  showMenu.value = true
-  setTimeout(() => {
-    document.addEventListener('click', closeMenu, { once: true })
-  }, 0)
-}
-
-function closeMenu() {
-  showMenu.value = false
-}
-
-async function addToPlaylist(playlistId: string) {
-  await playlists.addTrack(playlistId, props.track.id)
-  showMenu.value = false
 }
 
 const isActive = () => player.currentTrack?.id === props.track.id
@@ -70,32 +53,20 @@ const isActive = () => player.currentTrack?.id === props.track.id
         <Play :size="16" />
       </button>
 
-      <div v-if="showAddToPlaylist" class="relative">
-        <button
-          class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-          title="Add to playlist"
-          @click.stop="openMenu"
-        >
-          <Plus :size="16" />
-        </button>
-
-        <div
-          v-if="showMenu"
-          class="absolute right-0 bottom-full bg-muted border border-border rounded min-w-[160px] z-50 overflow-hidden"
-        >
-          <template v-if="playlists.playlists.length">
-            <button
-              v-for="pl in playlists.playlists"
-              :key="pl.id"
-              class="block w-full px-3.5 py-2.5 text-left text-[13px] hover:bg-card transition-colors"
-              @click="addToPlaylist(pl.id)"
-            >
-              {{ pl.name }}
-            </button>
-          </template>
-          <span v-else class="block px-3.5 py-2.5 text-[13px] text-dimmed">No playlists yet</span>
-        </div>
-      </div>
+      <button
+        v-if="showAddToPlaylist"
+        class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        title="Add to playlist"
+        @click.stop="dialogOpen = true"
+      >
+        <Plus :size="16" />
+      </button>
     </div>
   </div>
+
+  <AddToPlaylistDialog
+    :open="dialogOpen"
+    :tracks="[track]"
+    @close="dialogOpen = false"
+  />
 </template>

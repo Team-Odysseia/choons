@@ -2,18 +2,30 @@
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMusicStore } from '@/stores/music'
+import { artistImageUrl } from '@/api/artists'
+import { albumImageUrl } from '@/api/albums'
 
 const route = useRoute()
 const router = useRouter()
 const music = useMusicStore()
 
 onMounted(() => music.fetchArtist(route.params.id as string))
+
+function isNew(createdAt: string) {
+  return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
+}
 </script>
 
 <template>
   <div v-if="!music.loading && music.currentArtist">
     <div class="flex items-center gap-6 mb-8">
+      <img
+        v-if="music.currentArtist.avatarUrl"
+        :src="artistImageUrl(music.currentArtist.id)"
+        class="size-[120px] rounded-full object-cover shrink-0"
+      />
       <div
+        v-else
         class="size-[120px] rounded-full bg-muted flex items-center justify-center text-[56px] font-extrabold text-muted-foreground shrink-0"
       >
         {{ music.currentArtist.name[0]?.toUpperCase() }}
@@ -37,10 +49,22 @@ onMounted(() => music.fetchArtist(route.params.id as string))
         class="bg-card rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted"
         @click="router.push(`/library/albums/${album.id}`)"
       >
-        <div
-          class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[40px] mb-3"
-        >
-          ♪
+        <div class="relative mb-3">
+          <img
+            v-if="album.coverUrl"
+            :src="albumImageUrl(album.id)"
+            class="w-full aspect-square rounded object-cover"
+          />
+          <div
+            v-else
+            class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[40px]"
+          >
+            ♪
+          </div>
+          <span
+            v-if="isNew(album.createdAt)"
+            class="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded"
+          >NEW</span>
         </div>
         <div class="font-bold text-sm mb-1 truncate">{{ album.title }}</div>
         <div class="text-xs text-muted-foreground truncate">{{ album.releaseYear }}</div>

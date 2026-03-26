@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMusicStore } from '@/stores/music'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistsStore } from '@/stores/playlists'
 import TrackRow from '@/components/music/TrackRow.vue'
+import AddToPlaylistDialog from '@/components/music/AddToPlaylistDialog.vue'
 import { Button } from '@/components/ui/button'
-import { Play, Shuffle } from 'lucide-vue-next'
+import { Play, Shuffle, ListPlus } from 'lucide-vue-next'
+import { albumImageUrl } from '@/api/albums'
 
 const route = useRoute()
 const router = useRouter()
 const music = useMusicStore()
 const player = usePlayerStore()
 const playlists = usePlaylistsStore()
+
+const albumDialogOpen = ref(false)
 
 onMounted(async () => {
   await music.fetchAlbum(route.params.id as string)
@@ -23,7 +27,13 @@ onMounted(async () => {
 <template>
   <div v-if="!music.loading && music.currentAlbum">
     <div class="flex items-end gap-6 mb-8">
+      <img
+        v-if="music.currentAlbum.coverUrl"
+        :src="albumImageUrl(music.currentAlbum.id)"
+        class="size-[160px] rounded-lg object-cover shrink-0"
+      />
       <div
+        v-else
         class="size-[160px] bg-muted rounded-lg flex items-center justify-center text-[64px] shrink-0"
       >
         ♪
@@ -51,6 +61,14 @@ onMounted(async () => {
         <Shuffle :size="16" />
         Shuffle
       </Button>
+      <Button
+        variant="outline"
+        :disabled="music.currentAlbumTracks.length === 0"
+        @click="albumDialogOpen = true"
+      >
+        <ListPlus :size="16" />
+        Add to playlist
+      </Button>
     </div>
 
     <div v-if="music.currentAlbumTracks.length === 0" class="text-[13px] text-dimmed mt-6">
@@ -68,4 +86,10 @@ onMounted(async () => {
     </div>
   </div>
   <div v-else class="text-[13px] text-dimmed">Loading…</div>
+
+  <AddToPlaylistDialog
+    :open="albumDialogOpen"
+    :tracks="music.currentAlbumTracks"
+    @close="albumDialogOpen = false"
+  />
 </template>

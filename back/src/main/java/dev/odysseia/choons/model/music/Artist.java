@@ -29,6 +29,9 @@ public class Artist {
   @Column(columnDefinition = "TEXT")
   private String bio;
 
+  @Column
+  private String avatarKey;
+
   @CreationTimestamp
   @Column(updatable = false)
   private LocalDateTime createdAt;
