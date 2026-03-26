@@ -32,6 +32,9 @@ public class Album {
 
   private int releaseYear;
 
+  @Column
+  private String coverKey;
+
   @CreationTimestamp
   @Column(updatable = false)
   private LocalDateTime createdAt;

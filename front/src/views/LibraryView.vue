@@ -1,53 +1,150 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMusicStore } from '@/stores/music'
+import { usePlaylistsStore } from '@/stores/playlists'
+import { albumImageUrl } from '@/api/albums'
+import { artistImageUrl } from '@/api/artists'
 
-const music = useMusicStore()
 const router = useRouter()
+const music = useMusicStore()
+const playlists = usePlaylistsStore()
 
-onMounted(() => music.fetchArtists())
+const swiperRef = ref<HTMLElement | null>(null)
+
+const recentPlaylists = computed(() =>
+  [...playlists.playlists]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 4),
+)
+
+onMounted(() => Promise.all([
+  music.fetchArtists(),
+  music.fetchRecentAlbums(),
+  playlists.fetchMyPlaylists(),
+]))
+
+function isNew(createdAt: string) {
+  return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
+}
+
+function scrollSwiper(direction: 'left' | 'right') {
+  if (!swiperRef.value) return
+  swiperRef.value.scrollBy({ left: direction === 'left' ? -560 : 560, behavior: 'smooth' })
+}
 </script>
 
 <template>
-  <div>
-    <h1 class="page-title">Library</h1>
+  <div class="flex flex-col gap-10">
 
-    <div v-if="music.loading" class="text-muted">Loading…</div>
+    <!-- Playlists quick access -->
+    <section v-if="recentPlaylists.length > 0">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold">Your Playlists</h2>
+        <button
+          class="text-[13px] font-semibold text-dimmed hover:text-foreground transition-colors"
+          @click="router.push('/playlists')"
+        >See all</button>
+      </div>
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+        <div
+          v-for="pl in recentPlaylists"
+          :key="pl.id"
+          class="flex items-center gap-3 bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors group"
+          @click="router.push(`/playlists/${pl.id}`)"
+        >
+          <div class="size-10 bg-muted group-hover:bg-accent rounded flex items-center justify-center text-[18px] shrink-0 transition-colors">♫</div>
+          <div class="flex flex-col min-w-0">
+            <span class="text-[13px] font-semibold truncate">{{ pl.name }}</span>
+            <span class="text-[11px] text-dimmed">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <div v-else-if="music.artists.length === 0" class="text-muted">
-      No artists yet. Ask an admin to add some music.
-    </div>
+    <!-- Recently added albums swiper -->
+    <section v-if="music.recentAlbums.length > 0">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold">Recently Added</h2>
+        <div class="flex items-center gap-2">
+          <button
+            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
+            aria-label="Scroll left"
+            @click="scrollSwiper('left')"
+          >‹</button>
+          <button
+            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
+            aria-label="Scroll right"
+            @click="scrollSwiper('right')"
+          >›</button>
+          <button
+            class="text-[13px] font-semibold text-dimmed hover:text-foreground transition-colors ml-1"
+            @click="router.push('/library/albums')"
+          >See all albums</button>
+        </div>
+      </div>
+      <div ref="swiperRef" class="swiper-track flex gap-4 overflow-x-auto pb-2">
+        <div
+          v-for="album in music.recentAlbums"
+          :key="album.id"
+          class="shrink-0 w-[160px] bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
+          @click="router.push(`/library/albums/${album.id}`)"
+        >
+          <div class="relative mb-3">
+            <img
+              v-if="album.coverUrl"
+              :src="albumImageUrl(album.id)"
+              class="w-full aspect-square rounded object-cover"
+            />
+            <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[36px]">
+              ♪
+            </div>
+            <span
+              v-if="isNew(album.createdAt)"
+              class="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded"
+            >NEW</span>
+          </div>
+          <div class="font-bold text-sm truncate">{{ album.title }}</div>
+          <div class="text-xs text-muted-foreground truncate mt-0.5">{{ album.artist.name }}</div>
+        </div>
+      </div>
+    </section>
 
-    <div v-else>
-      <h2 class="section-title">Artists</h2>
-      <div class="grid-cards">
+    <!-- Artists -->
+    <section>
+      <h2 class="text-lg font-bold mb-4">Artists</h2>
+      <div v-if="music.loading" class="text-[13px] text-dimmed">Loading…</div>
+      <div v-else-if="music.artists.length === 0" class="text-[13px] text-dimmed">
+        No artists yet. Ask an admin to add some music.
+      </div>
+      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
         <div
           v-for="artist in music.artists"
           :key="artist.id"
-          class="card"
+          class="bg-card rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted"
           @click="router.push(`/library/artists/${artist.id}`)"
         >
-          <div class="artist-avatar">{{ artist.name[0]?.toUpperCase() }}</div>
-          <div class="card-title">{{ artist.name }}</div>
+          <img
+            v-if="artist.avatarUrl"
+            :src="artistImageUrl(artist.id)"
+            class="w-full aspect-square rounded-full object-cover mb-3"
+          />
+          <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[40px] font-extrabold text-muted-foreground mb-3">
+            {{ artist.name[0]?.toUpperCase() }}
+          </div>
+          <div class="font-bold text-sm mb-1 truncate">{{ artist.name }}</div>
         </div>
       </div>
-    </div>
+    </section>
+
   </div>
 </template>
 
 <style scoped>
-.artist-avatar {
-  width: 100%;
-  aspect-ratio: 1;
-  background: var(--bg-elevated);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  font-weight: 800;
-  color: var(--text-secondary);
-  margin-bottom: 12px;
+.swiper-track {
+  scrollbar-width: none;
+}
+.swiper-track::-webkit-scrollbar {
+  display: none;
 }
 </style>

@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMusicStore } from '@/stores/music'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistsStore } from '@/stores/playlists'
 import TrackRow from '@/components/music/TrackRow.vue'
+import AddToPlaylistDialog from '@/components/music/AddToPlaylistDialog.vue'
+import { Button } from '@/components/ui/button'
+import { Play, Shuffle, ListPlus } from 'lucide-vue-next'
+import { albumImageUrl } from '@/api/albums'
 
 const route = useRoute()
 const router = useRouter()
 const music = useMusicStore()
 const player = usePlayerStore()
 const playlists = usePlaylistsStore()
+
+const albumDialogOpen = ref(false)
 
 onMounted(async () => {
   await music.fetchAlbum(route.params.id as string)
@@ -20,34 +26,55 @@ onMounted(async () => {
 
 <template>
   <div v-if="!music.loading && music.currentAlbum">
-    <div class="album-header">
-      <div class="album-cover-lg">♪</div>
+    <div class="flex items-end gap-6 mb-8">
+      <img
+        v-if="music.currentAlbum.coverUrl"
+        :src="albumImageUrl(music.currentAlbum.id)"
+        class="size-[160px] rounded-lg object-cover shrink-0"
+      />
+      <div
+        v-else
+        class="size-[160px] bg-muted rounded-lg flex items-center justify-center text-[64px] shrink-0"
+      >
+        ♪
+      </div>
       <div>
-        <div class="album-label">Album</div>
-        <h1 class="page-title" style="margin-bottom: 4px">{{ music.currentAlbum.title }}</h1>
-        <div class="album-meta">
+        <div class="text-xs font-bold uppercase tracking-widest text-dimmed mb-1">Album</div>
+        <h1 class="text-[28px] font-extrabold mb-1">{{ music.currentAlbum.title }}</h1>
+        <div class="text-sm mt-2">
           <span
-            class="album-artist-link"
+            class="font-semibold cursor-pointer hover:underline"
             @click="router.push(`/library/artists/${music.currentAlbum.artist.id}`)"
           >{{ music.currentAlbum.artist.name }}</span>
-          <span class="text-muted"> · {{ music.currentAlbum.releaseYear }}</span>
-          <span class="text-muted"> · {{ music.currentAlbumTracks.length }} tracks</span>
+          <span class="text-[13px] text-dimmed"> · {{ music.currentAlbum.releaseYear }}</span>
+          <span class="text-[13px] text-dimmed"> · {{ music.currentAlbumTracks.length }} tracks</span>
         </div>
       </div>
     </div>
 
-    <div class="album-actions">
-      <button class="btn btn-primary" @click="player.playQueue(music.currentAlbumTracks)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    <div class="flex items-center gap-2 mb-6">
+      <Button @click="player.playQueue(music.currentAlbumTracks)">
+        <Play :size="16" />
         Play all
-      </button>
+      </Button>
+      <Button variant="outline" @click="player.playQueueShuffled(music.currentAlbumTracks)">
+        <Shuffle :size="16" />
+        Shuffle
+      </Button>
+      <Button
+        variant="outline"
+        :disabled="music.currentAlbumTracks.length === 0"
+        @click="albumDialogOpen = true"
+      >
+        <ListPlus :size="16" />
+        Add to playlist
+      </Button>
     </div>
 
-    <div v-if="music.currentAlbumTracks.length === 0" class="text-muted" style="margin-top: 24px">
+    <div v-if="music.currentAlbumTracks.length === 0" class="text-[13px] text-dimmed mt-6">
       No tracks in this album yet.
     </div>
-
-    <div v-else class="track-list">
+    <div v-else class="mt-2">
       <TrackRow
         v-for="(track, i) in music.currentAlbumTracks"
         :key="track.id"
@@ -58,55 +85,11 @@ onMounted(async () => {
       />
     </div>
   </div>
-  <div v-else class="text-muted">Loading…</div>
+  <div v-else class="text-[13px] text-dimmed">Loading…</div>
+
+  <AddToPlaylistDialog
+    :open="albumDialogOpen"
+    :tracks="music.currentAlbumTracks"
+    @close="albumDialogOpen = false"
+  />
 </template>
-
-<style scoped>
-.album-header {
-  display: flex;
-  align-items: flex-end;
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.album-cover-lg {
-  width: 160px;
-  height: 160px;
-  background: var(--bg-elevated);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 64px;
-  flex-shrink: 0;
-}
-
-.album-label {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.album-meta {
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-.album-artist-link {
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.album-artist-link:hover { text-decoration: underline; }
-
-.album-actions {
-  margin-bottom: 24px;
-}
-
-.track-list {
-  margin-top: 8px;
-}
-</style>

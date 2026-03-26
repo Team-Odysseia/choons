@@ -25,6 +25,11 @@ const router = createRouter({
           component: () => import('@/views/LibraryView.vue'),
         },
         {
+          path: 'albums',
+          name: 'all-albums',
+          component: () => import('@/views/AllAlbumsView.vue'),
+        },
+        {
           path: 'artists/:id',
           name: 'artist',
           component: () => import('@/views/ArtistView.vue'),
@@ -73,14 +78,19 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminArtistsView.vue'),
         },
         {
+          path: 'artists/:id/edit',
+          name: 'admin-artist-edit',
+          component: () => import('@/views/admin/AdminArtistEditView.vue'),
+        },
+        {
           path: 'albums',
           name: 'admin-albums',
           component: () => import('@/views/admin/AdminAlbumsView.vue'),
         },
         {
-          path: 'tracks',
-          name: 'admin-tracks',
-          component: () => import('@/views/admin/AdminTracksView.vue'),
+          path: 'albums/:id/edit',
+          name: 'admin-album-edit',
+          component: () => import('@/views/admin/AdminAlbumEditView.vue'),
         },
       ],
     },

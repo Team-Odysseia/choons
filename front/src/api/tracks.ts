@@ -24,6 +24,29 @@ export const uploadTrack = (
     })
     .then((r) => r.data)
 
+export const uploadTracks = (
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+) =>
+  client
+    .post<TrackResponse[]>('/admin/tracks/batch', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (e) => {
+        if (onProgress && e.total) {
+          onProgress(Math.round((e.loaded * 100) / e.total))
+        }
+      },
+    })
+    .then((r) => r.data)
+
+export const updateAlbumTracks = (
+  albumId: string,
+  tracks: Array<{ id: string; title: string; trackNumber: number }>,
+) =>
+  client.put<TrackResponse[]>(`/admin/albums/${albumId}/tracks`, tracks).then((r) => r.data)
+
+export const deleteTrack = (id: string) => client.delete(`/admin/tracks/${id}`)
+
 export const streamUrl = (trackId: string) => {
   const token = localStorage.getItem('token')
   return `${import.meta.env.VITE_API_URL}/stream/${trackId}?token=${token}`

@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { registerListener } from '@/api/auth'
-import type { UserResponse } from '@/api/types'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
-const error = ref('')
-const created = ref<UserResponse | null>(null)
 
 async function submit() {
-  error.value = ''
-  created.value = null
   loading.value = true
   try {
-    created.value = await registerListener(username.value, password.value)
+    const created = await registerListener(username.value, password.value)
     username.value = ''
     password.value = ''
+    toast.success(`Listener "${created.username}" created successfully`)
   } catch (e: any) {
-    error.value = e.response?.data?.error ?? 'Failed to create listener'
+    toast.error(e.response?.data?.error ?? 'Failed to create listener')
   } finally {
     loading.value = false
   }
@@ -27,27 +27,20 @@ async function submit() {
 
 <template>
   <div>
-    <h1 class="page-title">Register Listener</h1>
+    <h1 class="text-[28px] font-extrabold mb-6">Register Listener</h1>
 
     <form class="admin-form" @submit.prevent="submit">
       <div class="form-group">
-        <label for="username">Username</label>
-        <input id="username" v-model="username" class="form-input" required />
+        <Label for="username">Username</Label>
+        <Input id="username" v-model="username" required />
       </div>
       <div class="form-group">
-        <label for="password">Password</label>
-        <input id="password" v-model="password" class="form-input" type="password" required />
+        <Label for="password">Password</Label>
+        <Input id="password" v-model="password" type="password" required />
       </div>
-
-      <p v-if="error" class="error-msg">{{ error }}</p>
-
-      <div v-if="created" class="success-msg">
-        Listener <strong>{{ created.username }}</strong> created successfully.
-      </div>
-
-      <button type="submit" class="btn btn-primary" :disabled="loading">
+      <Button type="submit" :disabled="loading">
         {{ loading ? 'Creating…' : 'Create listener' }}
-      </button>
+      </Button>
     </form>
   </div>
 </template>
@@ -60,12 +53,9 @@ async function submit() {
   gap: 16px;
 }
 
-.success-msg {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--accent);
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 </style>

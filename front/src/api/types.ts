@@ -15,6 +15,7 @@ export interface ArtistResponse {
   name: string
   bio: string | null
   createdAt: string
+  avatarUrl: string | null
 }
 
 export interface AlbumResponse {
@@ -23,6 +24,7 @@ export interface AlbumResponse {
   artist: ArtistResponse
   releaseYear: number
   createdAt: string
+  coverUrl: string | null
 }
 
 export interface TrackResponse {
