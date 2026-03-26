@@ -77,11 +77,6 @@ const router = createRouter({
           name: 'admin-albums',
           component: () => import('@/views/admin/AdminAlbumsView.vue'),
         },
-        {
-          path: 'tracks',
-          name: 'admin-tracks',
-          component: () => import('@/views/admin/AdminTracksView.vue'),
-        },
       ],
     },
   ],

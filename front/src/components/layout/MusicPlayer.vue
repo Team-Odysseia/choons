@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
+import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2 } from 'lucide-vue-next'
 
 const player = usePlayerStore()
 
@@ -45,36 +46,49 @@ function onVolume(e: Event) {
 
     <!-- Controls -->
     <div class="flex flex-col items-center gap-1.5">
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <!-- Shuffle -->
+        <button
+          class="size-8 flex items-center justify-center transition-colors"
+          :class="player.isShuffled ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+          title="Shuffle"
+          @click="player.toggleShuffle()"
+        >
+          <Shuffle :size="18" />
+        </button>
+
         <button
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           :disabled="!player.hasPrev"
           @click="player.playPrev()"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
-          </svg>
+          <SkipBack :size="20" />
         </button>
         <button
           class="size-[34px] rounded-full bg-foreground text-black flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed"
           :disabled="!player.currentTrack"
           @click="player.togglePlay()"
         >
-          <svg v-if="!player.isPlaying" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
+          <Play v-if="!player.isPlaying" :size="20" />
+          <Pause v-else :size="20" />
         </button>
         <button
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           :disabled="!player.hasNext"
           @click="player.playNext()"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z" />
-          </svg>
+          <SkipForward :size="20" />
+        </button>
+
+        <!-- Loop -->
+        <button
+          class="size-8 flex items-center justify-center transition-colors relative"
+          :class="player.loopMode !== 'none' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+          :title="player.loopMode === 'none' ? 'Loop off' : player.loopMode === 'queue' ? 'Loop queue' : 'Loop track'"
+          @click="player.cycleLoop()"
+        >
+          <Repeat1 v-if="player.loopMode === 'track'" :size="18" />
+          <Repeat v-else :size="18" />
         </button>
       </div>
 
@@ -98,9 +112,7 @@ function onVolume(e: Event) {
       @mouseenter="showVolumeLabel = true"
       @mouseleave="showVolumeLabel = false"
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-dimmed shrink-0">
-        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
-      </svg>
+      <Volume2 :size="16" class="text-dimmed shrink-0" />
       <input
         type="range"
         class="w-[90px] range-input"

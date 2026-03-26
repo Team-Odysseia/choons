@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { Library, ListMusic, LogOut } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -23,9 +24,7 @@ function logout() {
             to="/library"
             class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 3l9 7.5V21h-6v-5H9v5H3V10.5L12 3z" />
-            </svg>
+            <Library :size="20" />
             Library
           </RouterLink>
         </li>
@@ -34,9 +33,7 @@ function logout() {
             to="/playlists"
             class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h12v2H3z" />
-            </svg>
+            <ListMusic :size="20" />
             Playlists
           </RouterLink>
         </li>
@@ -53,7 +50,6 @@ function logout() {
             { to: '/admin/listeners', label: 'Listeners' },
             { to: '/admin/artists', label: 'Artists' },
             { to: '/admin/albums', label: 'Albums' },
-            { to: '/admin/tracks', label: 'Tracks' },
           ]" :key="to">
             <RouterLink
               :to="to"
@@ -74,9 +70,7 @@ function logout() {
         class="flex items-center gap-1.5 text-[12px] font-semibold text-dimmed hover:text-destructive transition-colors shrink-0"
         @click="logout"
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zm5-9H11v2h10v14H11v2h12V4z" />
-        </svg>
+        <LogOut :size="15" />
         Log out
       </button>
     </div>

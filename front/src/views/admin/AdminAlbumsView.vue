@@ -3,10 +3,20 @@ import { ref, onMounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { getArtists } from '@/api/artists'
 import { getAlbums, createAlbum } from '@/api/albums'
+import { uploadTrack } from '@/api/tracks'
 import type { ArtistResponse, AlbumResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import draggable from 'vuedraggable'
+import { GripVertical, X, Music } from 'lucide-vue-next'
+
+interface PendingTrack {
+  uid: string
+  file: File
+  title: string
+  durationSeconds: number
+}
 
 const artists = ref<ArtistResponse[]>([])
 const albums = ref<AlbumResponse[]>([])
@@ -14,25 +24,113 @@ const title = ref('')
 const artistId = ref('')
 const releaseYear = ref(new Date().getFullYear())
 const loading = ref(false)
+const uploadProgress = ref(0)
+const uploadStatus = ref('')
+
+const pendingTracks = ref<PendingTrack[]>([])
+const isDragOver = ref(false)
 
 onMounted(async () => {
   artists.value = await getArtists()
   albums.value = await getAlbums()
 })
 
+function formatDuration(secs: number) {
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function stripExtension(name: string) {
+  return name.replace(/\.[^/.]+$/, '')
+}
+
+function getAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const audio = new Audio(url)
+    audio.addEventListener('loadedmetadata', () => {
+      resolve(Math.round(audio.duration))
+      URL.revokeObjectURL(url)
+    })
+    audio.addEventListener('error', () => {
+      resolve(0)
+      URL.revokeObjectURL(url)
+    })
+  })
+}
+
+async function addFiles(files: FileList | File[]) {
+  const audioTypes = ['audio/mpeg', 'audio/ogg', 'audio/flac', 'audio/wav', 'audio/x-flac', 'audio/aac']
+  for (const file of Array.from(files)) {
+    if (!audioTypes.includes(file.type)) continue
+    const durationSeconds = await getAudioDuration(file)
+    pendingTracks.value.push({
+      uid: crypto.randomUUID(),
+      file,
+      title: stripExtension(file.name),
+      durationSeconds,
+    })
+  }
+}
+
+function onDropZoneChange(e: Event) {
+  const files = (e.target as HTMLInputElement).files
+  if (files) addFiles(files)
+}
+
+function onDrop(e: DragEvent) {
+  isDragOver.value = false
+  if (e.dataTransfer?.files) addFiles(e.dataTransfer.files)
+}
+
+function removeTrack(uid: string) {
+  pendingTracks.value = pendingTracks.value.filter((t) => t.uid !== uid)
+}
+
 async function submit() {
+  if (!title.value || !artistId.value) {
+    toast.error('Please fill in all album fields')
+    return
+  }
   loading.value = true
+  uploadProgress.value = 0
   try {
-    const created = await createAlbum(title.value, artistId.value, releaseYear.value)
-    albums.value.unshift(created)
+    const album = await createAlbum(title.value, artistId.value, releaseYear.value)
+
+    if (pendingTracks.value.length > 0) {
+      const total = pendingTracks.value.length
+      for (let i = 0; i < total; i++) {
+        const pt = pendingTracks.value[i]
+        uploadStatus.value = `Uploading track ${i + 1} of ${total}…`
+        uploadProgress.value = 0
+        const formData = new FormData()
+        formData.append('title', pt.title)
+        formData.append('albumId', album.id)
+        formData.append('artistId', artistId.value)
+        formData.append('trackNumber', String(i + 1))
+        formData.append('durationSeconds', String(pt.durationSeconds))
+        formData.append('audioFile', pt.file)
+        await uploadTrack(formData, (pct) => {
+          uploadProgress.value = pct
+        })
+      }
+      toast.success(`"${album.title}" created with ${total} track${total !== 1 ? 's' : ''}`)
+    } else {
+      toast.success(`Album "${album.title}" created`)
+    }
+
+    albums.value.unshift(album)
     title.value = ''
     artistId.value = ''
     releaseYear.value = new Date().getFullYear()
-    toast.success(`Album "${created.title}" created successfully`)
+    pendingTracks.value = []
   } catch (e: any) {
     toast.error(e.response?.data?.error ?? 'Failed to create album')
   } finally {
     loading.value = false
+    uploadProgress.value = 0
+    uploadStatus.value = ''
   }
 }
 </script>
@@ -43,6 +141,8 @@ async function submit() {
 
     <form class="admin-form" @submit.prevent="submit">
       <h2 class="text-lg font-bold mb-4">Add Album</h2>
+
+      <!-- Album fields -->
       <div class="form-group">
         <Label>Title</Label>
         <Input v-model="title" required />
@@ -68,11 +168,81 @@ async function submit() {
           required
         />
       </div>
+
+      <!-- Drop zone -->
+      <div class="form-group">
+        <Label>Tracks</Label>
+        <div
+          class="relative flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed px-4 py-8 text-center transition-colors cursor-pointer"
+          :class="isDragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'"
+          @dragover.prevent="isDragOver = true"
+          @dragleave.prevent="isDragOver = false"
+          @drop.prevent="onDrop"
+          @click="($refs.fileInput as HTMLInputElement).click()"
+        >
+          <Music :size="28" class="text-dimmed" />
+          <span class="text-[13px] text-muted-foreground">Drop audio files here, or click to browse</span>
+          <span class="text-[11px] text-dimmed">MP3, FLAC, OGG, WAV, AAC</span>
+          <input
+            ref="fileInput"
+            type="file"
+            accept="audio/mpeg,audio/ogg,audio/flac,audio/wav,audio/aac"
+            multiple
+            class="hidden"
+            @change="onDropZoneChange"
+          />
+        </div>
+      </div>
+
+      <!-- Pending track list -->
+      <div v-if="pendingTracks.length > 0" class="flex flex-col gap-1">
+        <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 pb-1 border-b border-border">
+          <span class="text-[11px] text-dimmed text-right">#</span>
+          <span></span>
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed">Title</span>
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed text-right">Time</span>
+          <span></span>
+        </div>
+
+        <draggable v-model="pendingTracks" item-key="uid" handle=".drag-handle">
+          <template #item="{ element, index }">
+            <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 group">
+              <span class="text-[12px] text-dimmed text-right">{{ index + 1 }}</span>
+              <GripVertical :size="14" class="drag-handle text-dimmed cursor-grab active:cursor-grabbing" />
+              <input
+                v-model="element.title"
+                class="bg-transparent border-none outline-none text-[13px] font-medium text-foreground w-full focus:bg-muted rounded px-1 -mx-1"
+              />
+              <span class="text-[12px] text-dimmed text-right">{{ formatDuration(element.durationSeconds) }}</span>
+              <button
+                type="button"
+                class="flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
+                @click="removeTrack(element.uid)"
+              >
+                <X :size="14" />
+              </button>
+            </div>
+          </template>
+        </draggable>
+      </div>
+
+      <!-- Upload progress -->
+      <div v-if="loading && uploadStatus" class="flex flex-col gap-1.5">
+        <span class="text-[13px] text-dimmed">{{ uploadStatus }}</span>
+        <div class="progress-wrap">
+          <div class="progress-bar-outer">
+            <div class="progress-bar-inner" :style="{ width: uploadProgress + '%' }" />
+          </div>
+          <span class="text-[13px] text-dimmed">{{ uploadProgress }}%</span>
+        </div>
+      </div>
+
       <Button type="submit" :disabled="loading">
-        {{ loading ? 'Adding…' : 'Add album' }}
+        {{ loading ? (uploadProgress > 0 ? 'Uploading…' : 'Creating…') : 'Create Album' }}
       </Button>
     </form>
 
+    <!-- Albums list -->
     <div class="list-section">
       <h2 class="text-lg font-bold mb-4">All Albums</h2>
       <div v-if="albums.length === 0" class="text-[13px] text-dimmed">No albums yet.</div>
@@ -88,7 +258,7 @@ async function submit() {
 
 <style scoped>
 .admin-form {
-  max-width: 440px;
+  max-width: 500px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -102,6 +272,10 @@ async function submit() {
 }
 
 select option { background: var(--muted); }
+
+.progress-wrap { display: flex; align-items: center; gap: 10px; }
+.progress-bar-outer { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.progress-bar-inner { height: 100%; background: var(--primary); transition: width 0.2s; }
 
 .list-section { margin-top: 8px; }
 .item-list { display: flex; flex-direction: column; gap: 4px; }

@@ -6,6 +6,7 @@ import { usePlayerStore } from '@/stores/player'
 import { usePlaylistsStore } from '@/stores/playlists'
 import TrackRow from '@/components/music/TrackRow.vue'
 import { Button } from '@/components/ui/button'
+import { Play, Shuffle } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,12 +42,14 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="mb-6">
+    <div class="flex items-center gap-2 mb-6">
       <Button @click="player.playQueue(music.currentAlbumTracks)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z" />
-        </svg>
+        <Play :size="16" />
         Play all
+      </Button>
+      <Button variant="outline" @click="player.playQueueShuffled(music.currentAlbumTracks)">
+        <Shuffle :size="16" />
+        Shuffle
       </Button>
     </div>
 

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistsStore } from '@/stores/playlists'
 import type { TrackResponse } from '@/api/types'
+import { Play, Plus } from 'lucide-vue-next'
 
 const props = defineProps<{
   track: TrackResponse
@@ -66,9 +67,7 @@ const isActive = () => player.currentTrack?.id === props.track.id
         title="Play"
         @click.stop="play"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z" />
-        </svg>
+        <Play :size="16" />
       </button>
 
       <div v-if="showAddToPlaylist" class="relative">
@@ -77,9 +76,7 @@ const isActive = () => player.currentTrack?.id === props.track.id
           title="Add to playlist"
           @click.stop="openMenu"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-          </svg>
+          <Plus :size="16" />
         </button>
 
         <div

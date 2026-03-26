@@ -8,6 +8,7 @@ import type { ArtistResponse, AlbumResponse, TrackResponse } from '@/api/types'
 export const useMusicStore = defineStore('music', () => {
   const artists = ref<ArtistResponse[]>([])
   const albums = ref<AlbumResponse[]>([])
+  const recentTracks = ref<TrackResponse[]>([])
   const currentArtist = ref<ArtistResponse | null>(null)
   const currentAlbum = ref<AlbumResponse | null>(null)
   const currentAlbumTracks = ref<TrackResponse[]>([])
@@ -20,6 +21,13 @@ export const useMusicStore = defineStore('music', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  async function fetchRecentTracks() {
+    const all = await getTracks()
+    recentTracks.value = [...all]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10)
   }
 
   async function fetchArtist(id: string) {
@@ -45,11 +53,13 @@ export const useMusicStore = defineStore('music', () => {
   return {
     artists,
     albums,
+    recentTracks,
     currentArtist,
     currentAlbum,
     currentAlbumTracks,
     loading,
     fetchArtists,
+    fetchRecentTracks,
     fetchArtist,
     fetchAlbum,
   }

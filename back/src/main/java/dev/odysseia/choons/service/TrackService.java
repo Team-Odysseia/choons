@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -70,6 +71,22 @@ public class TrackService {
     Track track = trackRepository.save(saved);
 
     return toResponse(track);
+  }
+
+  public List<TrackResponse> uploadBatch(UUID albumId, UUID artistId,
+                                          List<String> titles,
+                                          List<Integer> durations,
+                                          List<MultipartFile> files) throws IOException {
+    if (files.size() != titles.size() || files.size() != durations.size()) {
+      throw new IllegalArgumentException(
+        "Mismatched batch upload lists: files=" + files.size() +
+        " titles=" + titles.size() + " durations=" + durations.size());
+    }
+    List<TrackResponse> results = new ArrayList<>();
+    for (int i = 0; i < files.size(); i++) {
+      results.add(upload(titles.get(i), albumId, artistId, i + 1, durations.get(i), files.get(i)));
+    }
+    return results;
   }
 
   public List<TrackResponse> findByAlbum(UUID albumId) {

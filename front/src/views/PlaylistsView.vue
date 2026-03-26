@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Trash2 } from 'lucide-vue-next'
 
 const router = useRouter()
 const playlists = usePlaylistsStore()
@@ -75,11 +76,7 @@ async function remove(id: string, name: string) {
           title="Delete"
           @click.stop="remove(pl.id, pl.name)"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7z"
-            />
-          </svg>
+          <Trash2 :size="16" />
         </button>
       </div>
     </div>

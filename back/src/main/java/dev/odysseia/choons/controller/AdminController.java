@@ -63,6 +63,17 @@ public class AdminController {
             .body(trackService.upload(title, albumId, artistId, trackNumber, durationSeconds, audioFile));
   }
 
+  @PostMapping(value = "/tracks/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<List<TrackResponse>> uploadBatch(
+          @RequestParam UUID albumId,
+          @RequestParam UUID artistId,
+          @RequestParam List<String> titles,
+          @RequestParam List<Integer> durations,
+          @RequestParam("files") List<MultipartFile> files) throws IOException {
+    return ResponseEntity.status(HttpStatus.CREATED)
+            .body(trackService.uploadBatch(albumId, artistId, titles, durations, files));
+  }
+
   @GetMapping("/tracks")
   public ResponseEntity<List<TrackResponse>> listTracks(@RequestParam(required = false) UUID albumId) {
     List<TrackResponse> tracks = albumId != null
