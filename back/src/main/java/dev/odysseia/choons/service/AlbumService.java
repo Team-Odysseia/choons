@@ -1,7 +1,6 @@
 package dev.odysseia.choons.service;
 
 import dev.odysseia.choons.dto.AlbumResponse;
-import dev.odysseia.choons.dto.CreateAlbumRequest;
 import dev.odysseia.choons.model.music.Album;
 import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.repository.AlbumRepository;
@@ -30,14 +29,27 @@ public class AlbumService {
   @Autowired private ArtistService artistService;
   @Autowired private R2Service r2Service;
 
-  public AlbumResponse create(CreateAlbumRequest request) {
-    Artist artist = artistRepository.findById(request.artistId())
-            .orElseThrow(() -> new NoSuchElementException("Artist not found: " + request.artistId()));
+  public AlbumResponse create(String title, UUID artistId, int releaseYear, MultipartFile coverFile) throws IOException {
+    Artist artist = artistRepository.findById(artistId)
+            .orElseThrow(() -> new NoSuchElementException("Artist not found: " + artistId));
     Album album = albumRepository.save(Album.builder()
-            .title(request.title())
+            .title(title)
             .artist(artist)
-            .releaseYear(request.releaseYear())
+            .releaseYear(releaseYear)
             .build());
+
+    if (coverFile != null && !coverFile.isEmpty()) {
+      String contentType = coverFile.getContentType();
+      if (contentType == null || !ALLOWED_IMAGE_TYPES.containsKey(contentType)) {
+        throw new IllegalArgumentException("Unsupported image type: " + contentType);
+      }
+      String ext = ALLOWED_IMAGE_TYPES.get(contentType);
+      String key = "images/albums/" + album.getId() + "." + ext;
+      r2Service.upload(key, coverFile.getInputStream(), coverFile.getSize(), contentType);
+      album.setCoverKey(key);
+      album = albumRepository.save(album);
+    }
+
     return toResponse(album);
   }
 

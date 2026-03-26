@@ -9,6 +9,7 @@ import type { ArtistResponse, AlbumResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import ImageUpload from '@/components/admin/ImageUpload.vue'
 import draggable from 'vuedraggable'
 import { GripVertical, X, Music, Pencil } from 'lucide-vue-next'
 
@@ -31,6 +32,8 @@ const uploadStatus = ref('')
 
 const pendingTracks = ref<PendingTrack[]>([])
 const isDragOver = ref(false)
+const pendingCover = ref<File | null>(null)
+const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
 
 onMounted(async () => {
   artists.value = await getArtists()
@@ -98,7 +101,7 @@ async function submit() {
   loading.value = true
   uploadProgress.value = 0
   try {
-    const album = await createAlbum(title.value, artistId.value, releaseYear.value)
+    const album = await createAlbum(title.value, artistId.value, releaseYear.value, pendingCover.value)
 
     if (pendingTracks.value.length > 0) {
       const total = pendingTracks.value.length
@@ -127,6 +130,8 @@ async function submit() {
     artistId.value = ''
     releaseYear.value = new Date().getFullYear()
     pendingTracks.value = []
+    pendingCover.value = null
+    imageUploadRef.value?.reset()
   } catch (e: any) {
     toast.error(e.response?.data?.error ?? 'Failed to create album')
   } finally {
@@ -168,6 +173,16 @@ async function submit() {
           min="1900"
           :max="new Date().getFullYear() + 2"
           required
+        />
+      </div>
+
+      <!-- Cover image -->
+      <div class="form-group">
+        <ImageUpload
+          ref="imageUploadRef"
+          label="Cover"
+          @select="pendingCover = $event"
+          @remove="pendingCover = null"
         />
       </div>
 

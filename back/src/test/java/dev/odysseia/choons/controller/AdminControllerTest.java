@@ -99,6 +99,62 @@ class AdminControllerTest {
         userRepository.deleteAll();
     }
 
+    // ─── POST /admin/artists ──────────────────────────────────────────────────
+
+    @Test
+    void createArtist_returnsCreatedWithNameAndNullAvatarUrl() throws Exception {
+        mockMvc.perform(multipart("/admin/artists")
+                        .param("name", "New Artist")
+                        .param("bio", "Some bio")
+                        .header("Authorization", adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("New Artist"))
+                .andExpect(jsonPath("$.avatarUrl").isEmpty());
+    }
+
+    @Test
+    void createArtist_withAvatar_returnsAvatarUrl() throws Exception {
+        MockMultipartFile img = new MockMultipartFile(
+                "avatarFile", "avatar.jpg", "image/jpeg", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/admin/artists")
+                        .file(img)
+                        .param("name", "Artist With Avatar")
+                        .param("bio", "")
+                        .header("Authorization", adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.avatarUrl").isNotEmpty());
+    }
+
+    // ─── POST /admin/albums ───────────────────────────────────────────────────
+
+    @Test
+    void createAlbum_returnsCreatedWithTitleAndNullCoverUrl() throws Exception {
+        mockMvc.perform(multipart("/admin/albums")
+                        .param("title", "New Album")
+                        .param("artistId", artist.getId().toString())
+                        .param("releaseYear", "2025")
+                        .header("Authorization", adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("New Album"))
+                .andExpect(jsonPath("$.coverUrl").isEmpty());
+    }
+
+    @Test
+    void createAlbum_withCover_returnsCoverUrl() throws Exception {
+        MockMultipartFile img = new MockMultipartFile(
+                "coverFile", "cover.png", "image/png", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/admin/albums")
+                        .file(img)
+                        .param("title", "Album With Cover")
+                        .param("artistId", artist.getId().toString())
+                        .param("releaseYear", "2025")
+                        .header("Authorization", adminToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.coverUrl").isNotEmpty());
+    }
+
     // ─── Auth guard ───────────────────────────────────────────────────────────
 
     @Test

@@ -1,7 +1,6 @@
 package dev.odysseia.choons.service;
 
 import dev.odysseia.choons.dto.ArtistResponse;
-import dev.odysseia.choons.dto.CreateArtistRequest;
 import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.repository.ArtistRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,11 +25,24 @@ public class ArtistService {
   @Autowired private ArtistRepository artistRepository;
   @Autowired private R2Service r2Service;
 
-  public ArtistResponse create(CreateArtistRequest request) {
+  public ArtistResponse create(String name, String bio, MultipartFile avatarFile) throws IOException {
     Artist artist = artistRepository.save(Artist.builder()
-            .name(request.name())
-            .bio(request.bio())
+            .name(name)
+            .bio(bio)
             .build());
+
+    if (avatarFile != null && !avatarFile.isEmpty()) {
+      String contentType = avatarFile.getContentType();
+      if (contentType == null || !ALLOWED_IMAGE_TYPES.containsKey(contentType)) {
+        throw new IllegalArgumentException("Unsupported image type: " + contentType);
+      }
+      String ext = ALLOWED_IMAGE_TYPES.get(contentType);
+      String key = "images/artists/" + artist.getId() + "." + ext;
+      r2Service.upload(key, avatarFile.getInputStream(), avatarFile.getSize(), contentType);
+      artist.setAvatarKey(key);
+      artist = artistRepository.save(artist);
+    }
+
     return toResponse(artist);
   }
 

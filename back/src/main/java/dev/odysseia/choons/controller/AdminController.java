@@ -1,6 +1,9 @@
 package dev.odysseia.choons.controller;
 
-import dev.odysseia.choons.dto.*;
+import dev.odysseia.choons.dto.AlbumResponse;
+import dev.odysseia.choons.dto.ArtistResponse;
+import dev.odysseia.choons.dto.TrackResponse;
+import dev.odysseia.choons.dto.UpdateTrackRequest;
 import dev.odysseia.choons.service.AlbumService;
 import dev.odysseia.choons.service.ArtistService;
 import dev.odysseia.choons.service.TrackService;
@@ -27,9 +30,12 @@ public class AdminController {
 
   // ─── Artists ─────────────────────────────────────────────────────────────────
 
-  @PostMapping("/artists")
-  public ResponseEntity<ArtistResponse> createArtist(@RequestBody CreateArtistRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(artistService.create(request));
+  @PostMapping(value = "/artists", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ArtistResponse> createArtist(
+          @RequestParam String name,
+          @RequestParam(required = false) String bio,
+          @RequestPart(value = "avatarFile", required = false) MultipartFile avatarFile) throws IOException {
+    return ResponseEntity.status(HttpStatus.CREATED).body(artistService.create(name, bio, avatarFile));
   }
 
   @GetMapping("/artists")
@@ -59,9 +65,13 @@ public class AdminController {
 
   // ─── Albums ──────────────────────────────────────────────────────────────────
 
-  @PostMapping("/albums")
-  public ResponseEntity<AlbumResponse> createAlbum(@RequestBody CreateAlbumRequest request) {
-    return ResponseEntity.status(HttpStatus.CREATED).body(albumService.create(request));
+  @PostMapping(value = "/albums", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<AlbumResponse> createAlbum(
+          @RequestParam String title,
+          @RequestParam UUID artistId,
+          @RequestParam int releaseYear,
+          @RequestPart(value = "coverFile", required = false) MultipartFile coverFile) throws IOException {
+    return ResponseEntity.status(HttpStatus.CREATED).body(albumService.create(title, artistId, releaseYear, coverFile));
   }
 
   @GetMapping("/albums")

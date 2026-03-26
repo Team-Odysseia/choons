@@ -7,6 +7,7 @@ import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import ImageUpload from '@/components/admin/ImageUpload.vue'
 import { Pencil } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -14,6 +15,8 @@ const artists = ref<ArtistResponse[]>([])
 const name = ref('')
 const bio = ref('')
 const loading = ref(false)
+const pendingAvatar = ref<File | null>(null)
+const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
 
 onMounted(load)
 
@@ -24,10 +27,12 @@ async function load() {
 async function submit() {
   loading.value = true
   try {
-    const created = await createArtist(name.value, bio.value)
+    const created = await createArtist(name.value, bio.value, pendingAvatar.value)
     artists.value.unshift(created)
     name.value = ''
     bio.value = ''
+    pendingAvatar.value = null
+    imageUploadRef.value?.reset()
     toast.success(`Artist "${created.name}" created successfully`)
   } catch (e: any) {
     toast.error(e.response?.data?.error ?? 'Failed to create artist')
@@ -53,6 +58,14 @@ async function submit() {
           v-model="bio"
           class="flex w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary resize-y"
           rows="3"
+        />
+      </div>
+      <div class="form-group">
+        <ImageUpload
+          ref="imageUploadRef"
+          label="Avatar"
+          @select="pendingAvatar = $event"
+          @remove="pendingAvatar = null"
         />
       </div>
       <Button type="submit" :disabled="loading">

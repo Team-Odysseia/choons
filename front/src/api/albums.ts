@@ -9,8 +9,16 @@ export const getAlbums = (artistId?: string) =>
 export const getAlbum = (id: string) =>
   client.get<AlbumResponse>(`/music/albums/${id}`).then((r) => r.data)
 
-export const createAlbum = (title: string, artistId: string, releaseYear: number) =>
-  client.post<AlbumResponse>('/admin/albums', { title, artistId, releaseYear }).then((r) => r.data)
+export const createAlbum = (title: string, artistId: string, releaseYear: number, coverFile?: File | null) => {
+  const fd = new FormData()
+  fd.append('title', title)
+  fd.append('artistId', artistId)
+  fd.append('releaseYear', String(releaseYear))
+  if (coverFile) fd.append('coverFile', coverFile)
+  return client
+    .post<AlbumResponse>('/admin/albums', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    .then((r) => r.data)
+}
 
 export const getAdminAlbum = (id: string) =>
   client.get<AlbumResponse>(`/admin/albums/${id}`).then((r) => r.data)
