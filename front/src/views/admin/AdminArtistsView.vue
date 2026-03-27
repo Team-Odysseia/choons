@@ -2,19 +2,22 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { getArtists, createArtist } from '@/api/artists'
+import { getArtists, createArtist, deleteArtist } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ImageUpload from '@/components/admin/ImageUpload.vue'
-import { Pencil } from 'lucide-vue-next'
+import BaseDialog from '@/components/ui/dialog/BaseDialog.vue'
+import { Pencil, Trash2 } from 'lucide-vue-next'
 
 const router = useRouter()
 const artists = ref<ArtistResponse[]>([])
 const name = ref('')
 const bio = ref('')
 const loading = ref(false)
+const deletingId = ref<string | null>(null)
+const confirmTarget = ref<ArtistResponse | null>(null)
 const pendingAvatar = ref<File | null>(null)
 const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
 
@@ -22,6 +25,22 @@ onMounted(load)
 
 async function load() {
   artists.value = await getArtists()
+}
+
+async function confirmDelete() {
+  const artist = confirmTarget.value
+  if (!artist) return
+  confirmTarget.value = null
+  deletingId.value = artist.id
+  try {
+    await deleteArtist(artist.id)
+    artists.value = artists.value.filter((a) => a.id !== artist.id)
+    toast.success(`"${artist.name}" deleted`)
+  } catch (e: any) {
+    toast.error(e.response?.data?.error ?? 'Failed to delete artist')
+  } finally {
+    deletingId.value = null
+  }
 }
 
 async function submit() {
@@ -80,19 +99,46 @@ async function submit() {
         <div v-for="a in artists" :key="a.id" class="list-item">
           <div class="flex items-center justify-between gap-3">
             <span class="item-name">{{ a.name }}</span>
-            <button
-              class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
-              title="Edit"
-              @click="router.push(`/admin/artists/${a.id}/edit`)"
-            >
-              <Pencil :size="14" />
-            </button>
+            <div class="flex items-center gap-1">
+              <button
+                class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
+                title="Edit"
+                @click="router.push(`/admin/artists/${a.id}/edit`)"
+              >
+                <Pencil :size="14" />
+              </button>
+              <button
+                class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-destructive hover:bg-muted transition-colors"
+                title="Delete"
+                :disabled="deletingId === a.id"
+                @click="confirmTarget = a"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </div>
           </div>
           <span class="text-[13px] text-dimmed">{{ a.bio?.slice(0, 60) }}{{ (a.bio?.length ?? 0) > 60 ? '…' : '' }}</span>
         </div>
       </div>
     </div>
   </div>
+
+  <BaseDialog
+    :open="!!confirmTarget"
+    title="Delete Artist"
+    @close="confirmTarget = null"
+  >
+    <div class="px-5 pb-5">
+      <p class="text-sm text-muted-foreground mb-5">
+        Delete <span class="font-semibold text-foreground">{{ confirmTarget?.name }}</span>?
+        This will permanently remove all their albums and tracks from storage.
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button variant="outline" @click="confirmTarget = null">Cancel</Button>
+        <Button variant="destructive" @click="confirmDelete">Delete</Button>
+      </div>
+    </div>
+  </BaseDialog>
 </template>
 
 <style scoped>

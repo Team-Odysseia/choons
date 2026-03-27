@@ -44,6 +44,9 @@ public class Track {
   @Column(nullable = false)
   private String contentType;
 
+  @Column(name = "lrclib_id")
+  private Integer lrclibId;
+
   @CreationTimestamp
   @Column(updatable = false)
   private LocalDateTime createdAt;

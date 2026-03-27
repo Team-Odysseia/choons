@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AppSidebar from './AppSidebar.vue'
 import MusicPlayer from './MusicPlayer.vue'
+import RightDrawer from './RightDrawer.vue'
 </script>
 
 <template>
@@ -15,4 +16,5 @@ import MusicPlayer from './MusicPlayer.vue'
     </main>
     <MusicPlayer />
   </div>
+  <RightDrawer />
 </template>

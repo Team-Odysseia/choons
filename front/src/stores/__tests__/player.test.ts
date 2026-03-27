@@ -4,8 +4,13 @@ import { usePlayerStore } from '../player'
 import { audioMock } from '../../../vitest.setup'
 import type { TrackResponse } from '@/api/types'
 
+const { recordStreamMock } = vi.hoisted(() => ({
+  recordStreamMock: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@/api/tracks', () => ({
   streamUrl: vi.fn((id: string) => `http://test/stream/${id}`),
+  recordStream: recordStreamMock,
 }))
 
 function makeTrack(n: number): TrackResponse {
@@ -27,6 +32,7 @@ const t3 = makeTrack(3)
 beforeEach(() => {
   localStorage.clear()
   setActivePinia(createPinia())
+  recordStreamMock.mockClear()
 })
 
 // ─── playTrack ────────────────────────────────────────────────────────────────
@@ -245,6 +251,66 @@ describe('addToQueue', () => {
     store.playQueue([t1])
     store.addToQueue(t2)
     expect(store.queue).toEqual([t1, t2])
+  })
+})
+
+// ─── stream tracking ──────────────────────────────────────────────────────────
+
+describe('stream tracking', () => {
+  it('records stream when currentTime reaches min(30, duration*0.5)', () => {
+    const store = usePlayerStore()
+    store.playTrack(t1)
+    audioMock.duration = 60
+    ;(store as any).duration = 60
+    audioMock.currentTime = 30
+    audioMock._emit('timeupdate')
+    expect(recordStreamMock).toHaveBeenCalledWith(t1.id)
+  })
+
+  it('records stream early for short tracks (50% threshold)', () => {
+    const store = usePlayerStore()
+    store.playTrack(t1)
+    audioMock.duration = 20
+    ;(store as any).duration = 20
+    audioMock.currentTime = 10
+    audioMock._emit('timeupdate')
+    expect(recordStreamMock).toHaveBeenCalledWith(t1.id)
+  })
+
+  it('only records once per play session', () => {
+    const store = usePlayerStore()
+    store.playTrack(t1)
+    audioMock.duration = 60
+    ;(store as any).duration = 60
+    audioMock.currentTime = 30
+    audioMock._emit('timeupdate')
+    audioMock.currentTime = 35
+    audioMock._emit('timeupdate')
+    expect(recordStreamMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('resets and records again when a new track starts', () => {
+    const store = usePlayerStore()
+    store.playTrack(t1)
+    audioMock.duration = 60
+    ;(store as any).duration = 60
+    audioMock.currentTime = 30
+    audioMock._emit('timeupdate')
+
+    store.playTrack(t2)
+    audioMock.currentTime = 30
+    audioMock._emit('timeupdate')
+    expect(recordStreamMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not record before threshold', () => {
+    const store = usePlayerStore()
+    store.playTrack(t1)
+    audioMock.duration = 60
+    ;(store as any).duration = 60
+    audioMock.currentTime = 10
+    audioMock._emit('timeupdate')
+    expect(recordStreamMock).not.toHaveBeenCalled()
   })
 })
 

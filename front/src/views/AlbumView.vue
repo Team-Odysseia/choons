@@ -7,7 +7,7 @@ import { usePlaylistsStore } from '@/stores/playlists'
 import TrackRow from '@/components/music/TrackRow.vue'
 import AddToPlaylistDialog from '@/components/music/AddToPlaylistDialog.vue'
 import { Button } from '@/components/ui/button'
-import { Play, Shuffle, ListPlus } from 'lucide-vue-next'
+import { Play, Shuffle, ListPlus, Plus } from 'lucide-vue-next'
 import { albumImageUrl } from '@/api/albums'
 
 const route = useRoute()
@@ -64,9 +64,17 @@ onMounted(async () => {
       <Button
         variant="outline"
         :disabled="music.currentAlbumTracks.length === 0"
-        @click="albumDialogOpen = true"
+        @click="player.addTracksToQueue(music.currentAlbumTracks)"
       >
         <ListPlus :size="16" />
+        Add to queue
+      </Button>
+      <Button
+        variant="outline"
+        :disabled="music.currentAlbumTracks.length === 0"
+        @click="albumDialogOpen = true"
+      >
+        <Plus :size="16" />
         Add to playlist
       </Button>
     </div>
@@ -81,6 +89,7 @@ onMounted(async () => {
         :track="track"
         :queue="music.currentAlbumTracks"
         :index="i"
+        :show-add-to-queue="true"
         :show-add-to-playlist="true"
       />
     </div>

@@ -3,8 +3,11 @@ package dev.odysseia.choons.service;
 import dev.odysseia.choons.dto.AlbumResponse;
 import dev.odysseia.choons.model.music.Album;
 import dev.odysseia.choons.model.music.Artist;
+import dev.odysseia.choons.model.music.Track;
 import dev.odysseia.choons.repository.AlbumRepository;
 import dev.odysseia.choons.repository.ArtistRepository;
+import dev.odysseia.choons.repository.PlaylistTrackRepository;
+import dev.odysseia.choons.repository.TrackRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +29,8 @@ public class AlbumService {
 
   @Autowired private AlbumRepository albumRepository;
   @Autowired private ArtistRepository artistRepository;
+  @Autowired private TrackRepository trackRepository;
+  @Autowired private PlaylistTrackRepository playlistTrackRepository;
   @Autowired private ArtistService artistService;
   @Autowired private R2Service r2Service;
 
@@ -77,6 +82,27 @@ public class AlbumService {
     }
 
     return toResponse(albumRepository.save(album));
+  }
+
+  @org.springframework.transaction.annotation.Transactional
+  public void delete(UUID id) {
+    Album album = albumRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("Album not found: " + id));
+    List<Track> tracks = trackRepository.findByAlbumIdOrderByTrackNumberAsc(id);
+    if (!tracks.isEmpty()) {
+      List<UUID> trackIds = tracks.stream().map(Track::getId).toList();
+      playlistTrackRepository.deleteByTrackIdIn(trackIds);
+      for (Track track : tracks) {
+        if (track.getR2Key() != null && !track.getR2Key().equals("pending")) {
+          r2Service.delete(track.getR2Key());
+        }
+      }
+      trackRepository.deleteAll(tracks);
+    }
+    if (album.getCoverKey() != null) {
+      r2Service.delete(album.getCoverKey());
+    }
+    albumRepository.delete(album);
   }
 
   public void deleteCover(UUID id) {

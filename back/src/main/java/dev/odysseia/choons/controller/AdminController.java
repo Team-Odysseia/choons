@@ -3,6 +3,7 @@ package dev.odysseia.choons.controller;
 import dev.odysseia.choons.dto.AlbumResponse;
 import dev.odysseia.choons.dto.ArtistResponse;
 import dev.odysseia.choons.dto.TrackResponse;
+import dev.odysseia.choons.dto.UpdateLrclibIdRequest;
 import dev.odysseia.choons.dto.UpdateTrackRequest;
 import dev.odysseia.choons.service.AlbumService;
 import dev.odysseia.choons.service.ArtistService;
@@ -57,6 +58,12 @@ public class AdminController {
     return ResponseEntity.ok(artistService.update(id, name, bio, avatarFile));
   }
 
+  @DeleteMapping("/artists/{id}")
+  public ResponseEntity<Void> deleteArtist(@PathVariable UUID id) {
+    artistService.delete(id);
+    return ResponseEntity.noContent().build();
+  }
+
   @DeleteMapping("/artists/{id}/avatar")
   public ResponseEntity<Void> deleteArtistAvatar(@PathVariable UUID id) {
     artistService.deleteAvatar(id);
@@ -95,6 +102,12 @@ public class AdminController {
           @RequestParam int releaseYear,
           @RequestPart(value = "coverFile", required = false) MultipartFile coverFile) throws IOException {
     return ResponseEntity.ok(albumService.update(id, title, artistId, releaseYear, coverFile));
+  }
+
+  @DeleteMapping("/albums/{id}")
+  public ResponseEntity<Void> deleteAlbum(@PathVariable UUID id) {
+    albumService.delete(id);
+    return ResponseEntity.noContent().build();
   }
 
   @DeleteMapping("/albums/{id}/cover")
@@ -148,6 +161,13 @@ public class AdminController {
           @PathVariable UUID id,
           @RequestBody UpdateTrackRequest request) {
     return ResponseEntity.ok(trackService.update(id, request.title(), request.trackNumber()));
+  }
+
+  @PutMapping("/tracks/{id}/lrclib-id")
+  public ResponseEntity<TrackResponse> updateTrackLrclibId(
+          @PathVariable UUID id,
+          @RequestBody UpdateLrclibIdRequest request) {
+    return ResponseEntity.ok(trackService.updateLrclibId(id, request.lrclibId()));
   }
 
   @DeleteMapping("/tracks/{id}")

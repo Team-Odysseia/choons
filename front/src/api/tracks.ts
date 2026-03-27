@@ -45,7 +45,13 @@ export const updateAlbumTracks = (
 ) =>
   client.put<TrackResponse[]>(`/admin/albums/${albumId}/tracks`, tracks).then((r) => r.data)
 
+export const updateTrackLrclibId = (id: string, lrclibId: number | null) =>
+  client.put<TrackResponse>(`/admin/tracks/${id}/lrclib-id`, { lrclibId }).then((r) => r.data)
+
 export const deleteTrack = (id: string) => client.delete(`/admin/tracks/${id}`)
+
+export const recordStream = (trackId: string) =>
+  client.post(`/stream/${trackId}/played`)
 
 export const streamUrl = (trackId: string) => {
   const token = localStorage.getItem('token')

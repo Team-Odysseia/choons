@@ -2,9 +2,12 @@ package dev.odysseia.choons.service;
 
 import dev.odysseia.choons.dto.ArtistResponse;
 import dev.odysseia.choons.model.music.Artist;
+import dev.odysseia.choons.repository.AlbumRepository;
 import dev.odysseia.choons.repository.ArtistRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -23,6 +26,8 @@ public class ArtistService {
   );
 
   @Autowired private ArtistRepository artistRepository;
+  @Autowired private AlbumRepository albumRepository;
+  @Autowired @Lazy private AlbumService albumService;
   @Autowired private R2Service r2Service;
 
   public ArtistResponse create(String name, String bio, MultipartFile avatarFile) throws IOException {
@@ -67,6 +72,18 @@ public class ArtistService {
     }
 
     return toResponse(artistRepository.save(artist));
+  }
+
+  @Transactional
+  public void delete(UUID id) {
+    Artist artist = artistRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("Artist not found: " + id));
+    albumRepository.findByArtistIdOrderByReleaseYearDesc(id)
+            .forEach(album -> albumService.delete(album.getId()));
+    if (artist.getAvatarKey() != null) {
+      r2Service.delete(artist.getAvatarKey());
+    }
+    artistRepository.delete(artist);
   }
 
   public void deleteAvatar(UUID id) {

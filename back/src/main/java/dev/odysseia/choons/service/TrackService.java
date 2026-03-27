@@ -7,6 +7,7 @@ import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.model.music.Track;
 import dev.odysseia.choons.repository.AlbumRepository;
 import dev.odysseia.choons.repository.ArtistRepository;
+import dev.odysseia.choons.repository.PlaylistTrackRepository;
 import dev.odysseia.choons.repository.TrackRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,12 +33,18 @@ public class TrackService {
           "audio/aac", "aac"
   );
 
+  private static final java.util.Set<String> HIFI_TYPES = java.util.Set.of(
+          "audio/flac", "audio/x-flac", "audio/wav"
+  );
+
   @Autowired private TrackRepository trackRepository;
   @Autowired private AlbumRepository albumRepository;
   @Autowired private ArtistRepository artistRepository;
+  @Autowired private PlaylistTrackRepository playlistTrackRepository;
   @Autowired private R2Service r2Service;
   @Autowired private AlbumService albumService;
   @Autowired private ArtistService artistService;
+  @Autowired private LyricsService lyricsService;
 
   public TrackResponse upload(String title, UUID albumId, UUID artistId,
                               int trackNumber, int durationSeconds,
@@ -70,6 +77,8 @@ public class TrackService {
 
     saved.setR2Key(r2Key);
     Track track = trackRepository.save(saved);
+
+    lyricsService.tryFetchAndSave(track.getId(), title, artist.getName(), album.getTitle(), durationSeconds);
 
     return toResponse(track);
   }
@@ -114,14 +123,17 @@ public class TrackService {
     return results;
   }
 
+  @Transactional
   public void delete(UUID id) {
     Track track = trackRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Track not found: " + id));
+    playlistTrackRepository.deleteByTrackId(id);
     if (track.getR2Key() != null && !track.getR2Key().equals("pending")) {
       r2Service.delete(track.getR2Key());
     }
     trackRepository.delete(track);
   }
+
 
   public List<TrackResponse> findByAlbum(UUID albumId) {
     return trackRepository.findByAlbumIdOrderByTrackNumberAsc(albumId).stream()
@@ -154,7 +166,16 @@ public class TrackService {
             artistService.toResponse(track.getArtist()),
             track.getTrackNumber(),
             track.getDurationSeconds(),
-            track.getCreatedAt()
+            track.getCreatedAt(),
+            track.getContentType() != null && HIFI_TYPES.contains(track.getContentType()),
+            track.getLrclibId()
     );
+  }
+
+  public TrackResponse updateLrclibId(UUID id, Integer lrclibId) {
+    Track track = trackRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("Track not found: " + id));
+    track.setLrclibId(lrclibId);
+    return toResponse(trackRepository.save(track));
   }
 }

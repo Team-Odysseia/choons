@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { streamUrl } from '@/api/tracks'
+import { streamUrl, recordStream } from '@/api/tracks'
 import type { TrackResponse } from '@/api/types'
 
 export type LoopMode = 'none' | 'queue' | 'track'
@@ -29,10 +29,18 @@ export const usePlayerStore = defineStore('player', () => {
   const volume = ref(savedVolume)
   const loopMode = ref<LoopMode>('none')
   const isShuffled = ref(false)
+  const streamRecorded = ref(false)
   audio.volume = savedVolume
 
   audio.addEventListener('timeupdate', () => {
     currentTime.value = audio.currentTime
+    if (!streamRecorded.value && currentTrack.value && duration.value > 0) {
+      const threshold = Math.min(30, duration.value * 0.5)
+      if (audio.currentTime >= threshold) {
+        streamRecorded.value = true
+        recordStream(currentTrack.value.id).catch(() => {})
+      }
+    }
   })
   audio.addEventListener('durationchange', () => {
     duration.value = audio.duration || 0
@@ -78,6 +86,7 @@ export const usePlayerStore = defineStore('player', () => {
     } else {
       currentIndex.value = index ?? 0
     }
+    streamRecorded.value = false
     audio.src = streamUrl(track.id)
     audio.load()
     audio.play()
@@ -168,6 +177,42 @@ export const usePlayerStore = defineStore('player', () => {
 
   function addToQueue(track: TrackResponse) {
     queue.value.push(track)
+    if (originalQueue.value !== queue.value) originalQueue.value.push(track)
+  }
+
+  function addTracksToQueue(tracks: TrackResponse[]) {
+    queue.value.push(...tracks)
+    if (originalQueue.value !== queue.value) originalQueue.value.push(...tracks)
+  }
+
+  function removeFromQueue(index: number) {
+    const removed = queue.value[index]
+    if (!removed) return
+    queue.value.splice(index, 1)
+    const origIdx = originalQueue.value.findIndex((t) => t.id === removed.id)
+    if (origIdx !== -1) originalQueue.value.splice(origIdx, 1)
+    if (index < currentIndex.value) {
+      currentIndex.value--
+    }
+  }
+
+  function reorderQueue() {
+    if (currentTrack.value) {
+      const newIdx = queue.value.findIndex((t) => t.id === currentTrack.value!.id)
+      if (newIdx !== -1) currentIndex.value = newIdx
+    }
+  }
+
+  function clearQueue() {
+    if (currentTrack.value) {
+      queue.value = [currentTrack.value]
+      originalQueue.value = [currentTrack.value]
+      currentIndex.value = 0
+    } else {
+      queue.value = []
+      originalQueue.value = []
+      currentIndex.value = -1
+    }
   }
 
   return {
@@ -193,5 +238,9 @@ export const usePlayerStore = defineStore('player', () => {
     cycleLoop,
     toggleShuffle,
     addToQueue,
+    addTracksToQueue,
+    removeFromQueue,
+    reorderQueue,
+    clearQueue,
   }
 })

@@ -8,6 +8,7 @@ import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.model.user.UserRole;
 import dev.odysseia.choons.repository.*;
 import dev.odysseia.choons.service.JwtService;
+import dev.odysseia.choons.service.LyricsService;
 import dev.odysseia.choons.service.R2Service;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +49,7 @@ class AdminControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockitoBean R2Service r2Service;
+  @MockitoBean LyricsService lyricsService;
 
     private MockMvc mockMvc;
     private String adminToken;
@@ -322,6 +324,101 @@ class AdminControllerTest {
     void deleteTrack_withUnknownId_returns404() throws Exception {
         mockMvc.perform(delete("/admin/tracks/{id}", UUID.randomUUID())
                         .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // ─── DELETE /admin/artists/{id} ──────────────────────────────────────────
+
+    @Test
+    void deleteArtist_returns204AndRemovesArtist() throws Exception {
+        mockMvc.perform(delete("/admin/artists/{id}", artist.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/admin/artists/{id}", artist.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteArtist_cascadesAlbumsAndTracks() throws Exception {
+        UUID albumId = album.getId();
+        UUID trackId = track.getId();
+
+        mockMvc.perform(delete("/admin/artists/{id}", artist.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        assert albumRepository.findById(albumId).isEmpty();
+        assert trackRepository.findById(trackId).isEmpty();
+    }
+
+    @Test
+    void deleteArtist_withUnknownId_returns404() throws Exception {
+        mockMvc.perform(delete("/admin/artists/{id}", UUID.randomUUID())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // ─── DELETE /admin/albums/{id} ────────────────────────────────────────────
+
+    @Test
+    void deleteAlbum_returns204AndRemovesAlbum() throws Exception {
+        mockMvc.perform(delete("/admin/albums/{id}", album.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/admin/albums/{id}", album.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteAlbum_cascadesTracks() throws Exception {
+        UUID trackId = track.getId();
+
+        mockMvc.perform(delete("/admin/albums/{id}", album.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        assert trackRepository.findById(trackId).isEmpty();
+    }
+
+    @Test
+    void deleteAlbum_withUnknownId_returns404() throws Exception {
+        mockMvc.perform(delete("/admin/albums/{id}", UUID.randomUUID())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // ─── PUT /admin/tracks/{id}/lrclib-id ────────────────────────────────────
+
+    @Test
+    void updateTrackLrclibId_setsIdAndReturnsOk() throws Exception {
+        mockMvc.perform(put("/admin/tracks/{id}/lrclib-id", track.getId())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lrclibId\": 42}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lrclibId").value(42));
+    }
+
+    @Test
+    void updateTrackLrclibId_acceptsNull() throws Exception {
+        mockMvc.perform(put("/admin/tracks/{id}/lrclib-id", track.getId())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lrclibId\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lrclibId").isEmpty());
+    }
+
+    @Test
+    void updateTrackLrclibId_withUnknownId_returns404() throws Exception {
+        mockMvc.perform(put("/admin/tracks/{id}/lrclib-id", UUID.randomUUID())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lrclibId\": 99}"))
                 .andExpect(status().isNotFound());
     }
 

@@ -10,6 +10,7 @@ import dev.odysseia.choons.repository.ArtistRepository;
 import dev.odysseia.choons.repository.TrackRepository;
 import dev.odysseia.choons.repository.UserRepository;
 import dev.odysseia.choons.service.JwtService;
+import dev.odysseia.choons.service.StreamTrackingService;
 import dev.odysseia.choons.service.StreamingService;
 import dev.odysseia.choons.service.StreamingService.StreamingResult;
 import org.junit.jupiter.api.AfterEach;
@@ -35,9 +36,13 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
@@ -59,6 +64,7 @@ class StreamControllerTest {
     // Mockar StreamingService mantém o corpo assíncrono livre de stubs Mockito —
     // apenas usa ByteArrayInputStream já construído, sem race conditions.
     @MockitoBean StreamingService streamingService;
+    @MockitoBean StreamTrackingService streamTrackingService;
 
     private MockMvc mockMvc;
     private String listenerToken;
@@ -195,6 +201,34 @@ class StreamControllerTest {
 
         mockMvc.perform(asyncDispatch(async))
                 .andExpect(status().isOk());
+    }
+
+    // ─── POST /played ─────────────────────────────────────────────────────────
+
+    @Test
+    void recordPlay_withValidToken_returns204() throws Exception {
+        mockMvc.perform(post("/stream/{id}/played", trackId)
+                        .header(HttpHeaders.AUTHORIZATION, listenerToken))
+                .andExpect(status().isNoContent());
+
+        verify(streamTrackingService).recordStream(eq(trackId), eq("stream_listener"));
+    }
+
+    @Test
+    void recordPlay_withoutToken_returns401() throws Exception {
+        mockMvc.perform(post("/stream/{id}/played", trackId))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void recordPlay_withUnknownTrack_returns404() throws Exception {
+        UUID unknown = UUID.randomUUID();
+        org.mockito.Mockito.doThrow(new java.util.NoSuchElementException("Track not found"))
+                .when(streamTrackingService).recordStream(eq(unknown), any());
+
+        mockMvc.perform(post("/stream/{id}/played", unknown)
+                        .header(HttpHeaders.AUTHORIZATION, listenerToken))
+                .andExpect(status().isNotFound());
     }
 
     // ─── Builders de StreamingResult ─────────────────────────────────────────

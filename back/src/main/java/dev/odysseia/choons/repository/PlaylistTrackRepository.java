@@ -11,5 +11,7 @@ public interface PlaylistTrackRepository extends JpaRepository<PlaylistTrack, UU
   List<PlaylistTrack> findByPlaylistIdOrderByPositionAsc(UUID playlistId);
   Optional<PlaylistTrack> findByPlaylistIdAndTrackId(UUID playlistId, UUID trackId);
   void deleteByPlaylistIdAndTrackId(UUID playlistId, UUID trackId);
+  void deleteByTrackId(UUID trackId);
+  void deleteByTrackIdIn(List<UUID> trackIds);
   int countByPlaylistId(UUID playlistId);
 }

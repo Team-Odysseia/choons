@@ -43,6 +43,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                     .requestMatchers("/auth/login").permitAll()
+                    .requestMatchers("/public/**").permitAll()
+                    .requestMatchers("/media/images/albums/**").permitAll()
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     .requestMatchers("/stream/**").authenticated()
                     .requestMatchers("/music/**").authenticated()
