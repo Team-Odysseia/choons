@@ -7,6 +7,7 @@ import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.model.music.Track;
 import dev.odysseia.choons.repository.AlbumRepository;
 import dev.odysseia.choons.repository.ArtistRepository;
+import dev.odysseia.choons.repository.PlaylistTrackRepository;
 import dev.odysseia.choons.repository.TrackRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class TrackService {
   @Autowired private TrackRepository trackRepository;
   @Autowired private AlbumRepository albumRepository;
   @Autowired private ArtistRepository artistRepository;
+  @Autowired private PlaylistTrackRepository playlistTrackRepository;
   @Autowired private R2Service r2Service;
   @Autowired private AlbumService albumService;
   @Autowired private ArtistService artistService;
@@ -114,14 +116,17 @@ public class TrackService {
     return results;
   }
 
+  @Transactional
   public void delete(UUID id) {
     Track track = trackRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Track not found: " + id));
+    playlistTrackRepository.deleteByTrackId(id);
     if (track.getR2Key() != null && !track.getR2Key().equals("pending")) {
       r2Service.delete(track.getR2Key());
     }
     trackRepository.delete(track);
   }
+
 
   public List<TrackResponse> findByAlbum(UUID albumId) {
     return trackRepository.findByAlbumIdOrderByTrackNumberAsc(albumId).stream()

@@ -30,6 +30,9 @@ export const updateAlbum = (id: string, formData: FormData) =>
     })
     .then((r) => r.data)
 
+export const deleteAlbum = (id: string) =>
+  client.delete(`/admin/albums/${id}`)
+
 export const deleteAlbumCover = (id: string) =>
   client.delete(`/admin/albums/${id}/cover`)
 

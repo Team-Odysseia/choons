@@ -3,15 +3,16 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getArtists } from '@/api/artists'
-import { getAlbums, createAlbum } from '@/api/albums'
+import { getAlbums, createAlbum, deleteAlbum } from '@/api/albums'
 import { uploadTrack } from '@/api/tracks'
 import type { ArtistResponse, AlbumResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ImageUpload from '@/components/admin/ImageUpload.vue'
+import BaseDialog from '@/components/ui/dialog/BaseDialog.vue'
 import draggable from 'vuedraggable'
-import { GripVertical, X, Music, Pencil } from 'lucide-vue-next'
+import { GripVertical, X, Music, Pencil, Trash2 } from 'lucide-vue-next'
 
 interface PendingTrack {
   uid: string
@@ -34,6 +35,8 @@ const pendingTracks = ref<PendingTrack[]>([])
 const isDragOver = ref(false)
 const pendingCover = ref<File | null>(null)
 const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
+const deletingId = ref<string | null>(null)
+const confirmTarget = ref<AlbumResponse | null>(null)
 
 onMounted(async () => {
   artists.value = await getArtists()
@@ -91,6 +94,22 @@ function onDrop(e: DragEvent) {
 
 function removeTrack(uid: string) {
   pendingTracks.value = pendingTracks.value.filter((t) => t.uid !== uid)
+}
+
+async function confirmDelete() {
+  const al = confirmTarget.value
+  if (!al) return
+  confirmTarget.value = null
+  deletingId.value = al.id
+  try {
+    await deleteAlbum(al.id)
+    albums.value = albums.value.filter((a) => a.id !== al.id)
+    toast.success(`"${al.title}" deleted`)
+  } catch (e: any) {
+    toast.error(e.response?.data?.error ?? 'Failed to delete album')
+  } finally {
+    deletingId.value = null
+  }
 }
 
 async function submit() {
@@ -267,19 +286,46 @@ async function submit() {
         <div v-for="al in albums" :key="al.id" class="list-item">
           <div class="flex items-center justify-between gap-3">
             <span class="item-name">{{ al.title }}</span>
-            <button
-              class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
-              title="Edit"
-              @click="router.push(`/admin/albums/${al.id}/edit`)"
-            >
-              <Pencil :size="14" />
-            </button>
+            <div class="flex items-center gap-1">
+              <button
+                class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
+                title="Edit"
+                @click="router.push(`/admin/albums/${al.id}/edit`)"
+              >
+                <Pencil :size="14" />
+              </button>
+              <button
+                class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-destructive hover:bg-muted transition-colors"
+                title="Delete"
+                :disabled="deletingId === al.id"
+                @click="confirmTarget = al"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </div>
           </div>
           <span class="text-[13px] text-dimmed">{{ al.artist.name }} · {{ al.releaseYear }}</span>
         </div>
       </div>
     </div>
   </div>
+
+  <BaseDialog
+    :open="!!confirmTarget"
+    title="Delete Album"
+    @close="confirmTarget = null"
+  >
+    <div class="px-5 pb-5">
+      <p class="text-sm text-muted-foreground mb-5">
+        Delete <span class="font-semibold text-foreground">{{ confirmTarget?.title }}</span>?
+        This will permanently remove all its tracks from storage.
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button variant="outline" @click="confirmTarget = null">Cancel</Button>
+        <Button variant="destructive" @click="confirmDelete">Delete</Button>
+      </div>
+    </div>
+  </BaseDialog>
 </template>
 
 <style scoped>

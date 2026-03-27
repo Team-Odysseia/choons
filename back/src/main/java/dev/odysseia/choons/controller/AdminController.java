@@ -57,6 +57,12 @@ public class AdminController {
     return ResponseEntity.ok(artistService.update(id, name, bio, avatarFile));
   }
 
+  @DeleteMapping("/artists/{id}")
+  public ResponseEntity<Void> deleteArtist(@PathVariable UUID id) {
+    artistService.delete(id);
+    return ResponseEntity.noContent().build();
+  }
+
   @DeleteMapping("/artists/{id}/avatar")
   public ResponseEntity<Void> deleteArtistAvatar(@PathVariable UUID id) {
     artistService.deleteAvatar(id);
@@ -95,6 +101,12 @@ public class AdminController {
           @RequestParam int releaseYear,
           @RequestPart(value = "coverFile", required = false) MultipartFile coverFile) throws IOException {
     return ResponseEntity.ok(albumService.update(id, title, artistId, releaseYear, coverFile));
+  }
+
+  @DeleteMapping("/albums/{id}")
+  public ResponseEntity<Void> deleteAlbum(@PathVariable UUID id) {
+    albumService.delete(id);
+    return ResponseEntity.noContent().build();
   }
 
   @DeleteMapping("/albums/{id}/cover")

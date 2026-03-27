@@ -27,6 +27,9 @@ export const updateArtist = (id: string, formData: FormData) =>
     })
     .then((r) => r.data)
 
+export const deleteArtist = (id: string) =>
+  client.delete(`/admin/artists/${id}`)
+
 export const deleteArtistAvatar = (id: string) =>
   client.delete(`/admin/artists/${id}/avatar`)
 

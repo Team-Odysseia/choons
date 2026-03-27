@@ -325,6 +325,70 @@ class AdminControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // ─── DELETE /admin/artists/{id} ──────────────────────────────────────────
+
+    @Test
+    void deleteArtist_returns204AndRemovesArtist() throws Exception {
+        mockMvc.perform(delete("/admin/artists/{id}", artist.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/admin/artists/{id}", artist.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteArtist_cascadesAlbumsAndTracks() throws Exception {
+        UUID albumId = album.getId();
+        UUID trackId = track.getId();
+
+        mockMvc.perform(delete("/admin/artists/{id}", artist.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        assert albumRepository.findById(albumId).isEmpty();
+        assert trackRepository.findById(trackId).isEmpty();
+    }
+
+    @Test
+    void deleteArtist_withUnknownId_returns404() throws Exception {
+        mockMvc.perform(delete("/admin/artists/{id}", UUID.randomUUID())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // ─── DELETE /admin/albums/{id} ────────────────────────────────────────────
+
+    @Test
+    void deleteAlbum_returns204AndRemovesAlbum() throws Exception {
+        mockMvc.perform(delete("/admin/albums/{id}", album.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/admin/albums/{id}", album.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteAlbum_cascadesTracks() throws Exception {
+        UUID trackId = track.getId();
+
+        mockMvc.perform(delete("/admin/albums/{id}", album.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        assert trackRepository.findById(trackId).isEmpty();
+    }
+
+    @Test
+    void deleteAlbum_withUnknownId_returns404() throws Exception {
+        mockMvc.perform(delete("/admin/albums/{id}", UUID.randomUUID())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
     // ─── GET /admin/artists/{id} and /admin/albums/{id} ──────────────────────
 
     @Test
