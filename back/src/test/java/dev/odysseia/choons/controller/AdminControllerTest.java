@@ -8,6 +8,7 @@ import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.model.user.UserRole;
 import dev.odysseia.choons.repository.*;
 import dev.odysseia.choons.service.JwtService;
+import dev.odysseia.choons.service.LyricsService;
 import dev.odysseia.choons.service.R2Service;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +49,7 @@ class AdminControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockitoBean R2Service r2Service;
+  @MockitoBean LyricsService lyricsService;
 
     private MockMvc mockMvc;
     private String adminToken;
@@ -386,6 +388,37 @@ class AdminControllerTest {
     void deleteAlbum_withUnknownId_returns404() throws Exception {
         mockMvc.perform(delete("/admin/albums/{id}", UUID.randomUUID())
                         .header("Authorization", adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    // ─── PUT /admin/tracks/{id}/lrclib-id ────────────────────────────────────
+
+    @Test
+    void updateTrackLrclibId_setsIdAndReturnsOk() throws Exception {
+        mockMvc.perform(put("/admin/tracks/{id}/lrclib-id", track.getId())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lrclibId\": 42}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lrclibId").value(42));
+    }
+
+    @Test
+    void updateTrackLrclibId_acceptsNull() throws Exception {
+        mockMvc.perform(put("/admin/tracks/{id}/lrclib-id", track.getId())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lrclibId\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lrclibId").isEmpty());
+    }
+
+    @Test
+    void updateTrackLrclibId_withUnknownId_returns404() throws Exception {
+        mockMvc.perform(put("/admin/tracks/{id}/lrclib-id", UUID.randomUUID())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lrclibId\": 99}"))
                 .andExpect(status().isNotFound());
     }
 

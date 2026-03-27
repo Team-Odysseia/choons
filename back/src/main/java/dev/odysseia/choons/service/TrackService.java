@@ -33,6 +33,10 @@ public class TrackService {
           "audio/aac", "aac"
   );
 
+  private static final java.util.Set<String> HIFI_TYPES = java.util.Set.of(
+          "audio/flac", "audio/x-flac", "audio/wav"
+  );
+
   @Autowired private TrackRepository trackRepository;
   @Autowired private AlbumRepository albumRepository;
   @Autowired private ArtistRepository artistRepository;
@@ -40,6 +44,7 @@ public class TrackService {
   @Autowired private R2Service r2Service;
   @Autowired private AlbumService albumService;
   @Autowired private ArtistService artistService;
+  @Autowired private LyricsService lyricsService;
 
   public TrackResponse upload(String title, UUID albumId, UUID artistId,
                               int trackNumber, int durationSeconds,
@@ -72,6 +77,8 @@ public class TrackService {
 
     saved.setR2Key(r2Key);
     Track track = trackRepository.save(saved);
+
+    lyricsService.tryFetchAndSave(track.getId(), title, artist.getName(), album.getTitle(), durationSeconds);
 
     return toResponse(track);
   }
@@ -159,7 +166,16 @@ public class TrackService {
             artistService.toResponse(track.getArtist()),
             track.getTrackNumber(),
             track.getDurationSeconds(),
-            track.getCreatedAt()
+            track.getCreatedAt(),
+            track.getContentType() != null && HIFI_TYPES.contains(track.getContentType()),
+            track.getLrclibId()
     );
+  }
+
+  public TrackResponse updateLrclibId(UUID id, Integer lrclibId) {
+    Track track = trackRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("Track not found: " + id));
+    track.setLrclibId(lrclibId);
+    return toResponse(trackRepository.save(track));
   }
 }

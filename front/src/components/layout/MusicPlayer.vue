@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2 } from 'lucide-vue-next'
+import { useDrawerStore } from '@/stores/drawer'
+import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2, ListMusic, Mic2 } from 'lucide-vue-next'
 
 const player = usePlayerStore()
+const drawer = useDrawerStore()
 
 const progressPercent = computed(() =>
   player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0,
@@ -106,12 +108,28 @@ function onVolume(e: Event) {
       </div>
     </div>
 
-    <!-- Volume -->
+    <!-- Volume + drawer toggles -->
     <div
       class="flex items-center gap-2 justify-end"
       @mouseenter="showVolumeLabel = true"
       @mouseleave="showVolumeLabel = false"
     >
+      <button
+        class="size-7 flex items-center justify-center transition-colors"
+        :class="drawer.activePanel === 'queue' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+        title="Queue"
+        @click="drawer.toggle('queue')"
+      >
+        <ListMusic :size="16" />
+      </button>
+      <button
+        class="size-7 flex items-center justify-center transition-colors"
+        :class="drawer.activePanel === 'lyrics' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+        title="Lyrics"
+        @click="drawer.toggle('lyrics')"
+      >
+        <Mic2 :size="16" />
+      </button>
       <Volume2 :size="16" class="text-dimmed shrink-0" />
       <input
         type="range"

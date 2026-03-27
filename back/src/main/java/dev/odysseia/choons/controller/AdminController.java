@@ -3,6 +3,7 @@ package dev.odysseia.choons.controller;
 import dev.odysseia.choons.dto.AlbumResponse;
 import dev.odysseia.choons.dto.ArtistResponse;
 import dev.odysseia.choons.dto.TrackResponse;
+import dev.odysseia.choons.dto.UpdateLrclibIdRequest;
 import dev.odysseia.choons.dto.UpdateTrackRequest;
 import dev.odysseia.choons.service.AlbumService;
 import dev.odysseia.choons.service.ArtistService;
@@ -160,6 +161,13 @@ public class AdminController {
           @PathVariable UUID id,
           @RequestBody UpdateTrackRequest request) {
     return ResponseEntity.ok(trackService.update(id, request.title(), request.trackNumber()));
+  }
+
+  @PutMapping("/tracks/{id}/lrclib-id")
+  public ResponseEntity<TrackResponse> updateTrackLrclibId(
+          @PathVariable UUID id,
+          @RequestBody UpdateLrclibIdRequest request) {
+    return ResponseEntity.ok(trackService.updateLrclibId(id, request.lrclibId()));
   }
 
   @DeleteMapping("/tracks/{id}")

@@ -35,6 +35,8 @@ export interface TrackResponse {
   trackNumber: number
   durationSeconds: number
   createdAt: string
+  hifi: boolean
+  lrclibId: number | null
 }
 
 export interface PlaylistSummaryResponse {

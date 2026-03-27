@@ -5,7 +5,7 @@ import { usePlaylistsStore } from '@/stores/playlists'
 import { usePlayerStore } from '@/stores/player'
 import TrackRow from '@/components/music/TrackRow.vue'
 import { Button } from '@/components/ui/button'
-import { X, Play, Shuffle } from 'lucide-vue-next'
+import { X, Play, Shuffle, ListPlus } from 'lucide-vue-next'
 
 const route = useRoute()
 const playlists = usePlaylistsStore()
@@ -48,6 +48,14 @@ async function removeTrack(trackId: string) {
       >
         <Shuffle :size="16" />
         Shuffle
+      </Button>
+      <Button
+        variant="outline"
+        :disabled="playlists.current.tracks.length === 0"
+        @click="player.addTracksToQueue(playlists.current!.tracks)"
+      >
+        <ListPlus :size="16" />
+        Add to queue
       </Button>
     </div>
 

@@ -10,5 +10,7 @@ public record TrackResponse(
         ArtistResponse artist,
         int trackNumber,
         int durationSeconds,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        boolean hifi,
+        Integer lrclibId
 ) {}
