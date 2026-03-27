@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface AlbumRepository extends JpaRepository<Album, UUID> {
   List<Album> findByArtistIdOrderByReleaseYearDesc(UUID artistId);
   List<Album> findAllByOrderByArtistNameAscTitleAsc();
+  List<Album> findByCoverKeyIsNotNull();
 }

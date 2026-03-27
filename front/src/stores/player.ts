@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { streamUrl } from '@/api/tracks'
+import { streamUrl, recordStream } from '@/api/tracks'
 import type { TrackResponse } from '@/api/types'
 
 export type LoopMode = 'none' | 'queue' | 'track'
@@ -29,10 +29,18 @@ export const usePlayerStore = defineStore('player', () => {
   const volume = ref(savedVolume)
   const loopMode = ref<LoopMode>('none')
   const isShuffled = ref(false)
+  const streamRecorded = ref(false)
   audio.volume = savedVolume
 
   audio.addEventListener('timeupdate', () => {
     currentTime.value = audio.currentTime
+    if (!streamRecorded.value && currentTrack.value && duration.value > 0) {
+      const threshold = Math.min(30, duration.value * 0.5)
+      if (audio.currentTime >= threshold) {
+        streamRecorded.value = true
+        recordStream(currentTrack.value.id).catch(() => {})
+      }
+    }
   })
   audio.addEventListener('durationchange', () => {
     duration.value = audio.duration || 0
@@ -78,6 +86,7 @@ export const usePlayerStore = defineStore('player', () => {
     } else {
       currentIndex.value = index ?? 0
     }
+    streamRecorded.value = false
     audio.src = streamUrl(track.id)
     audio.load()
     audio.play()

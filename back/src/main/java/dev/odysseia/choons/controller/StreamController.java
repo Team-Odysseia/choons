@@ -1,10 +1,13 @@
 package dev.odysseia.choons.controller;
 
+import dev.odysseia.choons.model.user.User;
+import dev.odysseia.choons.service.StreamTrackingService;
 import dev.odysseia.choons.service.StreamingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
@@ -15,6 +18,7 @@ import java.util.UUID;
 public class StreamController {
 
   @Autowired private StreamingService streamingService;
+  @Autowired private StreamTrackingService streamTrackingService;
 
   @GetMapping("/{trackId}")
   public ResponseEntity<StreamingResponseBody> stream(
@@ -41,5 +45,12 @@ public class StreamController {
     }
 
     return ResponseEntity.ok().headers(headers).body(body);
+  }
+
+  @PostMapping("/{trackId}/played")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void recordPlay(@PathVariable UUID trackId, Authentication authentication) {
+    User user = (User) authentication.getPrincipal();
+    streamTrackingService.recordStream(trackId, user.getUsername());
   }
 }
