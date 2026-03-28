@@ -215,6 +215,17 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  function stop() {
+    audio.pause()
+    audio.src = ''
+    currentTrack.value = null
+    queue.value = []
+    originalQueue.value = []
+    currentIndex.value = -1
+    isPlaying.value = false
+    streamRecorded.value = false
+  }
+
   return {
     currentTrack,
     queue,
@@ -242,5 +253,6 @@ export const usePlayerStore = defineStore('player', () => {
     removeFromQueue,
     reorderQueue,
     clearQueue,
+    stop,
   }
 })

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as apiLogin, me as apiMe } from '@/api/auth'
+import { usePlayerStore } from '@/stores/player'
 import type { UserResponse } from '@/api/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -33,6 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    usePlayerStore().stop()
     token.value = null
     user.value = null
     localStorage.removeItem('token')

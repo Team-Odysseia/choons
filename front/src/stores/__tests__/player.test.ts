@@ -314,6 +314,21 @@ describe('stream tracking', () => {
   })
 })
 
+// ─── stop ─────────────────────────────────────────────────────────────────────
+
+describe('stop', () => {
+  it('pausa o áudio e reseta currentTrack, fila e índice', () => {
+    const store = usePlayerStore()
+    store.playQueue([t1, t2, t3], 1)
+    store.stop()
+    expect(audioMock.pause).toHaveBeenCalled()
+    expect(store.currentTrack).toBeNull()
+    expect(store.queue).toEqual([])
+    expect(store.currentIndex).toBe(-1)
+    expect(store.isPlaying).toBe(false)
+  })
+})
+
 // ─── evento ended ─────────────────────────────────────────────────────────────
 
 describe('evento ended', () => {

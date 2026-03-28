@@ -4,10 +4,15 @@ import { useAuthStore } from '../auth'
 
 const mockLogin = vi.fn()
 const mockMe = vi.fn()
+const mockPlayerStop = vi.fn()
 
 vi.mock('@/api/auth', () => ({
   login: (...args: unknown[]) => mockLogin(...args),
   me: () => mockMe(),
+}))
+
+vi.mock('@/stores/player', () => ({
+  usePlayerStore: () => ({ stop: mockPlayerStop }),
 }))
 
 const adminUser = { id: 'u-1', username: 'admin', role: 'ADMIN' as const }
@@ -16,6 +21,7 @@ const listenerUser = { id: 'u-2', username: 'listener', role: 'LISTENER' as cons
 beforeEach(() => {
   localStorage.clear()
   setActivePinia(createPinia())
+  mockPlayerStop.mockClear()
 })
 
 // ─── estado inicial ───────────────────────────────────────────────────────────
@@ -92,6 +98,17 @@ describe('logout', () => {
     expect(store.user).toBeNull()
     expect(store.isAuthenticated).toBe(false)
     expect(localStorage.getItem('token')).toBeNull()
+  })
+
+  it('para o player ao fazer logout', async () => {
+    mockLogin.mockResolvedValueOnce({ token: 'jwt-abc' })
+    mockMe.mockResolvedValueOnce(adminUser)
+
+    const store = useAuthStore()
+    await store.login('admin', 'pass')
+    store.logout()
+
+    expect(mockPlayerStop).toHaveBeenCalledOnce()
   })
 })
 
