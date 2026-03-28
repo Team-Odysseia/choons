@@ -2,17 +2,31 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query'
 import LibraryView from '../LibraryView.vue'
-import { useMusicStore } from '@/stores/music'
 import { usePlaylistsStore } from '@/stores/playlists'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock('@/api/albums', () => ({ getAlbums: vi.fn().mockResolvedValue([]), getAlbum: vi.fn() }))
-vi.mock('@/api/artists', () => ({ getArtists: vi.fn().mockResolvedValue([]), getArtist: vi.fn() }))
+const mockGetAlbums = vi.fn().mockResolvedValue([])
+const mockGetArtists = vi.fn().mockResolvedValue([])
+const mockGetMostPlayedTracks = vi.fn().mockResolvedValue([])
+
+vi.mock('@/api/albums', () => ({
+  getAlbums: (...args: unknown[]) => mockGetAlbums(...args),
+  getAlbum: vi.fn(),
+  albumImageUrl: vi.fn((id: string) => `/media/images/albums/${id}`),
+}))
+vi.mock('@/api/artists', () => ({
+  getArtists: () => mockGetArtists(),
+  getArtist: vi.fn(),
+  artistImageUrl: vi.fn((id: string) => `/media/images/artists/${id}`),
+}))
 vi.mock('@/api/tracks', () => ({
   getTracks: vi.fn().mockResolvedValue([]),
-  getMostPlayedTracks: vi.fn().mockResolvedValue([]),
+  getMostPlayedTracks: (...args: unknown[]) => mockGetMostPlayedTracks(...args),
+  streamUrl: vi.fn(),
+  recordStream: vi.fn(),
 }))
 vi.mock('@/api/playlists', () => ({
   getPlaylists: vi.fn().mockResolvedValue([]),
@@ -31,7 +45,7 @@ vi.mock('@/api/playlists', () => ({
 const now = Date.now()
 const daysAgo = (n: number) => new Date(now - n * 24 * 60 * 60 * 1000).toISOString()
 
-const artist = { id: 'a-1', name: 'Test Artist', bio: null, createdAt: daysAgo(60) }
+const artist = { id: 'a-1', name: 'Test Artist', bio: null, createdAt: daysAgo(60), avatarUrl: null }
 
 function makeAlbum(id: string, title: string, daysOld: number) {
   return { id, title, artist, releaseYear: 2024, createdAt: daysAgo(daysOld), coverUrl: null }
@@ -55,6 +69,7 @@ function makeRouter() {
       { path: '/library/albums', component: { template: '<div />' } },
       { path: '/library/albums/:id', component: { template: '<div />' } },
       { path: '/playlists', component: { template: '<div />' } },
+      { path: '/playlists/:id', component: { template: '<div />' } },
     ],
   })
 }
@@ -63,54 +78,57 @@ function mountView() {
   const pinia = createPinia()
   setActivePinia(pinia)
 
-  // Stub store actions so onMounted does not overwrite patched state
-  const music = useMusicStore()
-  music.fetchArtists = vi.fn().mockResolvedValue(undefined)
-  music.fetchRecentAlbums = vi.fn().mockResolvedValue(undefined)
-  music.fetchMostPlayed = vi.fn().mockResolvedValue(undefined)
   const playlists = usePlaylistsStore()
   playlists.fetchMyPlaylists = vi.fn().mockResolvedValue(undefined)
   playlists.fetchPublicPlaylists = vi.fn().mockResolvedValue(undefined)
 
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const router = makeRouter()
+
   const wrapper = mount(LibraryView, {
-    global: { plugins: [pinia, router] },
+    global: { plugins: [pinia, [VueQueryPlugin, { queryClient }], router] },
   })
 
-  return { wrapper, router, music, playlists }
+  return { wrapper, router, playlists, queryClient }
 }
 
 // ─── Recently Added Albums swiper ────────────────────────────────────────────
 
 describe('recently added albums swiper', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockGetAlbums.mockResolvedValue([])
+    mockGetArtists.mockResolvedValue([])
+    mockGetMostPlayedTracks.mockResolvedValue([])
+  })
 
-  it('does not render swiper when recentAlbums is empty', async () => {
+  it('does not render swiper when no albums', async () => {
     const { wrapper } = mountView()
     await flushPromises()
     expect(wrapper.find('.swiper-track').exists()).toBe(false)
   })
 
-  it('renders album cards when recentAlbums has items', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-1', 'Album One', 3)] })
-    await wrapper.vm.$nextTick()
+  it('renders album cards when albums are returned', async () => {
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album One', 3)])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.find('.swiper-track').exists()).toBe(true)
     expect(wrapper.text()).toContain('Album One')
     expect(wrapper.text()).toContain('Test Artist')
   })
 
   it('renders "See all albums" button', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-1', 'Album One', 3)] })
-    await wrapper.vm.$nextTick()
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album One', 3)])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.text()).toContain('See all albums')
   })
 
   it('"See all albums" navigates to /library/albums', async () => {
-    const { wrapper, router, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-1', 'Album One', 3)] })
-    await wrapper.vm.$nextTick()
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album One', 3)])
+    const { wrapper, router } = mountView()
+    await flushPromises()
     const btn = wrapper.findAll('button').find((b) => b.text().includes('See all albums'))
     await btn!.trigger('click')
     await flushPromises()
@@ -118,41 +136,41 @@ describe('recently added albums swiper', () => {
   })
 
   it('shows NEW badge for albums added within 14 days', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-1', 'New Album', 7)] })
-    await wrapper.vm.$nextTick()
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'New Album', 7)])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.text()).toContain('NEW')
   })
 
   it('does not show NEW badge for albums older than 14 days', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-1', 'Old Album', 30)] })
-    await wrapper.vm.$nextTick()
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Old Album', 30)])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.text()).not.toContain('NEW')
   })
 
   it('clicking an album card navigates to the album detail page', async () => {
-    const { wrapper, router, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-42', 'Nav Album', 3)] })
-    await wrapper.vm.$nextTick()
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-42', 'Nav Album', 3)])
+    const { wrapper, router } = mountView()
+    await flushPromises()
     const card = wrapper.find('.swiper-track > div')
     await card.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/library/albums/al-42')
   })
 
-  it('renders scroll left and right buttons', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-1', 'Album', 3)] })
-    await wrapper.vm.$nextTick()
+  it('renders scroll buttons', async () => {
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album', 3)])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.find('[aria-label="Scroll left"]').exists()).toBe(true)
     expect(wrapper.find('[aria-label="Scroll right"]').exists()).toBe(true)
   })
 
   it('renders the section heading "Recently Added"', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ recentAlbums: [makeAlbum('al-1', 'Album', 3)] })
-    await wrapper.vm.$nextTick()
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album', 3)])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.text()).toContain('Recently Added')
   })
 })
@@ -160,7 +178,13 @@ describe('recently added albums swiper', () => {
 // ─── Community Playlists section ─────────────────────────────────────────────
 
 describe('community playlists section', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockGetAlbums.mockResolvedValue([])
+    mockGetArtists.mockResolvedValue([])
+    mockGetMostPlayedTracks.mockResolvedValue([])
+  })
 
   it('does not render when publicPlaylists is empty', async () => {
     const { wrapper } = mountView()
@@ -182,26 +206,63 @@ describe('community playlists section', () => {
 // ─── Most Played section ──────────────────────────────────────────────────────
 
 describe('most played section', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockGetAlbums.mockResolvedValue([])
+    mockGetArtists.mockResolvedValue([])
+    mockGetMostPlayedTracks.mockResolvedValue([])
+  })
 
-  it('does not render when mostPlayedTracks is empty', async () => {
+  it('does not render when no most played tracks', async () => {
     const { wrapper } = mountView()
     await flushPromises()
     expect(wrapper.text()).not.toContain('Most Played')
   })
 
   it('renders section heading when there are most played tracks', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ mostPlayedTracks: [makeTrack('t-1', 'Top Song')] })
-    await wrapper.vm.$nextTick()
+    mockGetMostPlayedTracks.mockResolvedValue([makeTrack('t-1', 'Top Song')])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.text()).toContain('Most Played')
   })
 
   it('renders track titles', async () => {
-    const { wrapper, music } = mountView()
-    music.$patch({ mostPlayedTracks: [makeTrack('t-1', 'Top Song'), makeTrack('t-2', 'Second Song')] })
-    await wrapper.vm.$nextTick()
+    mockGetMostPlayedTracks.mockResolvedValue([makeTrack('t-1', 'Top Song'), makeTrack('t-2', 'Second Song')])
+    const { wrapper } = mountView()
+    await flushPromises()
     expect(wrapper.text()).toContain('Top Song')
     expect(wrapper.text()).toContain('Second Song')
+  })
+})
+
+// ─── Artists section ─────────────────────────────────────────────────────────
+
+describe('artists section', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockGetAlbums.mockResolvedValue([])
+    mockGetMostPlayedTracks.mockResolvedValue([])
+  })
+
+  it('shows loading state while fetching', async () => {
+    mockGetArtists.mockReturnValue(new Promise(() => {}))
+    const { wrapper } = mountView()
+    expect(wrapper.text()).toContain('Loading')
+  })
+
+  it('shows empty state when no artists', async () => {
+    mockGetArtists.mockResolvedValue([])
+    const { wrapper } = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('No artists yet')
+  })
+
+  it('renders artist names', async () => {
+    mockGetArtists.mockResolvedValue([{ ...artist, id: 'a-1', name: 'The Beatles' }])
+    const { wrapper } = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('The Beatles')
   })
 })

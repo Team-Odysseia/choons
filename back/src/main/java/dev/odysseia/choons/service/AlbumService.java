@@ -1,6 +1,7 @@
 package dev.odysseia.choons.service;
 
 import dev.odysseia.choons.dto.AlbumResponse;
+import dev.odysseia.choons.mapper.AlbumMapper;
 import dev.odysseia.choons.model.music.Album;
 import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.model.music.Track;
@@ -31,8 +32,8 @@ public class AlbumService {
   @Autowired private ArtistRepository artistRepository;
   @Autowired private TrackRepository trackRepository;
   @Autowired private PlaylistTrackRepository playlistTrackRepository;
-  @Autowired private ArtistService artistService;
   @Autowired private R2Service r2Service;
+  @Autowired private AlbumMapper albumMapper;
 
   public AlbumResponse create(String title, UUID artistId, int releaseYear, MultipartFile coverFile) throws IOException {
     Artist artist = artistRepository.findById(artistId)
@@ -134,16 +135,6 @@ public class AlbumService {
   }
 
   public AlbumResponse toResponse(Album album) {
-    String coverUrl = album.getCoverKey() != null
-            ? "/media/images/albums/" + album.getId()
-            : null;
-    return new AlbumResponse(
-            album.getId(),
-            album.getTitle(),
-            artistService.toResponse(album.getArtist()),
-            album.getReleaseYear(),
-            album.getCreatedAt(),
-            coverUrl
-    );
+    return albumMapper.toResponse(album);
   }
 }

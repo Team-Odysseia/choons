@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
 import { login as apiLogin, me as apiMe } from '@/api/auth'
 import { usePlayerStore } from '@/stores/player'
 import type { UserResponse } from '@/api/types'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('token'))
+  const token = useLocalStorage<string | null>('token', null)
   const user = ref<UserResponse | null>(null)
   const loading = ref(false)
 
@@ -17,7 +18,6 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const data = await apiLogin(username, password)
       token.value = data.token
-      localStorage.setItem('token', data.token)
       await fetchMe()
     } finally {
       loading.value = false
@@ -37,7 +37,6 @@ export const useAuthStore = defineStore('auth', () => {
     usePlayerStore().stop()
     token.value = null
     user.value = null
-    localStorage.removeItem('token')
   }
 
   return { token, user, loading, isAuthenticated, isAdmin, login, logout, fetchMe }

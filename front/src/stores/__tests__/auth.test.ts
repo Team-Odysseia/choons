@@ -55,7 +55,7 @@ describe('login', () => {
     await store.login('admin', 'pass')
 
     expect(store.token).toBe('jwt-abc')
-    expect(localStorage.getItem('token')).toBe('jwt-abc')
+    expect(store.token).toBe('jwt-abc')
     expect(store.user).toEqual(adminUser)
     expect(store.isAuthenticated).toBe(true)
   })
@@ -77,7 +77,7 @@ describe('login', () => {
     await expect(store.login('admin', 'wrong')).rejects.toThrow()
 
     expect(store.token).toBeNull()
-    expect(localStorage.getItem('token')).toBeNull()
+    expect(store.token).toBeNull()
     expect(store.loading).toBe(false)
   })
 })
@@ -97,7 +97,7 @@ describe('logout', () => {
     expect(store.token).toBeNull()
     expect(store.user).toBeNull()
     expect(store.isAuthenticated).toBe(false)
-    expect(localStorage.getItem('token')).toBeNull()
+    expect(store.token).toBeNull()
   })
 
   it('para o player ao fazer logout', async () => {

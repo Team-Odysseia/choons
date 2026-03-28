@@ -47,7 +47,11 @@
   --radius: 0.5rem;
   --text-muted: #6a6a6a;
   --sidebar-w: 220px;
-  --player-h: 88px;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --player-h: calc(88px + var(--safe-area-bottom));
 }
 
 @layer base {

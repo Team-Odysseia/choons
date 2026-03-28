@@ -19,8 +19,8 @@ const drawer = useDrawerStore()
     >
       <div
         v-if="drawer.activePanel"
-        class="fixed right-0 top-0 w-[300px] bg-card border-l border-border flex flex-col z-40"
-        style="height: calc(100vh - var(--player-h))"
+        class="fixed right-0 top-0 w-full md:w-[300px] bg-card border-l border-border flex flex-col z-40"
+        style="height: calc(100vh - var(--player-h)); padding-top: var(--safe-area-top); padding-right: var(--safe-area-right)"
       >
         <!-- Tab header -->
         <div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">

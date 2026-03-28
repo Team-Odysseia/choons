@@ -2,6 +2,7 @@ package dev.odysseia.choons.service;
 
 import dev.odysseia.choons.dto.TrackResponse;
 import dev.odysseia.choons.dto.UpdateTrackRequest;
+import dev.odysseia.choons.mapper.TrackMapper;
 import dev.odysseia.choons.model.music.Album;
 import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.model.music.Track;
@@ -36,19 +37,14 @@ public class TrackService {
           "audio/aac", "aac"
   );
 
-  private static final java.util.Set<String> HIFI_TYPES = java.util.Set.of(
-          "audio/flac", "audio/x-flac", "audio/wav"
-  );
-
   @Autowired private TrackRepository trackRepository;
   @Autowired private AlbumRepository albumRepository;
   @Autowired private ArtistRepository artistRepository;
   @Autowired private PlaylistTrackRepository playlistTrackRepository;
   @Autowired private StreamEventRepository streamEventRepository;
   @Autowired private R2Service r2Service;
-  @Autowired private AlbumService albumService;
-  @Autowired private ArtistService artistService;
   @Autowired private LyricsService lyricsService;
+  @Autowired private TrackMapper trackMapper;
 
   public TrackResponse upload(String title, UUID albumId, UUID artistId,
                               int trackNumber, int durationSeconds,
@@ -169,17 +165,7 @@ public class TrackService {
   }
 
   public TrackResponse toResponse(Track track) {
-    return new TrackResponse(
-            track.getId(),
-            track.getTitle(),
-            albumService.toResponse(track.getAlbum()),
-            artistService.toResponse(track.getArtist()),
-            track.getTrackNumber(),
-            track.getDurationSeconds(),
-            track.getCreatedAt(),
-            track.getContentType() != null && HIFI_TYPES.contains(track.getContentType()),
-            track.getLrclibId()
-    );
+    return trackMapper.toResponse(track);
   }
 
   public TrackResponse updateLrclibId(UUID id, Integer lrclibId) {

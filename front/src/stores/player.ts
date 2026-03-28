@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
 import { streamUrl, recordStream } from '@/api/tracks'
 import type { TrackResponse } from '@/api/types'
 
@@ -25,12 +26,35 @@ export const usePlayerStore = defineStore('player', () => {
   const isPlaying = ref(false)
   const currentTime = ref(0)
   const duration = ref(0)
-  const savedVolume = parseFloat(localStorage.getItem('volume') ?? '1')
-  const volume = ref(savedVolume)
+  const volume = useLocalStorage('volume', 1)
   const loopMode = ref<LoopMode>('none')
   const isShuffled = ref(false)
   const streamRecorded = ref(false)
-  audio.volume = savedVolume
+  audio.volume = volume.value
+
+  // ─── Media Session ──────────────────────────────────────────────────────────
+
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', () => audio.play().catch(() => { isPlaying.value = false }))
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause())
+    navigator.mediaSession.setActionHandler('previoustrack', () => playPrev())
+    navigator.mediaSession.setActionHandler('nexttrack', () => playNext())
+  }
+
+  watch(currentTrack, (track) => {
+    if (!('mediaSession' in navigator)) return
+    if (track) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist.name,
+        album: track.album.title,
+      })
+    } else {
+      navigator.mediaSession.metadata = null
+    }
+  })
+
+  // ─── Audio events ────────────────────────────────────────────────────────────
 
   audio.addEventListener('timeupdate', () => {
     currentTime.value = audio.currentTime
@@ -48,7 +72,7 @@ export const usePlayerStore = defineStore('player', () => {
   audio.addEventListener('ended', () => {
     if (loopMode.value === 'track') {
       audio.currentTime = 0
-      audio.play()
+      audio.play().catch(() => { isPlaying.value = false })
     } else {
       playNext()
     }
@@ -88,8 +112,9 @@ export const usePlayerStore = defineStore('player', () => {
     }
     streamRecorded.value = false
     audio.src = streamUrl(track.id)
-    audio.load()
-    audio.play()
+    audio.play().catch(() => {
+      isPlaying.value = false
+    })
   }
 
   function playQueue(tracks: TrackResponse[], startIndex = 0) {
@@ -135,7 +160,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   function togglePlay() {
     if (audio.paused) {
-      audio.play()
+      audio.play().catch(() => { isPlaying.value = false })
     } else {
       audio.pause()
     }
@@ -148,7 +173,6 @@ export const usePlayerStore = defineStore('player', () => {
   function setVolume(vol: number) {
     volume.value = vol
     audio.volume = vol
-    localStorage.setItem('volume', String(vol))
   }
 
   function cycleLoop() {

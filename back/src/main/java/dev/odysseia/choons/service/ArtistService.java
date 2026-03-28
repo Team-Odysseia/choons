@@ -1,6 +1,7 @@
 package dev.odysseia.choons.service;
 
 import dev.odysseia.choons.dto.ArtistResponse;
+import dev.odysseia.choons.mapper.ArtistMapper;
 import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.repository.AlbumRepository;
 import dev.odysseia.choons.repository.ArtistRepository;
@@ -29,6 +30,7 @@ public class ArtistService {
   @Autowired private AlbumRepository albumRepository;
   @Autowired @Lazy private AlbumService albumService;
   @Autowired private R2Service r2Service;
+  @Autowired private ArtistMapper artistMapper;
 
   public ArtistResponse create(String name, String bio, MultipartFile avatarFile) throws IOException {
     Artist artist = artistRepository.save(Artist.builder()
@@ -109,9 +111,6 @@ public class ArtistService {
   }
 
   public ArtistResponse toResponse(Artist artist) {
-    String avatarUrl = artist.getAvatarKey() != null
-            ? "/media/images/artists/" + artist.getId()
-            : null;
-    return new ArtistResponse(artist.getId(), artist.getName(), artist.getBio(), artist.getCreatedAt(), avatarUrl);
+    return artistMapper.toResponse(artist);
   }
 }

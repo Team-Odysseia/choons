@@ -33,7 +33,7 @@ const isActive = () => player.currentTrack?.id === props.track.id
 
 <template>
   <div
-    class="grid [grid-template-columns:32px_1fr_40px_1fr_60px_80px] items-center gap-3 px-3 py-2 rounded transition-colors hover:bg-muted group"
+    class="grid [grid-template-columns:32px_minmax(0,1fr)_60px] md:[grid-template-columns:32px_minmax(0,1fr)_40px_minmax(0,1fr)_60px_80px] items-center gap-2 md:gap-3 px-3 py-2 rounded transition-colors hover:bg-muted group"
   >
     <span class="text-[13px] text-dimmed text-right">{{ (index ?? 0) + 1 }}</span>
 
@@ -42,21 +42,21 @@ const isActive = () => player.currentTrack?.id === props.track.id
       @click.stop="play"
     >
       <span class="text-sm font-medium truncate" :class="isActive() ? 'text-primary' : 'text-foreground'">{{ track.title }}</span>
-      <span class="text-xs text-muted-foreground">{{ track.artist.name }}</span>
+      <span class="text-xs text-muted-foreground truncate">{{ track.artist.name }}</span>
     </div>
 
-    <div class="flex items-center">
+    <div class="hidden md:flex items-center">
       <span v-if="track.hifi" class="text-[9px] font-bold tracking-widest px-1 py-px rounded border border-primary/50 text-primary/80 leading-none">HI-FI</span>
     </div>
 
     <span
-      class="text-[13px] text-muted-foreground truncate cursor-pointer hover:underline hover:text-foreground transition-colors"
+      class="hidden md:block text-[13px] text-muted-foreground truncate cursor-pointer hover:underline hover:text-foreground transition-colors"
       @click.stop="router.push(`/library/albums/${track.album.id}`)"
     >{{ track.album.title }}</span>
 
     <span class="text-[13px] text-dimmed text-right">{{ formatDuration(track.durationSeconds) }}</span>
 
-    <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div class="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
       <button
         class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
         title="Play"

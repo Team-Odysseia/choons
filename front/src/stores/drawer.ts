@@ -5,6 +5,7 @@ export type DrawerPanel = 'queue' | 'lyrics'
 
 export const useDrawerStore = defineStore('drawer', () => {
   const activePanel = ref<DrawerPanel | null>(null)
+  const sidebarOpen = ref(false)
 
   function toggle(panel: DrawerPanel) {
     activePanel.value = activePanel.value === panel ? null : panel
@@ -14,5 +15,13 @@ export const useDrawerStore = defineStore('drawer', () => {
     activePanel.value = null
   }
 
-  return { activePanel, toggle, close }
+  function toggleSidebar() {
+    sidebarOpen.value = !sidebarOpen.value
+  }
+
+  function closeSidebar() {
+    sidebarOpen.value = false
+  }
+
+  return { activePanel, sidebarOpen, toggle, close, toggleSidebar, closeSidebar }
 })

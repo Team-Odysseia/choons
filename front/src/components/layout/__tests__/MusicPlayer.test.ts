@@ -123,8 +123,8 @@ describe('controles de reprodução', () => {
     const nextBtn = wrapper.findAll('button').find((b) => !b.attributes('disabled') && b.find('svg').exists() && wrapper.findAll('button').indexOf(b) === 3)
     // Localiza pelo título (SkipForward não tem texto; usa posição entre botões de controle)
     const controlButtons = wrapper.findAll('button')
-    // Botões de controle: Shuffle(0), Prev(1), Play(2), Next(3), Loop(4)
-    await controlButtons[3].trigger('click')
+    // Botões de controle: Menu(0), Shuffle(1), Prev(2), Play(3), Next(4), Loop(5)
+    await controlButtons[4].trigger('click')
     expect(player.playNext).toHaveBeenCalled()
   })
 
@@ -139,7 +139,7 @@ describe('controles de reprodução', () => {
     await wrapper.vm.$nextTick()
 
     const controlButtons = wrapper.findAll('button')
-    await controlButtons[1].trigger('click')
+    await controlButtons[2].trigger('click')
     expect(player.playPrev).toHaveBeenCalled()
   })
 })
@@ -206,8 +206,8 @@ describe('shuffle', () => {
     vi.spyOn(player, 'toggleShuffle')
     await wrapper.vm.$nextTick()
 
-    // Botão shuffle é o primeiro botão de controle
-    await wrapper.findAll('button')[0].trigger('click')
+    // Botão shuffle é o segundo botão (índice 1), após o hamburger mobile
+    await wrapper.findAll('button')[1].trigger('click')
     expect(player.toggleShuffle).toHaveBeenCalled()
   })
 
@@ -216,7 +216,7 @@ describe('shuffle', () => {
     player.$patch({ isShuffled: true })
     await wrapper.vm.$nextTick()
 
-    const shuffleBtn = wrapper.findAll('button')[0]
+    const shuffleBtn = wrapper.findAll('button')[1]
     expect(shuffleBtn.classes()).toContain('text-primary')
   })
 })
@@ -229,7 +229,7 @@ describe('loop', () => {
     vi.spyOn(player, 'cycleLoop')
     await wrapper.vm.$nextTick()
 
-    await wrapper.findAll('button')[4].trigger('click')
+    await wrapper.findAll('button')[5].trigger('click')
     expect(player.cycleLoop).toHaveBeenCalled()
   })
 
@@ -238,7 +238,7 @@ describe('loop', () => {
     player.$patch({ loopMode: 'queue' })
     await wrapper.vm.$nextTick()
 
-    const loopBtn = wrapper.findAll('button')[4]
+    const loopBtn = wrapper.findAll('button')[5]
     expect(loopBtn.classes()).toContain('text-primary')
   })
 })

@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMusicStore } from '@/stores/music'
 import { usePlaylistsStore } from '@/stores/playlists'
+import { useArtistsQuery, useRecentAlbumsQuery, useMostPlayedQuery } from '@/composables/queries'
 import { albumImageUrl } from '@/api/albums'
 import { artistImageUrl } from '@/api/artists'
 import TrackRow from '@/components/music/TrackRow.vue'
 
 const router = useRouter()
-const music = useMusicStore()
 const playlists = usePlaylistsStore()
 
+const { data: artists, isPending: artistsLoading } = useArtistsQuery()
+const { data: recentAlbums } = useRecentAlbumsQuery()
+const { data: mostPlayed } = useMostPlayedQuery()
+
 const swiperRef = ref<HTMLElement | null>(null)
+const communityRef = ref<HTMLElement | null>(null)
 
 const recentPlaylists = computed(() =>
   [...playlists.playlists]
@@ -19,20 +23,10 @@ const recentPlaylists = computed(() =>
     .slice(0, 4),
 )
 
-const communityRef = ref<HTMLElement | null>(null)
-
 onMounted(() => Promise.all([
-  music.fetchArtists(),
-  music.fetchRecentAlbums(),
-  music.fetchMostPlayed(),
   playlists.fetchMyPlaylists(),
   playlists.fetchPublicPlaylists(),
 ]))
-
-function scrollCommunity(direction: 'left' | 'right') {
-  if (!communityRef.value) return
-  communityRef.value.scrollBy({ left: direction === 'left' ? -480 : 480, behavior: 'smooth' })
-}
 
 function isNew(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
@@ -41,6 +35,11 @@ function isNew(createdAt: string) {
 function scrollSwiper(direction: 'left' | 'right') {
   if (!swiperRef.value) return
   swiperRef.value.scrollBy({ left: direction === 'left' ? -560 : 560, behavior: 'smooth' })
+}
+
+function scrollCommunity(direction: 'left' | 'right') {
+  if (!communityRef.value) return
+  communityRef.value.scrollBy({ left: direction === 'left' ? -480 : 480, behavior: 'smooth' })
 }
 </script>
 
@@ -73,7 +72,7 @@ function scrollSwiper(direction: 'left' | 'right') {
     </section>
 
     <!-- Recently added albums swiper -->
-    <section v-if="music.recentAlbums.length > 0">
+    <section v-if="recentAlbums?.length">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-bold">Recently Added</h2>
         <div class="flex items-center gap-2">
@@ -95,7 +94,7 @@ function scrollSwiper(direction: 'left' | 'right') {
       </div>
       <div ref="swiperRef" class="swiper-track flex gap-4 overflow-x-auto pb-2">
         <div
-          v-for="album in music.recentAlbums"
+          v-for="album in recentAlbums"
           :key="album.id"
           class="shrink-0 w-[160px] bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
           @click="router.push(`/library/albums/${album.id}`)"
@@ -154,14 +153,14 @@ function scrollSwiper(direction: 'left' | 'right') {
     </section>
 
     <!-- Most Played -->
-    <section v-if="music.mostPlayedTracks.length > 0">
+    <section v-if="mostPlayed?.length">
       <h2 class="text-lg font-bold mb-4">Most Played</h2>
       <div class="flex flex-col">
         <TrackRow
-          v-for="(track, i) in music.mostPlayedTracks"
+          v-for="(track, i) in mostPlayed"
           :key="track.id"
           :track="track"
-          :queue="music.mostPlayedTracks"
+          :queue="mostPlayed"
           :index="i"
           :show-add-to-queue="true"
           :show-add-to-playlist="true"
@@ -172,13 +171,13 @@ function scrollSwiper(direction: 'left' | 'right') {
     <!-- Artists -->
     <section>
       <h2 class="text-lg font-bold mb-4">Artists</h2>
-      <div v-if="music.loading" class="text-[13px] text-dimmed">Loading…</div>
-      <div v-else-if="music.artists.length === 0" class="text-[13px] text-dimmed">
+      <div v-if="artistsLoading" class="text-[13px] text-dimmed">Loading…</div>
+      <div v-else-if="!artists?.length" class="text-[13px] text-dimmed">
         No artists yet. Ask an admin to add some music.
       </div>
       <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
         <div
-          v-for="artist in music.artists"
+          v-for="artist in artists"
           :key="artist.id"
           class="bg-card rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted"
           @click="router.push(`/library/artists/${artist.id}`)"
