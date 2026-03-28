@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getArtists, getArtist } from '@/api/artists'
 import { getAlbums, getAlbum } from '@/api/albums'
-import { getTracks } from '@/api/tracks'
+import { getTracks, getMostPlayedTracks } from '@/api/tracks'
 import type { ArtistResponse, AlbumResponse, TrackResponse } from '@/api/types'
 
 export const useMusicStore = defineStore('music', () => {
@@ -14,6 +14,7 @@ export const useMusicStore = defineStore('music', () => {
   const currentArtist = ref<ArtistResponse | null>(null)
   const currentAlbum = ref<AlbumResponse | null>(null)
   const currentAlbumTracks = ref<TrackResponse[]>([])
+  const mostPlayedTracks = ref<TrackResponse[]>([])
   const loading = ref(false)
 
   async function fetchArtists() {
@@ -61,6 +62,10 @@ export const useMusicStore = defineStore('music', () => {
     }
   }
 
+  async function fetchMostPlayed() {
+    mostPlayedTracks.value = await getMostPlayedTracks(5)
+  }
+
   async function fetchAlbum(id: string) {
     loading.value = true
     try {
@@ -80,11 +85,13 @@ export const useMusicStore = defineStore('music', () => {
     currentArtist,
     currentAlbum,
     currentAlbumTracks,
+    mostPlayedTracks,
     loading,
     fetchArtists,
     fetchRecentTracks,
     fetchRecentAlbums,
     fetchAllAlbums,
+    fetchMostPlayed,
     fetchArtist,
     fetchAlbum,
   }

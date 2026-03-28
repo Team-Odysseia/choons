@@ -17,8 +17,11 @@ vi.mock('@/api/artists', () => ({
   getArtist: vi.fn(),
 }))
 
+const mockGetMostPlayedTracks = vi.fn()
+
 vi.mock('@/api/tracks', () => ({
   getTracks: vi.fn().mockResolvedValue([]),
+  getMostPlayedTracks: (...args: unknown[]) => mockGetMostPlayedTracks(...args),
 }))
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -41,6 +44,18 @@ const albums = [
   { id: 'al-10', title: 'Kappa', artist, releaseYear: 2015, createdAt: daysAgo(200) },
   { id: 'al-11', title: 'Lambda', artist, releaseYear: 2014, createdAt: daysAgo(365) },
 ]
+
+const track = {
+  id: 't-1',
+  title: 'Top Song',
+  album: { id: 'al-1', title: 'Album', artist: { id: 'a-1', name: 'Artist', bio: null, createdAt: '' }, releaseYear: 2024, createdAt: '' },
+  artist: { id: 'a-1', name: 'Artist', bio: null, createdAt: '' },
+  trackNumber: 1,
+  durationSeconds: 180,
+  createdAt: '',
+  hifi: false,
+  lrclibId: null,
+}
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -117,5 +132,31 @@ describe('fetchAllAlbums', () => {
     const store = useMusicStore()
     await expect(store.fetchAllAlbums()).rejects.toThrow()
     expect(store.loading).toBe(false)
+  })
+})
+
+// ─── fetchMostPlayed ──────────────────────────────────────────────────────────
+
+describe('fetchMostPlayed', () => {
+  it('popula mostPlayedTracks com o retorno da API', async () => {
+    mockGetMostPlayedTracks.mockResolvedValueOnce([track])
+    const store = useMusicStore()
+    await store.fetchMostPlayed()
+    expect(store.mostPlayedTracks).toEqual([track])
+  })
+
+  it('começa com lista vazia e preenche após fetch', async () => {
+    mockGetMostPlayedTracks.mockResolvedValueOnce([track])
+    const store = useMusicStore()
+    expect(store.mostPlayedTracks).toEqual([])
+    await store.fetchMostPlayed()
+    expect(store.mostPlayedTracks).toHaveLength(1)
+  })
+
+  it('chama getMostPlayedTracks da API', async () => {
+    mockGetMostPlayedTracks.mockResolvedValueOnce([])
+    const store = useMusicStore()
+    await store.fetchMostPlayed()
+    expect(mockGetMostPlayedTracks).toHaveBeenCalledOnce()
   })
 })

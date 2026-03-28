@@ -10,7 +10,10 @@ import { usePlaylistsStore } from '@/stores/playlists'
 
 vi.mock('@/api/albums', () => ({ getAlbums: vi.fn().mockResolvedValue([]), getAlbum: vi.fn() }))
 vi.mock('@/api/artists', () => ({ getArtists: vi.fn().mockResolvedValue([]), getArtist: vi.fn() }))
-vi.mock('@/api/tracks', () => ({ getTracks: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/api/tracks', () => ({
+  getTracks: vi.fn().mockResolvedValue([]),
+  getMostPlayedTracks: vi.fn().mockResolvedValue([]),
+}))
 vi.mock('@/api/playlists', () => ({
   getPlaylists: vi.fn().mockResolvedValue([]),
   createPlaylist: vi.fn(),
@@ -29,7 +32,17 @@ const daysAgo = (n: number) => new Date(now - n * 24 * 60 * 60 * 1000).toISOStri
 const artist = { id: 'a-1', name: 'Test Artist', bio: null, createdAt: daysAgo(60) }
 
 function makeAlbum(id: string, title: string, daysOld: number) {
-  return { id, title, artist, releaseYear: 2024, createdAt: daysAgo(daysOld) }
+  return { id, title, artist, releaseYear: 2024, createdAt: daysAgo(daysOld), coverUrl: null }
+}
+
+function makeTrack(id: string, title: string) {
+  return {
+    id, title,
+    album: makeAlbum('al-1', 'Album', 10),
+    artist,
+    trackNumber: 1, durationSeconds: 180,
+    createdAt: daysAgo(5), hifi: false, lrclibId: null,
+  }
 }
 
 function makeRouter() {
@@ -52,6 +65,7 @@ function mountView() {
   const music = useMusicStore()
   music.fetchArtists = vi.fn().mockResolvedValue(undefined)
   music.fetchRecentAlbums = vi.fn().mockResolvedValue(undefined)
+  music.fetchMostPlayed = vi.fn().mockResolvedValue(undefined)
   const playlists = usePlaylistsStore()
   playlists.fetchMyPlaylists = vi.fn().mockResolvedValue(undefined)
 
@@ -137,5 +151,32 @@ describe('recently added albums swiper', () => {
     music.$patch({ recentAlbums: [makeAlbum('al-1', 'Album', 3)] })
     await wrapper.vm.$nextTick()
     expect(wrapper.text()).toContain('Recently Added')
+  })
+})
+
+// ─── Most Played section ──────────────────────────────────────────────────────
+
+describe('most played section', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('does not render when mostPlayedTracks is empty', async () => {
+    const { wrapper } = mountView()
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Most Played')
+  })
+
+  it('renders section heading when there are most played tracks', async () => {
+    const { wrapper, music } = mountView()
+    music.$patch({ mostPlayedTracks: [makeTrack('t-1', 'Top Song')] })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Most Played')
+  })
+
+  it('renders track titles', async () => {
+    const { wrapper, music } = mountView()
+    music.$patch({ mostPlayedTracks: [makeTrack('t-1', 'Top Song'), makeTrack('t-2', 'Second Song')] })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Top Song')
+    expect(wrapper.text()).toContain('Second Song')
   })
 })

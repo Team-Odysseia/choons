@@ -5,6 +5,7 @@ import { useMusicStore } from '@/stores/music'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { albumImageUrl } from '@/api/albums'
 import { artistImageUrl } from '@/api/artists'
+import TrackRow from '@/components/music/TrackRow.vue'
 
 const router = useRouter()
 const music = useMusicStore()
@@ -21,6 +22,7 @@ const recentPlaylists = computed(() =>
 onMounted(() => Promise.all([
   music.fetchArtists(),
   music.fetchRecentAlbums(),
+  music.fetchMostPlayed(),
   playlists.fetchMyPlaylists(),
 ]))
 
@@ -107,6 +109,22 @@ function scrollSwiper(direction: 'left' | 'right') {
           <div class="font-bold text-sm truncate">{{ album.title }}</div>
           <div class="text-xs text-muted-foreground truncate mt-0.5">{{ album.artist.name }}</div>
         </div>
+      </div>
+    </section>
+
+    <!-- Most Played -->
+    <section v-if="music.mostPlayedTracks.length > 0">
+      <h2 class="text-lg font-bold mb-4">Most Played</h2>
+      <div class="flex flex-col">
+        <TrackRow
+          v-for="(track, i) in music.mostPlayedTracks"
+          :key="track.id"
+          :track="track"
+          :queue="music.mostPlayedTracks"
+          :index="i"
+          :show-add-to-queue="true"
+          :show-add-to-playlist="true"
+        />
       </div>
     </section>
 

@@ -56,4 +56,10 @@ public class MusicController {
             : trackService.findAll();
     return ResponseEntity.ok(tracks);
   }
+
+  @GetMapping("/tracks/most-played")
+  public ResponseEntity<List<TrackResponse>> mostPlayedTracks(
+          @RequestParam(defaultValue = "10") int limit) {
+    return ResponseEntity.ok(trackService.findMostPlayed(limit));
+  }
 }
