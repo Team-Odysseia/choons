@@ -22,6 +22,8 @@ vi.mock('@/api/playlists', () => ({
   addTrackToPlaylist: vi.fn(),
   removeTrackFromPlaylist: vi.fn(),
   reorderPlaylist: vi.fn(),
+  setPlaylistVisibility: vi.fn(),
+  getPublicPlaylists: vi.fn().mockResolvedValue([]),
 }))
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -68,6 +70,7 @@ function mountView() {
   music.fetchMostPlayed = vi.fn().mockResolvedValue(undefined)
   const playlists = usePlaylistsStore()
   playlists.fetchMyPlaylists = vi.fn().mockResolvedValue(undefined)
+  playlists.fetchPublicPlaylists = vi.fn().mockResolvedValue(undefined)
 
   const router = makeRouter()
   const wrapper = mount(LibraryView, {
@@ -151,6 +154,28 @@ describe('recently added albums swiper', () => {
     music.$patch({ recentAlbums: [makeAlbum('al-1', 'Album', 3)] })
     await wrapper.vm.$nextTick()
     expect(wrapper.text()).toContain('Recently Added')
+  })
+})
+
+// ─── Community Playlists section ─────────────────────────────────────────────
+
+describe('community playlists section', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('does not render when publicPlaylists is empty', async () => {
+    const { wrapper } = mountView()
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Community Playlists')
+  })
+
+  it('renders section heading when there are public playlists', async () => {
+    const { wrapper, playlists } = mountView()
+    playlists.$patch({
+      publicPlaylists: [{ id: 'pl-1', name: 'Chill Vibes', trackCount: 3, isPublic: true, updatedAt: '2024-01-01' }],
+    })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Community Playlists')
+    expect(wrapper.text()).toContain('Chill Vibes')
   })
 })
 

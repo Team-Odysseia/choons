@@ -9,6 +9,7 @@ public record PlaylistResponse(
         String name,
         UUID ownerId,
         List<TrackResponse> tracks,
+        boolean isPublic,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {}

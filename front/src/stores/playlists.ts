@@ -5,6 +5,7 @@ import type { PlaylistResponse, PlaylistSummaryResponse } from '@/api/types'
 
 export const usePlaylistsStore = defineStore('playlists', () => {
   const playlists = ref<PlaylistSummaryResponse[]>([])
+  const publicPlaylists = ref<PlaylistSummaryResponse[]>([])
   const current = ref<PlaylistResponse | null>(null)
   const loading = ref(false)
 
@@ -15,6 +16,10 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  async function fetchPublicPlaylists() {
+    publicPlaylists.value = await api.getPublicPlaylists()
   }
 
   async function fetchPlaylist(id: string) {
@@ -28,7 +33,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   async function createPlaylist(name: string) {
     const created = await api.createPlaylist(name)
-    playlists.value.unshift({ id: created.id, name: created.name, trackCount: 0, updatedAt: created.updatedAt })
+    playlists.value.unshift({ id: created.id, name: created.name, trackCount: 0, isPublic: false, updatedAt: created.updatedAt })
     return created
   }
 
@@ -52,6 +57,11 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     current.value = await api.reorderPlaylist(playlistId, orderedTrackIds)
   }
 
+  async function setVisibility(playlistId: string, isPublic: boolean) {
+    current.value = await api.setPlaylistVisibility(playlistId, isPublic)
+    syncSummary(current.value)
+  }
+
   function syncSummary(playlist: PlaylistResponse) {
     const idx = playlists.value.findIndex((p) => p.id === playlist.id)
     if (idx !== -1) {
@@ -59,6 +69,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
         id: playlist.id,
         name: playlist.name,
         trackCount: playlist.tracks.length,
+        isPublic: playlist.isPublic,
         updatedAt: playlist.updatedAt,
       }
     }
@@ -66,14 +77,17 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   return {
     playlists,
+    publicPlaylists,
     current,
     loading,
     fetchMyPlaylists,
+    fetchPublicPlaylists,
     fetchPlaylist,
     createPlaylist,
     deletePlaylist,
     addTrack,
     removeTrack,
     reorder,
+    setVisibility,
   }
 })

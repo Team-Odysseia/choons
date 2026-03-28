@@ -43,6 +43,7 @@ export interface PlaylistSummaryResponse {
   id: string
   name: string
   trackCount: number
+  isPublic: boolean
   updatedAt: string
 }
 
@@ -51,6 +52,7 @@ export interface PlaylistResponse {
   name: string
   ownerId: string
   tracks: TrackResponse[]
+  isPublic: boolean
   createdAt: string
   updatedAt: string
 }

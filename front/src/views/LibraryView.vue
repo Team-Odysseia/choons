@@ -19,12 +19,20 @@ const recentPlaylists = computed(() =>
     .slice(0, 4),
 )
 
+const communityRef = ref<HTMLElement | null>(null)
+
 onMounted(() => Promise.all([
   music.fetchArtists(),
   music.fetchRecentAlbums(),
   music.fetchMostPlayed(),
   playlists.fetchMyPlaylists(),
+  playlists.fetchPublicPlaylists(),
 ]))
+
+function scrollCommunity(direction: 'left' | 'right') {
+  if (!communityRef.value) return
+  communityRef.value.scrollBy({ left: direction === 'left' ? -480 : 480, behavior: 'smooth' })
+}
 
 function isNew(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
@@ -108,6 +116,39 @@ function scrollSwiper(direction: 'left' | 'right') {
           </div>
           <div class="font-bold text-sm truncate">{{ album.title }}</div>
           <div class="text-xs text-muted-foreground truncate mt-0.5">{{ album.artist.name }}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Community Playlists -->
+    <section v-if="playlists.publicPlaylists.length > 0">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold">Community Playlists</h2>
+        <div class="flex items-center gap-2">
+          <button
+            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
+            aria-label="Scroll left"
+            @click="scrollCommunity('left')"
+          >‹</button>
+          <button
+            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
+            aria-label="Scroll right"
+            @click="scrollCommunity('right')"
+          >›</button>
+        </div>
+      </div>
+      <div ref="communityRef" class="swiper-track flex gap-3 overflow-x-auto pb-2">
+        <div
+          v-for="pl in playlists.publicPlaylists"
+          :key="pl.id"
+          class="shrink-0 w-[180px] flex items-center gap-3 bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors"
+          @click="router.push(`/playlists/${pl.id}`)"
+        >
+          <div class="size-10 bg-muted rounded flex items-center justify-center text-[18px] shrink-0">♫</div>
+          <div class="flex flex-col min-w-0">
+            <span class="text-[13px] font-semibold truncate">{{ pl.name }}</span>
+            <span class="text-[11px] text-dimmed">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
+          </div>
         </div>
       </div>
     </section>

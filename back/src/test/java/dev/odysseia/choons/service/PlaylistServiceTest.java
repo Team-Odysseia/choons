@@ -254,6 +254,85 @@ class PlaylistServiceTest {
                 .isInstanceOf(AccessDeniedException.class);
     }
 
+    // ─── setVisibility ────────────────────────────────────────────────────────
+
+    @Test
+    void setVisibility_ownerCanMakePlaylistPublic() throws AccessDeniedException {
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistRepository.save(any())).thenReturn(playlist);
+        when(playlistTrackRepository.findByPlaylistIdOrderByPositionAsc(playlist.getId()))
+                .thenReturn(List.of());
+
+        PlaylistResponse response = playlistService.setVisibility(playlist.getId(), true, owner);
+
+        assertThat(playlist.isPublic()).isTrue();
+        assertThat(response.isPublic()).isTrue();
+        verify(playlistRepository).save(playlist);
+    }
+
+    @Test
+    void setVisibility_throwsAccessDeniedForNonOwner() {
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+
+        assertThatThrownBy(() -> playlistService.setVisibility(playlist.getId(), true, otherUser))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(playlistRepository, never()).save(any());
+    }
+
+    // ─── findById (public access) ─────────────────────────────────────────────
+
+    @Test
+    void findById_nonOwnerCanReadPublicPlaylist() throws AccessDeniedException {
+        playlist.setPublic(true);
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistTrackRepository.findByPlaylistIdOrderByPositionAsc(playlist.getId()))
+                .thenReturn(List.of());
+
+        PlaylistResponse response = playlistService.findById(playlist.getId(), otherUser);
+
+        assertThat(response.id()).isEqualTo(playlist.getId());
+        assertThat(response.isPublic()).isTrue();
+    }
+
+    @Test
+    void findById_nonOwnerCannotReadPrivatePlaylist() {
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+
+        assertThatThrownBy(() -> playlistService.findById(playlist.getId(), otherUser))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    // ─── findAllPublic ────────────────────────────────────────────────────────
+
+    @Test
+    void findAllPublic_returnsPublicPlaylistsExcludingOwnUser() {
+        Playlist otherPlaylist = Playlist.builder()
+                .id(UUID.randomUUID())
+                .name("Other Public")
+                .owner(otherUser)
+                .isPublic(true)
+                .build();
+
+        when(playlistRepository.findByIsPublicTrueOrderByUpdatedAtDesc())
+                .thenReturn(List.of(playlist, otherPlaylist));
+        when(playlistTrackRepository.countByPlaylistId(otherPlaylist.getId())).thenReturn(0);
+
+        List<PlaylistSummaryResponse> result = playlistService.findAllPublic(owner);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo(otherPlaylist.getId());
+    }
+
+    @Test
+    void findAllPublic_returnsEmptyWhenNoOtherPublicPlaylists() {
+        when(playlistRepository.findByIsPublicTrueOrderByUpdatedAtDesc())
+                .thenReturn(List.of());
+
+        List<PlaylistSummaryResponse> result = playlistService.findAllPublic(owner);
+
+        assertThat(result).isEmpty();
+    }
+
     // ─── delete ───────────────────────────────────────────────────────────────
 
     @Test

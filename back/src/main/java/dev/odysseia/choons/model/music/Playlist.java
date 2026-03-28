@@ -39,6 +39,9 @@ public class Playlist {
   @Builder.Default
   private List<PlaylistTrack> tracks = new ArrayList<>();
 
+  @Column(nullable = false)
+  private boolean isPublic = false;
+
   @CreationTimestamp
   @Column(updatable = false)
   private LocalDateTime createdAt;

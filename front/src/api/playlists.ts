@@ -22,3 +22,11 @@ export const reorderPlaylist = (playlistId: string, orderedTrackIds: string[]) =
   client
     .put<PlaylistResponse>(`/playlists/${playlistId}/tracks/order`, { orderedTrackIds })
     .then((r) => r.data)
+
+export const setPlaylistVisibility = (playlistId: string, isPublic: boolean) =>
+  client
+    .put<PlaylistResponse>(`/playlists/${playlistId}/visibility`, { isPublic })
+    .then((r) => r.data)
+
+export const getPublicPlaylists = () =>
+  client.get<PlaylistSummaryResponse[]>('/playlists/public').then((r) => r.data)

@@ -39,13 +39,30 @@ public class PlaylistService {
                     p.getId(),
                     p.getName(),
                     playlistTrackRepository.countByPlaylistId(p.getId()),
+                    p.isPublic(),
                     p.getUpdatedAt()))
             .toList();
   }
 
   public PlaylistResponse findById(UUID id, User user) throws AccessDeniedException {
-    Playlist playlist = getAndVerifyOwner(id, user);
+    Playlist playlist = playlistRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("Playlist not found: " + id));
+    if (!playlist.getOwner().getId().equals(user.getId()) && !playlist.isPublic()) {
+      throw new java.nio.file.AccessDeniedException("Not your playlist");
+    }
     return toResponse(playlist);
+  }
+
+  public List<PlaylistSummaryResponse> findAllPublic(User excludeUser) {
+    return playlistRepository.findByIsPublicTrueOrderByUpdatedAtDesc().stream()
+            .filter(p -> !p.getOwner().getId().equals(excludeUser.getId()))
+            .map(p -> new PlaylistSummaryResponse(
+                    p.getId(),
+                    p.getName(),
+                    playlistTrackRepository.countByPlaylistId(p.getId()),
+                    p.isPublic(),
+                    p.getUpdatedAt()))
+            .toList();
   }
 
   @Transactional
@@ -92,6 +109,14 @@ public class PlaylistService {
     return toResponse(playlistRepository.findById(playlistId).orElseThrow());
   }
 
+  public PlaylistResponse setVisibility(UUID playlistId, boolean isPublic, User user)
+          throws AccessDeniedException {
+    Playlist playlist = getAndVerifyOwner(playlistId, user);
+    playlist.setPublic(isPublic);
+    playlistRepository.save(playlist);
+    return toResponse(playlist);
+  }
+
   @Transactional
   public void delete(UUID playlistId, User user) throws AccessDeniedException {
     getAndVerifyOwner(playlistId, user);
@@ -129,6 +154,7 @@ public class PlaylistService {
             playlist.getName(),
             playlist.getOwner().getId(),
             tracks,
+            playlist.isPublic(),
             playlist.getCreatedAt(),
             playlist.getUpdatedAt()
     );
