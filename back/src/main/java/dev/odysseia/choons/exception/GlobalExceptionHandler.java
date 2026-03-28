@@ -26,6 +26,12 @@ public class GlobalExceptionHandler {
             .body(Map.of("error", "Access denied"));
   }
 
+  @ExceptionHandler(java.nio.file.AccessDeniedException.class)
+  public ResponseEntity<Map<String, String>> handleNioAccessDenied(java.nio.file.AccessDeniedException ex) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(Map.of("error", "Access denied"));
+  }
+
   @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
   public ResponseEntity<Map<String, String>> handleAuthError(Exception ex) {
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useDrawerStore } from '@/stores/drawer'
-import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2, ListMusic, Mic2 } from 'lucide-vue-next'
+import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2, ListMusic, Mic2, Menu } from 'lucide-vue-next'
 
 const player = usePlayerStore()
 const drawer = useDrawerStore()
@@ -33,22 +33,32 @@ function onVolume(e: Event) {
 
 <template>
   <footer
-    class="col-[1/3] row-start-2 bg-popover border-t border-border grid [grid-template-columns:1fr_auto_1fr] items-center px-6 gap-4"
+    class="col-[1/2] md:col-[1/3] row-start-2 bg-popover border-t border-border grid items-center px-3 md:px-6 gap-2 md:gap-4"
+    :class="'[grid-template-columns:auto_1fr_auto] md:[grid-template-columns:1fr_auto_1fr]'"
+    style="padding-bottom: var(--safe-area-bottom)"
   >
-    <!-- Track info -->
-    <div class="min-w-0">
-      <div v-if="player.currentTrack" class="flex flex-col gap-0.5">
-        <span class="text-[13px] font-semibold truncate">{{ player.currentTrack.title }}</span>
-        <span class="text-[11px] text-muted-foreground">{{ player.currentTrack.artist.name }}</span>
-      </div>
-      <div v-else>
-        <span class="text-[13px] text-dimmed">No track selected</span>
+    <!-- Hamburger (mobile) + Track info -->
+    <div class="min-w-0 flex items-center gap-2">
+      <button
+        class="md:hidden shrink-0 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        @click="drawer.toggleSidebar()"
+      >
+        <Menu :size="20" />
+      </button>
+      <div class="min-w-0">
+        <div v-if="player.currentTrack" class="flex flex-col gap-0.5">
+          <span class="text-[13px] font-semibold truncate">{{ player.currentTrack.title }}</span>
+          <span class="text-[11px] text-muted-foreground truncate">{{ player.currentTrack.artist.name }}</span>
+        </div>
+        <div v-else>
+          <span class="text-[13px] text-dimmed">No track selected</span>
+        </div>
       </div>
     </div>
 
     <!-- Controls -->
     <div class="flex flex-col items-center gap-1.5">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1 md:gap-2">
         <!-- Shuffle -->
         <button
           class="size-8 flex items-center justify-center transition-colors"
@@ -94,7 +104,7 @@ function onVolume(e: Event) {
         </button>
       </div>
 
-      <div class="flex items-center gap-2 w-[340px]">
+      <div class="flex items-center gap-2 w-full max-w-[340px]">
         <span class="text-[11px] text-dimmed min-w-[32px] text-center">{{ formatTime(player.currentTime) }}</span>
         <input
           type="range"
@@ -114,6 +124,7 @@ function onVolume(e: Event) {
       @mouseenter="showVolumeLabel = true"
       @mouseleave="showVolumeLabel = false"
     >
+      <!-- Queue/lyrics buttons always visible -->
       <button
         class="size-7 flex items-center justify-center transition-colors"
         :class="drawer.activePanel === 'queue' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
@@ -123,17 +134,18 @@ function onVolume(e: Event) {
         <ListMusic :size="16" />
       </button>
       <button
-        class="size-7 flex items-center justify-center transition-colors"
+        class="hidden md:flex size-7 items-center justify-center transition-colors"
         :class="drawer.activePanel === 'lyrics' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
         title="Lyrics"
         @click="drawer.toggle('lyrics')"
       >
         <Mic2 :size="16" />
       </button>
-      <Volume2 :size="16" class="text-dimmed shrink-0" />
+      <!-- Volume (desktop only) -->
+      <Volume2 :size="16" class="hidden md:block text-dimmed shrink-0" />
       <input
         type="range"
-        class="w-[90px] range-input"
+        class="hidden md:block w-[90px] range-input"
         min="0"
         max="1"
         step="0.01"
@@ -141,7 +153,7 @@ function onVolume(e: Event) {
         @input="onVolume"
       />
       <span
-        class="text-[11px] text-dimmed min-w-[30px] transition-opacity"
+        class="hidden md:block text-[11px] text-dimmed min-w-[30px] transition-opacity"
         :class="showVolumeLabel ? 'opacity-100' : 'opacity-0'"
       >{{ volumePercent }}%</span>
     </div>

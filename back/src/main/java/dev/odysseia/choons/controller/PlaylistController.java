@@ -31,6 +31,11 @@ public class PlaylistController {
     return ResponseEntity.ok(playlistService.findByOwner(user));
   }
 
+  @GetMapping("/public")
+  public ResponseEntity<List<PlaylistSummaryResponse>> listPublic(@AuthenticationPrincipal User user) {
+    return ResponseEntity.ok(playlistService.findAllPublic(user));
+  }
+
   @GetMapping("/{id}")
   public ResponseEntity<PlaylistResponse> get(
           @PathVariable UUID id,
@@ -60,6 +65,14 @@ public class PlaylistController {
           @PathVariable UUID trackId,
           @AuthenticationPrincipal User user) throws AccessDeniedException {
     return ResponseEntity.ok(playlistService.removeTrack(id, trackId, user));
+  }
+
+  @PutMapping("/{id}/visibility")
+  public ResponseEntity<PlaylistResponse> setVisibility(
+          @PathVariable UUID id,
+          @RequestBody VisibilityRequest request,
+          @AuthenticationPrincipal User user) throws AccessDeniedException {
+    return ResponseEntity.ok(playlistService.setVisibility(id, request.isPublic(), user));
   }
 
   @PutMapping("/{id}/tracks/order")

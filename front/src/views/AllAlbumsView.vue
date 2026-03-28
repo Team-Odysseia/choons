@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMusicStore } from '@/stores/music'
+import { useAllAlbumsQuery } from '@/composables/queries'
 import { albumImageUrl } from '@/api/albums'
 
 const router = useRouter()
-const music = useMusicStore()
-
-onMounted(() => music.fetchAllAlbums())
+const { data: albums, isPending } = useAllAlbumsQuery()
 
 function isNew(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
@@ -18,13 +15,13 @@ function isNew(createdAt: string) {
   <div>
     <h1 class="text-2xl font-extrabold mb-6">All Albums</h1>
 
-    <div v-if="music.loading" class="text-[13px] text-dimmed">Loading…</div>
-    <div v-else-if="music.allAlbums.length === 0" class="text-[13px] text-dimmed">
+    <div v-if="isPending" class="text-[13px] text-dimmed">Loading…</div>
+    <div v-else-if="!albums?.length" class="text-[13px] text-dimmed">
       No albums yet. Ask an admin to add some music.
     </div>
     <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
       <div
-        v-for="album in music.allAlbums"
+        v-for="album in albums"
         :key="album.id"
         class="bg-card rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted"
         @click="router.push(`/library/albums/${album.id}`)"

@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface PlaylistRepository extends JpaRepository<Playlist, UUID> {
   List<Playlist> findByOwnerIdOrderByUpdatedAtDesc(UUID ownerId);
+  List<Playlist> findByIsPublicTrueOrderByUpdatedAtDesc();
 }

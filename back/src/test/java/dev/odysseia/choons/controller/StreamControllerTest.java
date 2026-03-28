@@ -22,6 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -51,6 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@TestPropertySource(properties = "spring.threads.virtual.enabled=false")
 class StreamControllerTest {
 
     @Autowired WebApplicationContext wac;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useMusicStore } from '@/stores/music'
+import { useAlbumQuery, useAlbumTracksQuery } from '@/composables/queries'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistsStore } from '@/stores/playlists'
 import TrackRow from '@/components/music/TrackRow.vue'
@@ -12,66 +12,66 @@ import { albumImageUrl } from '@/api/albums'
 
 const route = useRoute()
 const router = useRouter()
-const music = useMusicStore()
 const player = usePlayerStore()
 const playlists = usePlaylistsStore()
 
+const id = computed(() => route.params.id as string)
+const { data: album, isPending } = useAlbumQuery(id)
+const { data: tracks } = useAlbumTracksQuery(id)
+
 const albumDialogOpen = ref(false)
 
-onMounted(async () => {
-  await music.fetchAlbum(route.params.id as string)
-  await playlists.fetchMyPlaylists()
-})
+const trackList = computed(() => tracks.value ?? [])
 </script>
 
 <template>
-  <div v-if="!music.loading && music.currentAlbum">
-    <div class="flex items-end gap-6 mb-8">
+  <div v-if="!isPending && album">
+    <div class="flex flex-col md:flex-row md:items-end gap-4 md:gap-6 mb-8">
       <img
-        v-if="music.currentAlbum.coverUrl"
-        :src="albumImageUrl(music.currentAlbum.id)"
-        class="size-[160px] rounded-lg object-cover shrink-0"
+        v-if="album.coverUrl"
+        :src="albumImageUrl(album.id)"
+        class="size-[120px] md:size-[160px] rounded-lg object-cover shrink-0"
       />
       <div
         v-else
-        class="size-[160px] bg-muted rounded-lg flex items-center justify-center text-[64px] shrink-0"
+        class="size-[120px] md:size-[160px] bg-muted rounded-lg flex items-center justify-center text-[64px] shrink-0"
       >
         ♪
       </div>
-      <div>
+      <div class="min-w-0">
         <div class="text-xs font-bold uppercase tracking-widest text-dimmed mb-1">Album</div>
-        <h1 class="text-[28px] font-extrabold mb-1">{{ music.currentAlbum.title }}</h1>
+        <h1 class="text-[24px] md:text-[28px] font-extrabold mb-1">{{ album.title }}</h1>
         <div class="text-sm mt-2">
           <span
             class="font-semibold cursor-pointer hover:underline"
-            @click="router.push(`/library/artists/${music.currentAlbum.artist.id}`)"
-          >{{ music.currentAlbum.artist.name }}</span>
-          <span class="text-[13px] text-dimmed"> · {{ music.currentAlbum.releaseYear }}</span>
-          <span class="text-[13px] text-dimmed"> · {{ music.currentAlbumTracks.length }} tracks</span>
+            @click="router.push(`/library/artists/${album.artist.id}`)"
+          >{{ album.artist.name }}</span>
+          <span class="text-[13px] text-dimmed"> · {{ album.releaseYear }}</span>
+          <span class="text-[13px] text-dimmed"> · {{ trackList.length }} tracks</span>
         </div>
       </div>
     </div>
 
-    <div class="flex items-center gap-2 mb-6">
-      <Button @click="player.playQueue(music.currentAlbumTracks)">
+    <div class="flex flex-wrap items-center gap-2 mb-6">
+      <Button @click="player.playQueue(trackList)">
         <Play :size="16" />
         Play all
       </Button>
-      <Button variant="outline" @click="player.playQueueShuffled(music.currentAlbumTracks)">
+      <Button variant="outline" @click="player.playQueueShuffled(trackList)">
         <Shuffle :size="16" />
         Shuffle
       </Button>
       <Button
         variant="outline"
-        :disabled="music.currentAlbumTracks.length === 0"
-        @click="player.addTracksToQueue(music.currentAlbumTracks)"
+        :disabled="trackList.length === 0"
+        @click="player.addTracksToQueue(trackList)"
       >
         <ListPlus :size="16" />
         Add to queue
       </Button>
       <Button
         variant="outline"
-        :disabled="music.currentAlbumTracks.length === 0"
+        :disabled="trackList.length === 0"
         @click="albumDialogOpen = true"
       >
         <Plus :size="16" />
@@ -79,15 +79,15 @@ onMounted(async () => {
       </Button>
     </div>
 
-    <div v-if="music.currentAlbumTracks.length === 0" class="text-[13px] text-dimmed mt-6">
+    <div v-if="trackList.length === 0" class="text-[13px] text-dimmed mt-6">
       No tracks in this album yet.
     </div>
     <div v-else class="mt-2">
       <TrackRow
-        v-for="(track, i) in music.currentAlbumTracks"
+        v-for="(track, i) in trackList"
         :key="track.id"
         :track="track"
-        :queue="music.currentAlbumTracks"
+        :queue="trackList"
         :index="i"
         :show-add-to-queue="true"
         :show-add-to-playlist="true"
@@ -98,7 +98,7 @@ onMounted(async () => {
 
   <AddToPlaylistDialog
     :open="albumDialogOpen"
-    :tracks="music.currentAlbumTracks"
+    :tracks="trackList"
     @close="albumDialogOpen = false"
   />
 </template>

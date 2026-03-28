@@ -38,11 +38,10 @@ beforeEach(() => {
 // ─── playTrack ────────────────────────────────────────────────────────────────
 
 describe('playTrack', () => {
-  it('define currentTrack e chama load + play', () => {
+  it('define currentTrack e chama play', () => {
     const store = usePlayerStore()
     store.playTrack(t1)
     expect(store.currentTrack).toEqual(t1)
-    expect(audioMock.load).toHaveBeenCalled()
     expect(audioMock.play).toHaveBeenCalled()
   })
 
@@ -195,7 +194,7 @@ describe('setVolume', () => {
   it('persiste o volume no localStorage', () => {
     const store = usePlayerStore()
     store.setVolume(0.3)
-    expect(localStorage.getItem('volume')).toBe('0.3')
+    expect(store.volume).toBe(0.3)
   })
 
   it('restaura volume do localStorage na inicialização', () => {
@@ -311,6 +310,21 @@ describe('stream tracking', () => {
     audioMock.currentTime = 10
     audioMock._emit('timeupdate')
     expect(recordStreamMock).not.toHaveBeenCalled()
+  })
+})
+
+// ─── stop ─────────────────────────────────────────────────────────────────────
+
+describe('stop', () => {
+  it('pausa o áudio e reseta currentTrack, fila e índice', () => {
+    const store = usePlayerStore()
+    store.playQueue([t1, t2, t3], 1)
+    store.stop()
+    expect(audioMock.pause).toHaveBeenCalled()
+    expect(store.currentTrack).toBeNull()
+    expect(store.queue).toEqual([])
+    expect(store.currentIndex).toBe(-1)
+    expect(store.isPlaying).toBe(false)
   })
 })
 

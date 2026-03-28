@@ -1,20 +1,49 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { usePlayerStore } from '@/stores/player'
+import { useAuthStore } from '@/stores/auth'
 import TrackRow from '@/components/music/TrackRow.vue'
 import { Button } from '@/components/ui/button'
-import { X, Play, Shuffle, ListPlus } from 'lucide-vue-next'
+import { X, Play, Shuffle, ListPlus, Globe, Lock, Link } from 'lucide-vue-next'
+import { toast } from 'vue-sonner'
 
 const route = useRoute()
 const playlists = usePlaylistsStore()
 const player = usePlayerStore()
+const auth = useAuthStore()
+
+const togglingVisibility = ref(false)
+
+const isOwner = computed(
+  () => !!auth.user && playlists.current?.ownerId === auth.user.id,
+)
+
+const publicUrl = computed(() => {
+  const id = playlists.current?.id
+  return id ? `${window.location.origin}/p/${id}` : ''
+})
 
 onMounted(() => playlists.fetchPlaylist(route.params.id as string))
 
 async function removeTrack(trackId: string) {
   await playlists.removeTrack(playlists.current!.id, trackId)
+}
+
+async function toggleVisibility() {
+  if (!playlists.current) return
+  togglingVisibility.value = true
+  try {
+    await playlists.setVisibility(playlists.current.id, !playlists.current.isPublic)
+  } finally {
+    togglingVisibility.value = false
+  }
+}
+
+function copyLink() {
+  navigator.clipboard.writeText(publicUrl.value)
+  toast.success('Link copied!')
 }
 </script>
 
@@ -29,11 +58,24 @@ async function removeTrack(trackId: string) {
       <div>
         <div class="text-xs font-bold uppercase tracking-widest text-dimmed mb-1">Playlist</div>
         <h1 class="text-[28px] font-extrabold mb-2">{{ playlists.current.name }}</h1>
-        <span class="text-[13px] text-dimmed">{{ playlists.current.tracks.length }} tracks</span>
+        <div class="flex items-center gap-2">
+          <span class="text-[13px] text-dimmed">{{ playlists.current.tracks.length }} tracks</span>
+          <span
+            v-if="playlists.current.isPublic"
+            class="flex items-center gap-1 text-[12px] text-primary font-medium"
+          >
+            <Globe :size="12" />
+            Public
+          </span>
+          <span v-else class="flex items-center gap-1 text-[12px] text-dimmed">
+            <Lock :size="12" />
+            Private
+          </span>
+        </div>
       </div>
     </div>
 
-    <div class="flex items-center gap-2 mb-6">
+    <div class="flex items-center gap-2 mb-6 flex-wrap">
       <Button
         :disabled="playlists.current.tracks.length === 0"
         @click="player.playQueue(playlists.current!.tracks)"
@@ -57,6 +99,25 @@ async function removeTrack(trackId: string) {
         <ListPlus :size="16" />
         Add to queue
       </Button>
+      <template v-if="isOwner">
+        <Button
+          variant="outline"
+          :disabled="togglingVisibility"
+          @click="toggleVisibility"
+        >
+          <Globe v-if="!playlists.current.isPublic" :size="16" />
+          <Lock v-else :size="16" />
+          {{ playlists.current.isPublic ? 'Make private' : 'Make public' }}
+        </Button>
+        <Button
+          v-if="playlists.current.isPublic"
+          variant="outline"
+          @click="copyLink"
+        >
+          <Link :size="16" />
+          Copy link
+        </Button>
+      </template>
     </div>
 
     <div v-if="playlists.current.tracks.length === 0" class="text-[13px] text-dimmed">
@@ -76,6 +137,7 @@ async function removeTrack(trackId: string) {
           :index="i"
         />
         <button
+          v-if="isOwner"
           class="size-8 rounded-full flex items-center justify-center text-dimmed opacity-0 group-hover/row:opacity-100 hover:text-destructive transition-all shrink-0"
           title="Remove"
           @click="removeTrack(track.id)"

@@ -6,6 +6,11 @@ export const getTracks = (albumId?: string) =>
     .get<TrackResponse[]>('/music/tracks', { params: albumId ? { albumId } : {} })
     .then((r) => r.data)
 
+export const getMostPlayedTracks = (limit = 10) =>
+  client
+    .get<TrackResponse[]>('/music/tracks/most-played', { params: { limit } })
+    .then((r) => r.data)
+
 export const getTrack = (id: string) =>
   client.get<TrackResponse>(`/music/tracks/${id}`).then((r) => r.data)
 
