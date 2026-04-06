@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getArtists, createArtist, deleteArtist } from '@/api/artists'
@@ -20,6 +20,14 @@ const deletingId = ref<string | null>(null)
 const confirmTarget = ref<ArtistResponse | null>(null)
 const pendingAvatar = ref<File | null>(null)
 const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
+const addDialogOpen = ref(false)
+const search = ref('')
+
+const filteredArtists = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return artists.value
+  return artists.value.filter((a) => a.name.toLowerCase().includes(q))
+})
 
 onMounted(load)
 
@@ -52,6 +60,7 @@ async function submit() {
     bio.value = ''
     pendingAvatar.value = null
     imageUploadRef.value?.reset()
+    addDialogOpen.value = false
     toast.success(`Artist "${created.name}" created successfully`)
   } catch (e: any) {
     toast.error(e.response?.data?.error ?? 'Failed to create artist')
@@ -63,40 +72,19 @@ async function submit() {
 
 <template>
   <div>
-    <h1 class="text-[28px] font-extrabold mb-6">Artists</h1>
+    <div class="flex items-center justify-between gap-3 mb-6">
+      <h1 class="text-[28px] font-extrabold">Artists ({{ artists.length }})</h1>
+      <Button @click="addDialogOpen = true">Add Artist</Button>
+    </div>
 
-    <form class="admin-form" @submit.prevent="submit">
-      <h2 class="text-lg font-bold mb-4">Add Artist</h2>
-      <div class="form-group">
-        <Label>Name</Label>
-        <Input v-model="name" required />
-      </div>
-      <div class="form-group">
-        <Label>Bio</Label>
-        <textarea
-          v-model="bio"
-          class="flex w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary resize-y"
-          rows="3"
-        />
-      </div>
-      <div class="form-group">
-        <ImageUpload
-          ref="imageUploadRef"
-          label="Avatar"
-          @select="pendingAvatar = $event"
-          @remove="pendingAvatar = null"
-        />
-      </div>
-      <Button type="submit" :disabled="loading">
-        {{ loading ? 'Adding…' : 'Add artist' }}
-      </Button>
-    </form>
+    <div class="search-row mb-4">
+      <Input v-model="search" placeholder="Search artist by name" />
+    </div>
 
     <div class="list-section">
-      <h2 class="text-lg font-bold mb-4">All Artists</h2>
-      <div v-if="artists.length === 0" class="text-[13px] text-dimmed">No artists yet.</div>
+      <div v-if="filteredArtists.length === 0" class="text-[13px] text-dimmed">No artists found.</div>
       <div v-else class="item-list">
-        <div v-for="a in artists" :key="a.id" class="list-item">
+        <div v-for="a in filteredArtists" :key="a.id" class="list-item">
           <div class="flex items-center justify-between gap-3">
             <span class="item-name">{{ a.name }}</span>
             <div class="flex items-center gap-1">
@@ -124,6 +112,41 @@ async function submit() {
   </div>
 
   <BaseDialog
+    :open="addDialogOpen"
+    title="Add Artist"
+    @close="addDialogOpen = false"
+  >
+    <form class="admin-form" @submit.prevent="submit">
+      <div class="form-group">
+        <Label>Name</Label>
+        <Input v-model="name" required />
+      </div>
+      <div class="form-group">
+        <Label>Bio</Label>
+        <textarea
+          v-model="bio"
+          class="flex w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary resize-y"
+          rows="3"
+        />
+      </div>
+      <div class="form-group">
+        <ImageUpload
+          ref="imageUploadRef"
+          label="Avatar"
+          @select="pendingAvatar = $event"
+          @remove="pendingAvatar = null"
+        />
+      </div>
+      <div class="flex justify-end gap-2 mt-1">
+        <Button type="button" variant="outline" @click="addDialogOpen = false">Cancel</Button>
+        <Button type="submit" :disabled="loading">
+          {{ loading ? 'Adding…' : 'Add artist' }}
+        </Button>
+      </div>
+    </form>
+  </BaseDialog>
+
+  <BaseDialog
     :open="!!confirmTarget"
     title="Delete Artist"
     @close="confirmTarget = null"
@@ -143,11 +166,12 @@ async function submit() {
 
 <style scoped>
 .admin-form {
-  max-width: 440px;
+  width: 100%;
+  max-width: 760px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin-bottom: 40px;
+  padding: 0 20px 20px;
 }
 
 .form-group {
@@ -167,4 +191,8 @@ async function submit() {
   border-radius: 4px;
 }
 .item-name { font-weight: 600; }
+
+.search-row {
+  max-width: 520px;
+}
 </style>

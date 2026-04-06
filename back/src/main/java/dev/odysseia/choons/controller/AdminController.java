@@ -1,12 +1,17 @@
 package dev.odysseia.choons.controller;
 
 import dev.odysseia.choons.dto.AlbumResponse;
+import dev.odysseia.choons.dto.AdminListenerResponse;
 import dev.odysseia.choons.dto.ArtistResponse;
 import dev.odysseia.choons.dto.ListenerRequestBanResponse;
 import dev.odysseia.choons.dto.TrackResponse;
+import dev.odysseia.choons.dto.UpdateListenerRequest;
 import dev.odysseia.choons.dto.UpdateRequestBanRequest;
 import dev.odysseia.choons.dto.UpdateLrclibIdRequest;
 import dev.odysseia.choons.dto.UpdateTrackRequest;
+import dev.odysseia.choons.model.user.User;
+import dev.odysseia.choons.model.user.UserRole;
+import dev.odysseia.choons.repository.UserRepository;
 import dev.odysseia.choons.service.AlbumRequestService;
 import dev.odysseia.choons.service.AlbumService;
 import dev.odysseia.choons.service.ArtistService;
@@ -16,11 +21,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @RestController
@@ -32,6 +39,57 @@ public class AdminController {
   @Autowired private AlbumService albumService;
   @Autowired private TrackService trackService;
   @Autowired private AlbumRequestService albumRequestService;
+  @Autowired private UserRepository userRepository;
+  @Autowired private PasswordEncoder passwordEncoder;
+
+  @GetMapping("/listeners")
+  public ResponseEntity<List<AdminListenerResponse>> listListeners(@RequestParam(required = false) String query) {
+    String filter = query == null ? "" : query.trim();
+    List<User> listeners = filter.isEmpty()
+            ? userRepository.findByRoleOrderByUsernameAsc(UserRole.LISTENER)
+            : userRepository.findByRoleAndUsernameContainingIgnoreCaseOrderByUsernameAsc(UserRole.LISTENER, filter);
+    return ResponseEntity.ok(listeners.stream()
+            .map(u -> new AdminListenerResponse(u.getId(), u.getUsername(), u.isRequestsBlocked()))
+            .toList());
+  }
+
+  @PutMapping("/listeners/{id}")
+  public ResponseEntity<AdminListenerResponse> updateListener(
+          @PathVariable UUID id,
+          @RequestBody UpdateListenerRequest request) {
+    User listener = userRepository.findById(id)
+            .filter(u -> u.getRole() == UserRole.LISTENER)
+            .orElseThrow(() -> new NoSuchElementException("Listener not found: " + id));
+
+    String username = request.username() == null ? "" : request.username().trim();
+    if (username.isBlank()) {
+      throw new IllegalArgumentException("Username is required");
+    }
+
+    userRepository.findByUsername(username)
+            .filter(existing -> !existing.getId().equals(listener.getId()))
+            .ifPresent(existing -> {
+              throw new IllegalArgumentException("Username already in use");
+            });
+
+    listener.setUsername(username);
+    String password = request.password();
+    if (password != null && !password.isBlank()) {
+      listener.setPassword(passwordEncoder.encode(password));
+    }
+
+    User saved = userRepository.save(listener);
+    return ResponseEntity.ok(new AdminListenerResponse(saved.getId(), saved.getUsername(), saved.isRequestsBlocked()));
+  }
+
+  @DeleteMapping("/listeners/{id}")
+  public ResponseEntity<Void> deleteListener(@PathVariable UUID id) {
+    User listener = userRepository.findById(id)
+            .filter(u -> u.getRole() == UserRole.LISTENER)
+            .orElseThrow(() -> new NoSuchElementException("Listener not found: " + id));
+    userRepository.delete(listener);
+    return ResponseEntity.noContent().build();
+  }
 
   @PutMapping("/listeners/{id}/request-ban")
   public ResponseEntity<ListenerRequestBanResponse> setRequestBan(

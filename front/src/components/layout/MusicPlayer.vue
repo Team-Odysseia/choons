@@ -33,34 +33,48 @@ function onVolume(e: Event) {
 
 <template>
   <footer
-    class="col-[1/2] md:col-[1/3] row-start-2 bg-popover border-t border-border grid items-center px-3 md:px-6 gap-2 md:gap-4"
-    :class="'[grid-template-columns:auto_1fr_auto] md:[grid-template-columns:1fr_auto_1fr]'"
-    style="padding-bottom: var(--safe-area-bottom)"
+    class="col-[1/2] md:col-[1/3] row-start-2 bg-popover border-t border-border px-3 md:px-6 pt-2 md:pt-0"
+    style="padding-bottom: var(--safe-area-bottom); min-height: var(--player-h)"
   >
-    <!-- Hamburger (mobile) + Track info -->
-    <div class="min-w-0 flex items-center gap-2">
-      <button
-        class="md:hidden shrink-0 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-        @click="drawer.toggleSidebar()"
-      >
-        <Menu :size="20" />
-      </button>
-      <div class="min-w-0">
-        <div v-if="player.currentTrack" class="flex flex-col gap-0.5">
-          <span class="text-[13px] font-semibold truncate">{{ player.currentTrack.title }}</span>
-          <span class="text-[11px] text-muted-foreground truncate">{{ player.currentTrack.artist.name }}</span>
-        </div>
-        <div v-else>
-          <span class="text-[13px] text-dimmed">No track selected</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Controls -->
-    <div class="flex flex-col items-center gap-1.5">
-      <div class="flex items-center gap-1 md:gap-2">
-        <!-- Shuffle -->
+    <div class="md:hidden flex flex-col gap-1.5 pb-2">
+      <div class="flex items-center gap-2 min-w-0">
         <button
+          data-testid="menu-btn"
+          class="shrink-0 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          @click="drawer.toggleSidebar()"
+        >
+          <Menu :size="20" />
+        </button>
+        <div class="min-w-0 flex-1">
+          <div v-if="player.currentTrack" class="flex flex-col leading-tight">
+            <span class="text-[12px] font-semibold truncate">{{ player.currentTrack.title }}</span>
+            <span class="text-[11px] text-muted-foreground truncate">{{ player.currentTrack.artist.name }}</span>
+          </div>
+          <div v-else>
+            <span class="text-[12px] text-dimmed truncate block">No track selected</span>
+          </div>
+        </div>
+        <button
+          class="size-7 flex items-center justify-center transition-colors"
+          :class="drawer.activePanel === 'queue' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+          title="Queue"
+          @click="drawer.toggle('queue')"
+        >
+          <ListMusic :size="16" />
+        </button>
+        <button
+          class="size-7 flex items-center justify-center transition-colors"
+          :class="drawer.activePanel === 'lyrics' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+          title="Lyrics"
+          @click="drawer.toggle('lyrics')"
+        >
+          <Mic2 :size="16" />
+        </button>
+      </div>
+
+      <div class="flex items-center justify-center gap-1">
+        <button
+          data-testid="shuffle-btn"
           class="size-8 flex items-center justify-center transition-colors"
           :class="player.isShuffled ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
           title="Shuffle"
@@ -70,6 +84,7 @@ function onVolume(e: Event) {
         </button>
 
         <button
+          data-testid="prev-btn"
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           :disabled="!player.hasPrev"
           @click="player.playPrev()"
@@ -77,6 +92,7 @@ function onVolume(e: Event) {
           <SkipBack :size="20" />
         </button>
         <button
+          data-testid="play-btn"
           class="size-[34px] rounded-full bg-foreground text-black flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed"
           :disabled="!player.currentTrack"
           @click="player.togglePlay()"
@@ -85,6 +101,7 @@ function onVolume(e: Event) {
           <Pause v-else :size="20" />
         </button>
         <button
+          data-testid="next-btn"
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           :disabled="!player.hasNext"
           @click="player.playNext()"
@@ -92,9 +109,9 @@ function onVolume(e: Event) {
           <SkipForward :size="20" />
         </button>
 
-        <!-- Loop -->
         <button
-          class="size-8 flex items-center justify-center transition-colors relative"
+          data-testid="loop-btn"
+          class="size-8 flex items-center justify-center transition-colors"
           :class="player.loopMode !== 'none' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
           :title="player.loopMode === 'none' ? 'Loop off' : player.loopMode === 'queue' ? 'Loop queue' : 'Loop track'"
           @click="player.cycleLoop()"
@@ -104,9 +121,10 @@ function onVolume(e: Event) {
         </button>
       </div>
 
-      <div class="flex items-center gap-2 w-full max-w-[340px]">
+      <div class="flex items-center gap-2 w-full">
         <span class="text-[11px] text-dimmed min-w-[32px] text-center">{{ formatTime(player.currentTime) }}</span>
         <input
+          data-testid="progress-range"
           type="range"
           class="flex-1 range-input"
           min="0"
@@ -118,44 +136,121 @@ function onVolume(e: Event) {
       </div>
     </div>
 
-    <!-- Volume + drawer toggles -->
-    <div
-      class="flex items-center gap-2 justify-end"
-      @mouseenter="showVolumeLabel = true"
-      @mouseleave="showVolumeLabel = false"
-    >
-      <!-- Queue/lyrics buttons always visible -->
-      <button
-        class="size-7 flex items-center justify-center transition-colors"
-        :class="drawer.activePanel === 'queue' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
-        title="Queue"
-        @click="drawer.toggle('queue')"
+    <div class="hidden md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-4 h-full">
+      <div class="min-w-0 flex items-center gap-2">
+        <div class="min-w-0">
+          <div v-if="player.currentTrack" class="flex flex-col gap-0.5">
+            <span class="text-[13px] font-semibold truncate">{{ player.currentTrack.title }}</span>
+            <span class="text-[11px] text-muted-foreground truncate">{{ player.currentTrack.artist.name }}</span>
+          </div>
+          <div v-else>
+            <span class="text-[13px] text-dimmed">No track selected</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-center gap-1.5">
+        <div class="flex items-center gap-1 md:gap-2">
+          <button
+            data-testid="shuffle-btn"
+            class="size-8 flex items-center justify-center transition-colors"
+            :class="player.isShuffled ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+            title="Shuffle"
+            @click="player.toggleShuffle()"
+          >
+            <Shuffle :size="18" />
+          </button>
+
+          <button
+            data-testid="prev-btn"
+            class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!player.hasPrev"
+            @click="player.playPrev()"
+          >
+            <SkipBack :size="20" />
+          </button>
+          <button
+            data-testid="play-btn"
+            class="size-[34px] rounded-full bg-foreground text-black flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!player.currentTrack"
+            @click="player.togglePlay()"
+          >
+            <Play v-if="!player.isPlaying" :size="20" />
+            <Pause v-else :size="20" />
+          </button>
+          <button
+            data-testid="next-btn"
+            class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="!player.hasNext"
+            @click="player.playNext()"
+          >
+            <SkipForward :size="20" />
+          </button>
+
+          <button
+            data-testid="loop-btn"
+            class="size-8 flex items-center justify-center transition-colors relative"
+            :class="player.loopMode !== 'none' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+            :title="player.loopMode === 'none' ? 'Loop off' : player.loopMode === 'queue' ? 'Loop queue' : 'Loop track'"
+            @click="player.cycleLoop()"
+          >
+            <Repeat1 v-if="player.loopMode === 'track'" :size="18" />
+            <Repeat v-else :size="18" />
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2 w-full max-w-[340px]">
+          <span class="text-[11px] text-dimmed min-w-[32px] text-center">{{ formatTime(player.currentTime) }}</span>
+          <input
+            data-testid="progress-range"
+            type="range"
+            class="flex-1 range-input"
+            min="0"
+            max="100"
+            :value="progressPercent"
+            @input="onSeek"
+          />
+          <span class="text-[11px] text-dimmed min-w-[32px] text-center">{{ formatTime(player.duration) }}</span>
+        </div>
+      </div>
+
+      <div
+        class="flex items-center gap-2 justify-end"
+        @mouseenter="showVolumeLabel = true"
+        @mouseleave="showVolumeLabel = false"
       >
-        <ListMusic :size="16" />
-      </button>
-      <button
-        class="hidden md:flex size-7 items-center justify-center transition-colors"
-        :class="drawer.activePanel === 'lyrics' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
-        title="Lyrics"
-        @click="drawer.toggle('lyrics')"
-      >
-        <Mic2 :size="16" />
-      </button>
-      <!-- Volume (desktop only) -->
-      <Volume2 :size="16" class="hidden md:block text-dimmed shrink-0" />
-      <input
-        type="range"
-        class="hidden md:block w-[90px] range-input"
-        min="0"
-        max="1"
-        step="0.01"
-        :value="player.volume"
-        @input="onVolume"
-      />
-      <span
-        class="hidden md:block text-[11px] text-dimmed min-w-[30px] transition-opacity"
-        :class="showVolumeLabel ? 'opacity-100' : 'opacity-0'"
-      >{{ volumePercent }}%</span>
+        <button
+          class="size-7 flex items-center justify-center transition-colors"
+          :class="drawer.activePanel === 'queue' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+          title="Queue"
+          @click="drawer.toggle('queue')"
+        >
+          <ListMusic :size="16" />
+        </button>
+        <button
+          class="size-7 flex items-center justify-center transition-colors"
+          :class="drawer.activePanel === 'lyrics' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+          title="Lyrics"
+          @click="drawer.toggle('lyrics')"
+        >
+          <Mic2 :size="16" />
+        </button>
+        <Volume2 :size="16" class="text-dimmed shrink-0" />
+        <input
+          data-testid="volume-range"
+          type="range"
+          class="w-[90px] range-input"
+          min="0"
+          max="1"
+          step="0.01"
+          :value="player.volume"
+          @input="onVolume"
+        />
+        <span
+          class="text-[11px] text-dimmed min-w-[30px] transition-opacity"
+          :class="showVolumeLabel ? 'opacity-100' : 'opacity-0'"
+        >{{ volumePercent }}%</span>
+      </div>
     </div>
   </footer>
 </template>

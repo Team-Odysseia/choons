@@ -148,7 +148,7 @@ onMounted(load)
 
 <style scoped>
 .request-form {
-  max-width: 520px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;

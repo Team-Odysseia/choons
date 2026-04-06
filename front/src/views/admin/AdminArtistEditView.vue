@@ -113,7 +113,7 @@ async function save() {
 
 <style scoped>
 .admin-form {
-  max-width: 440px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;

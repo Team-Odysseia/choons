@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getArtists } from '@/api/artists'
@@ -37,6 +37,16 @@ const pendingCover = ref<File | null>(null)
 const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
 const deletingId = ref<string | null>(null)
 const confirmTarget = ref<AlbumResponse | null>(null)
+const addDialogOpen = ref(false)
+const search = ref('')
+
+const filteredAlbums = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return albums.value
+  return albums.value.filter((al) =>
+    al.title.toLowerCase().includes(q) || al.artist.name.toLowerCase().includes(q),
+  )
+})
 
 onMounted(async () => {
   artists.value = await getArtists()
@@ -152,6 +162,7 @@ async function submit() {
     pendingTracks.value = []
     pendingCover.value = null
     imageUploadRef.value?.reset()
+    addDialogOpen.value = false
   } catch (e: any) {
     toast.error(e.response?.data?.error ?? 'Failed to create album')
   } finally {
@@ -164,137 +175,20 @@ async function submit() {
 
 <template>
   <div>
-    <h1 class="text-[28px] font-extrabold mb-6">Albums</h1>
+    <div class="flex items-center justify-between gap-3 mb-6">
+      <h1 class="text-[28px] font-extrabold">Albums ({{ albums.length }})</h1>
+      <Button @click="addDialogOpen = true">Add Album</Button>
+    </div>
 
-    <form class="create-layout" @submit.prevent="submit">
-
-      <!-- Left column: metadata -->
-      <div class="admin-form">
-        <h2 class="text-lg font-bold">Add Album</h2>
-
-        <div class="form-group">
-          <Label>Title</Label>
-          <Input v-model="title" required />
-        </div>
-        <div class="form-group">
-          <Label>Artist</Label>
-          <select
-            v-model="artistId"
-            class="flex h-10 w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
-            required
-          >
-            <option value="">Select artist…</option>
-            <option v-for="a in artists" :key="a.id" :value="a.id">{{ a.name }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <Label>Release Year</Label>
-          <Input
-            v-model="releaseYear"
-            type="number"
-            min="1900"
-            :max="new Date().getFullYear() + 2"
-            required
-          />
-        </div>
-
-        <div class="form-group">
-          <ImageUpload
-            ref="imageUploadRef"
-            label="Cover"
-            @select="pendingCover = $event"
-            @remove="pendingCover = null"
-          />
-        </div>
-
-        <!-- Upload progress -->
-        <div v-if="loading && uploadStatus" class="flex flex-col gap-1.5">
-          <span class="text-[13px] text-dimmed">{{ uploadStatus }}</span>
-          <div class="progress-wrap">
-            <div class="progress-bar-outer">
-              <div class="progress-bar-inner" :style="{ width: uploadProgress + '%' }" />
-            </div>
-            <span class="text-[13px] text-dimmed">{{ uploadProgress }}%</span>
-          </div>
-        </div>
-
-        <Button type="submit" :disabled="loading">
-          {{ loading ? (uploadProgress > 0 ? 'Uploading…' : 'Creating…') : 'Create Album' }}
-        </Button>
-      </div>
-
-      <!-- Separator -->
-      <div class="separator" />
-
-      <!-- Right column: tracks -->
-      <div class="tracks-column">
-
-        <!-- Drop zone -->
-        <div class="form-group">
-          <Label>Tracks</Label>
-          <div
-            class="relative flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed px-4 py-8 text-center transition-colors cursor-pointer"
-            :class="isDragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'"
-            @dragover.prevent="isDragOver = true"
-            @dragleave.prevent="isDragOver = false"
-            @drop.prevent="onDrop"
-            @click="($refs.fileInput as HTMLInputElement).click()"
-          >
-            <Music :size="28" class="text-dimmed" />
-            <span class="text-[13px] text-muted-foreground">Drop audio files here, or click to browse</span>
-            <span class="text-[11px] text-dimmed">MP3, FLAC, OGG, WAV, AAC</span>
-            <input
-              ref="fileInput"
-              type="file"
-              accept="audio/mpeg,audio/ogg,audio/flac,audio/wav,audio/aac"
-              multiple
-              class="hidden"
-              @change="onDropZoneChange"
-            />
-          </div>
-        </div>
-
-        <!-- Pending track list -->
-        <div v-if="pendingTracks.length > 0" class="flex flex-col gap-1">
-          <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 pb-1 border-b border-border">
-            <span class="text-[11px] text-dimmed text-right">#</span>
-            <span></span>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed">Title</span>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed text-right">Time</span>
-            <span></span>
-          </div>
-
-          <draggable v-model="pendingTracks" item-key="uid" handle=".drag-handle">
-            <template #item="{ element, index }">
-              <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 group">
-                <span class="text-[12px] text-dimmed text-right">{{ index + 1 }}</span>
-                <GripVertical :size="14" class="drag-handle text-dimmed cursor-grab active:cursor-grabbing" />
-                <input
-                  v-model="element.title"
-                  class="bg-transparent border-none outline-none text-[13px] font-medium text-foreground w-full focus:bg-muted rounded px-1 -mx-1"
-                />
-                <span class="text-[12px] text-dimmed text-right">{{ formatDuration(element.durationSeconds) }}</span>
-                <button
-                  type="button"
-                  class="flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                  @click="removeTrack(element.uid)"
-                >
-                  <X :size="14" />
-                </button>
-              </div>
-            </template>
-          </draggable>
-        </div>
-
-      </div>
-    </form>
+    <div class="search-row mb-4">
+      <Input v-model="search" placeholder="Search album or artist" />
+    </div>
 
     <!-- Albums list -->
     <div class="list-section">
-      <h2 class="text-lg font-bold mb-4">All Albums</h2>
-      <div v-if="albums.length === 0" class="text-[13px] text-dimmed">No albums yet.</div>
+      <div v-if="filteredAlbums.length === 0" class="text-[13px] text-dimmed">No albums found.</div>
       <div v-else class="item-list">
-        <div v-for="al in albums" :key="al.id" class="list-item">
+        <div v-for="al in filteredAlbums" :key="al.id" class="list-item">
           <div class="flex items-center justify-between gap-3">
             <span class="item-name">{{ al.title }}</span>
             <div class="flex items-center gap-1">
@@ -322,6 +216,130 @@ async function submit() {
   </div>
 
   <BaseDialog
+    :open="addDialogOpen"
+    title="Add Album"
+    max-width-class="max-w-6xl"
+    @close="addDialogOpen = false"
+  >
+    <div class="dialog-scroll">
+      <form class="create-layout" @submit.prevent="submit">
+        <div class="admin-form">
+          <div class="form-group">
+            <Label>Title</Label>
+            <Input v-model="title" required />
+          </div>
+          <div class="form-group">
+            <Label>Artist</Label>
+            <select
+              v-model="artistId"
+              class="flex h-10 w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+              required
+            >
+              <option value="">Select artist…</option>
+              <option v-for="a in artists" :key="a.id" :value="a.id">{{ a.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <Label>Release Year</Label>
+            <Input
+              v-model="releaseYear"
+              type="number"
+              min="1900"
+              :max="new Date().getFullYear() + 2"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <ImageUpload
+              ref="imageUploadRef"
+              label="Cover"
+              @select="pendingCover = $event"
+              @remove="pendingCover = null"
+            />
+          </div>
+
+          <div v-if="loading && uploadStatus" class="flex flex-col gap-1.5">
+            <span class="text-[13px] text-dimmed">{{ uploadStatus }}</span>
+            <div class="progress-wrap">
+              <div class="progress-bar-outer">
+                <div class="progress-bar-inner" :style="{ width: uploadProgress + '%' }" />
+              </div>
+              <span class="text-[13px] text-dimmed">{{ uploadProgress }}%</span>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 mt-1">
+            <Button type="button" variant="outline" @click="addDialogOpen = false">Cancel</Button>
+            <Button type="submit" :disabled="loading">
+              {{ loading ? (uploadProgress > 0 ? 'Uploading…' : 'Creating…') : 'Create Album' }}
+            </Button>
+          </div>
+        </div>
+
+        <div class="separator" />
+
+        <div class="tracks-column">
+          <div class="form-group">
+            <Label>Tracks</Label>
+            <div
+              class="relative flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed px-4 py-8 text-center transition-colors cursor-pointer"
+              :class="isDragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'"
+              @dragover.prevent="isDragOver = true"
+              @dragleave.prevent="isDragOver = false"
+              @drop.prevent="onDrop"
+              @click="($refs.fileInput as HTMLInputElement).click()"
+            >
+              <Music :size="28" class="text-dimmed" />
+              <span class="text-[13px] text-muted-foreground">Drop audio files here, or click to browse</span>
+              <span class="text-[11px] text-dimmed">MP3, FLAC, OGG, WAV, AAC</span>
+              <input
+                ref="fileInput"
+                type="file"
+                accept="audio/mpeg,audio/ogg,audio/flac,audio/wav,audio/aac"
+                multiple
+                class="hidden"
+                @change="onDropZoneChange"
+              />
+            </div>
+          </div>
+
+          <div v-if="pendingTracks.length > 0" class="flex flex-col gap-1">
+            <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 pb-1 border-b border-border">
+              <span class="text-[11px] text-dimmed text-right">#</span>
+              <span></span>
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed">Title</span>
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed text-right">Time</span>
+              <span></span>
+            </div>
+
+            <draggable v-model="pendingTracks" item-key="uid" handle=".drag-handle">
+              <template #item="{ element, index }">
+                <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 group">
+                  <span class="text-[12px] text-dimmed text-right">{{ index + 1 }}</span>
+                  <GripVertical :size="14" class="drag-handle text-dimmed cursor-grab active:cursor-grabbing" />
+                  <input
+                    v-model="element.title"
+                    class="bg-transparent border-none outline-none text-[13px] font-medium text-foreground w-full focus:bg-muted rounded px-1 -mx-1"
+                  />
+                  <span class="text-[12px] text-dimmed text-right">{{ formatDuration(element.durationSeconds) }}</span>
+                  <button
+                    type="button"
+                    class="flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
+                    @click="removeTrack(element.uid)"
+                  >
+                    <X :size="14" />
+                  </button>
+                </div>
+              </template>
+            </draggable>
+          </div>
+        </div>
+      </form>
+    </div>
+  </BaseDialog>
+
+  <BaseDialog
     :open="!!confirmTarget"
     title="Delete Album"
     @close="confirmTarget = null"
@@ -341,25 +359,25 @@ async function submit() {
 
 <style scoped>
 .create-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
+  display: grid;
+  grid-template-columns: minmax(320px, 500px) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
   margin-bottom: 40px;
 }
 
 .admin-form {
-  width: 380px;
-  flex-shrink: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .separator {
+  display: none;
   width: 1px;
   align-self: stretch;
   background: var(--border);
-  margin: 0 32px;
 }
 
 .tracks-column {
@@ -386,4 +404,33 @@ select option { background: var(--muted); }
 .item-list { display: flex; flex-direction: column; gap: 4px; }
 .list-item { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; background: var(--card); border-radius: 4px; }
 .item-name { font-weight: 600; }
+
+.search-row {
+  max-width: 520px;
+}
+
+.dialog-scroll {
+  max-height: min(88dvh, 860px);
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+
+@media (max-width: 1023px) {
+  .create-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .create-layout {
+    grid-template-columns: minmax(320px, 460px) 1px minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .separator {
+    display: block;
+    margin: 0 24px;
+  }
+}
 </style>
