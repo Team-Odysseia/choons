@@ -1,5 +1,6 @@
 export type UserRole = 'ADMIN' | 'LISTENER'
 export type AlbumRequestStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
+export type PartyQueuePolicy = 'DJ_ONLY' | 'EVERYONE'
 
 export interface UserResponse {
   id: string
@@ -76,4 +77,39 @@ export interface ListenerRequestBanResponse {
   id: string
   username: string
   requestsBlocked: boolean
+}
+
+export interface PartyMemberResponse {
+  userId: string
+  username: string
+  host: boolean
+  dj: boolean
+  connected: boolean
+}
+
+export interface PartyQueueItemResponse {
+  id: string
+  position: number
+  track: TrackResponse
+  addedByUserId: string
+  addedByUsername: string
+}
+
+export interface PartyPlaybackResponse {
+  track: TrackResponse | null
+  playing: boolean
+  anchorPositionSec: number
+  anchorEpochMs: number
+}
+
+export interface PartyStateResponse {
+  id: string
+  inviteCode: string
+  name: string
+  queuePolicy: PartyQueuePolicy
+  hostUserId: string
+  members: PartyMemberResponse[]
+  queue: PartyQueueItemResponse[]
+  playback: PartyPlaybackResponse
+  canControlQueue: boolean
 }

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { useAlbumQuery, useAlbumTracksQuery } from '@/composables/queries'
 import { usePlayerStore } from '@/stores/player'
+import { usePartyStore } from '@/stores/party'
 import { usePlaylistsStore } from '@/stores/playlists'
 import TrackRow from '@/components/music/TrackRow.vue'
 import AddToPlaylistDialog from '@/components/music/AddToPlaylistDialog.vue'
@@ -13,6 +15,7 @@ import { albumImageUrl } from '@/api/albums'
 const route = useRoute()
 const router = useRouter()
 const player = usePlayerStore()
+const party = usePartyStore()
 const playlists = usePlaylistsStore()
 
 const id = computed(() => route.params.id as string)
@@ -22,6 +25,18 @@ const { data: tracks } = useAlbumTracksQuery(id)
 const albumDialogOpen = ref(false)
 
 const trackList = computed(() => tracks.value ?? [])
+
+function addAllToQueue() {
+  if (party.inParty) {
+    if (!party.canControl) {
+      toast.error('Only DJs can add tracks to party queue')
+      return
+    }
+    void party.addTracks(trackList.value)
+    return
+  }
+  player.addTracksToQueue(trackList.value)
+}
 </script>
 
 <template>
@@ -53,21 +68,21 @@ const trackList = computed(() => tracks.value ?? [])
     </div>
 
     <div class="flex flex-wrap items-center gap-2 mb-6">
-      <Button @click="player.playQueue(trackList)">
+      <Button v-if="!party.inParty" @click="player.playQueue(trackList)">
         <Play :size="16" />
         Play all
       </Button>
-      <Button variant="outline" @click="player.playQueueShuffled(trackList)">
+      <Button v-if="!party.inParty" variant="outline" @click="player.playQueueShuffled(trackList)">
         <Shuffle :size="16" />
         Shuffle
       </Button>
       <Button
         variant="outline"
-        :disabled="trackList.length === 0"
-        @click="player.addTracksToQueue(trackList)"
+        :disabled="trackList.length === 0 || (party.inParty && !party.canControl)"
+        @click="addAllToQueue"
       >
         <ListPlus :size="16" />
-        Add to queue
+        {{ party.inParty ? 'Add to party queue' : 'Add to queue' }}
       </Button>
       <Button
         variant="outline"

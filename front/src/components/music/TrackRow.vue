@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { usePlayerStore } from '@/stores/player'
+import { usePartyStore } from '@/stores/party'
 import type { TrackResponse } from '@/api/types'
 import { Play, Plus, ListPlus } from 'lucide-vue-next'
 import AddToPlaylistDialog from './AddToPlaylistDialog.vue'
@@ -15,11 +17,25 @@ const props = defineProps<{
 }>()
 
 const player = usePlayerStore()
+const party = usePartyStore()
 const router = useRouter()
 const dialogOpen = ref(false)
 
 function play() {
+  if (party.inParty) return
   player.playTrack(props.track, props.queue ?? [props.track], props.index ?? 0)
+}
+
+function addToQueue() {
+  if (party.inParty) {
+    if (!party.canControl) {
+      toast.error('Only DJs can add tracks to party queue')
+      return
+    }
+    void party.addTrack(props.track.id)
+    return
+  }
+  player.addToQueue(props.track)
 }
 
 function formatDuration(secs: number) {
@@ -58,6 +74,7 @@ const isActive = () => player.currentTrack?.id === props.track.id
 
     <div class="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
       <button
+        v-if="!party.inParty"
         class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
         title="Play"
         @click.stop="play"
@@ -68,8 +85,9 @@ const isActive = () => player.currentTrack?.id === props.track.id
       <button
         v-if="showAddToQueue"
         class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-        title="Add to queue"
-        @click.stop="player.addToQueue(track)"
+        :disabled="party.inParty && !party.canControl"
+        :title="party.inParty ? 'Add to party queue' : 'Add to queue'"
+        @click.stop="addToQueue"
       >
         <ListPlus :size="16" />
       </button>

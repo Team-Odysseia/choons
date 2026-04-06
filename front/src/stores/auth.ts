@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { login as apiLogin, me as apiMe } from '@/api/auth'
 import { usePlayerStore } from '@/stores/player'
+import { usePartyStore } from '@/stores/party'
 import type { UserResponse } from '@/api/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -19,6 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await apiLogin(username, password)
       token.value = data.token
       await fetchMe()
+      await usePartyStore().fetchMyParty()
     } finally {
       loading.value = false
     }
@@ -34,6 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    usePartyStore().stopPolling()
     usePlayerStore().stop()
     token.value = null
     user.value = null

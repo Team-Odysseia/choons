@@ -71,6 +71,19 @@ const router = createRouter({
       ],
     },
     {
+      path: '/parties',
+      component: () => import('@/components/layout/AppLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'parties',
+          component: () => import('@/views/PartiesView.vue'),
+          meta: { shell: 'form' },
+        },
+      ],
+    },
+    {
       path: '/admin',
       component: () => import('@/components/layout/AppLayout.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },

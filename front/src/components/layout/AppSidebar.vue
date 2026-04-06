@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDrawerStore } from '@/stores/drawer'
 import { useRoute, useRouter } from 'vue-router'
-import { Library, ListMusic, LogOut, Send, X } from 'lucide-vue-next'
+import { Library, ListMusic, LogOut, PartyPopper, Send, X } from 'lucide-vue-next'
 import { listAllAlbumRequests } from '@/api/albumRequests'
 
 const auth = useAuthStore()
@@ -158,6 +158,16 @@ onBeforeUnmount(() => {
           >
             <ListMusic :size="20" />
             Playlists
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink
+            to="/parties"
+            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
+            @click="drawer.closeSidebar()"
+          >
+            <PartyPopper :size="20" />
+            Parties
           </RouterLink>
         </li>
         <li v-if="!auth.isAdmin">

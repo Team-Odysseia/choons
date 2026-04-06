@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { usePlayerStore } from '@/stores/player'
+import { usePartyStore } from '@/stores/party'
 import draggable from 'vuedraggable'
 import { GripVertical, X } from 'lucide-vue-next'
 
 const player = usePlayerStore()
+const party = usePartyStore()
 
 function formatDuration(secs: number) {
   const m = Math.floor(secs / 60)
@@ -11,8 +13,24 @@ function formatDuration(secs: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-function onDragChange(event: any) {
-  if (event.moved) player.reorderQueue()
+function onDragChange() {
+  if (party.inParty && party.canControl && party.state) {
+    const ids = party.state.queue.map((q) => q.id)
+    void party.reorderQueueByIds(ids)
+    return
+  }
+  player.reorderQueue()
+}
+
+function removeAt(index: number) {
+  if (party.inParty && party.state) {
+    if (!party.canControl) return
+    const item = party.state.queue[index]
+    if (!item) return
+    void party.removeQueueItem(item.id)
+    return
+  }
+  player.removeFromQueue(index)
 }
 </script>
 
@@ -26,7 +44,9 @@ function onDragChange(event: any) {
         <span class="text-[12px] text-dimmed">
           {{ player.queue.length }} track{{ player.queue.length !== 1 ? 's' : '' }}
         </span>
+        <span v-if="party.inParty" class="text-[11px] text-dimmed">Party queue</span>
         <button
+          v-else
           class="text-[12px] text-dimmed hover:text-destructive transition-colors"
           @click="player.clearQueue()"
         >
@@ -38,6 +58,7 @@ function onDragChange(event: any) {
         :list="player.queue"
         item-key="id"
         handle=".drag-handle"
+        :disabled="party.inParty"
         @change="onDragChange"
       >
         <template #item="{ element, index }">
@@ -58,9 +79,10 @@ function onDragChange(event: any) {
             </div>
             <span class="text-[11px] text-dimmed shrink-0">{{ formatDuration(element.durationSeconds) }}</span>
             <button
+              v-if="!party.inParty || party.canControl"
               class="size-6 flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all shrink-0"
               title="Remove"
-              @click="player.removeFromQueue(index)"
+              @click="removeAt(index)"
             >
               <X :size="12" />
             </button>

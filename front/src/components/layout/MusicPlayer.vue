@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { usePlayerStore } from '@/stores/player'
 import { useDrawerStore } from '@/stores/drawer'
-import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2, ListMusic, Mic2, Menu } from 'lucide-vue-next'
+import { usePartyStore } from '@/stores/party'
+import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2, ListMusic, Mic2, Menu, Users2 } from 'lucide-vue-next'
 
 const player = usePlayerStore()
 const drawer = useDrawerStore()
+const party = usePartyStore()
 
 const progressPercent = computed(() =>
   player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0,
@@ -23,11 +26,65 @@ function formatTime(secs: number) {
 
 function onSeek(e: Event) {
   const val = parseFloat((e.target as HTMLInputElement).value)
-  player.seek((val / 100) * player.duration)
+  const nextPos = (val / 100) * player.duration
+  if (party.inParty) {
+    if (!party.canControl) {
+      toast.error('Only DJs can control playback in this party')
+      return
+    }
+    void party.seek(nextPos)
+    return
+  }
+  player.seek(nextPos)
 }
 
 function onVolume(e: Event) {
   player.setVolume(parseFloat((e.target as HTMLInputElement).value))
+}
+
+function openPanel(panel: 'queue' | 'lyrics' | 'party') {
+  drawer.toggle(panel)
+}
+
+function onPrev() {
+  if (party.inParty) {
+    if (!party.canControl) {
+      toast.error('Only DJs can control playback in this party')
+      return
+    }
+    void party.prev()
+    return
+  }
+  player.playPrev()
+}
+
+function onNext() {
+  if (party.inParty) {
+    if (!party.canControl) {
+      toast.error('Only DJs can control playback in this party')
+      return
+    }
+    void party.next()
+    return
+  }
+  player.playNext()
+}
+
+function onTogglePlay() {
+  if (party.inParty) {
+    if (!party.canControl) {
+      toast.error('Only DJs can control playback in this party')
+      return
+    }
+    if (!party.state?.playback.track) return
+    if (player.isPlaying) {
+      void party.pause(player.currentTime)
+    } else {
+      void party.play(party.state.playback.track.id, player.currentTime)
+    }
+    return
+  }
+  player.togglePlay()
 }
 </script>
 
@@ -58,7 +115,7 @@ function onVolume(e: Event) {
           class="size-7 flex items-center justify-center transition-colors"
           :class="drawer.activePanel === 'queue' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
           title="Queue"
-          @click="drawer.toggle('queue')"
+          @click="openPanel('queue')"
         >
           <ListMusic :size="16" />
         </button>
@@ -66,9 +123,18 @@ function onVolume(e: Event) {
           class="size-7 flex items-center justify-center transition-colors"
           :class="drawer.activePanel === 'lyrics' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
           title="Lyrics"
-          @click="drawer.toggle('lyrics')"
+          @click="openPanel('lyrics')"
         >
           <Mic2 :size="16" />
+        </button>
+        <button
+          v-if="party.inParty"
+          class="size-7 flex items-center justify-center transition-colors"
+          :class="drawer.activePanel === 'party' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+          title="Party"
+          @click="openPanel('party')"
+        >
+          <Users2 :size="16" />
         </button>
       </div>
 
@@ -86,16 +152,16 @@ function onVolume(e: Event) {
         <button
           data-testid="prev-btn"
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          :disabled="!player.hasPrev"
-          @click="player.playPrev()"
+          :disabled="!player.hasPrev || (party.inParty && !party.canControl)"
+          @click="onPrev"
         >
           <SkipBack :size="20" />
         </button>
         <button
           data-testid="play-btn"
           class="size-[34px] rounded-full bg-foreground text-black flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed"
-          :disabled="!player.currentTrack"
-          @click="player.togglePlay()"
+          :disabled="!player.currentTrack || (party.inParty && !party.canControl)"
+          @click="onTogglePlay"
         >
           <Play v-if="!player.isPlaying" :size="20" />
           <Pause v-else :size="20" />
@@ -103,8 +169,8 @@ function onVolume(e: Event) {
         <button
           data-testid="next-btn"
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          :disabled="!player.hasNext"
-          @click="player.playNext()"
+          :disabled="!player.hasNext || (party.inParty && !party.canControl)"
+          @click="onNext"
         >
           <SkipForward :size="20" />
         </button>
@@ -129,6 +195,7 @@ function onVolume(e: Event) {
           class="flex-1 range-input"
           min="0"
           max="100"
+          :disabled="party.inParty && !party.canControl"
           :value="progressPercent"
           @input="onSeek"
         />
@@ -164,16 +231,16 @@ function onVolume(e: Event) {
           <button
             data-testid="prev-btn"
             class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="!player.hasPrev"
-            @click="player.playPrev()"
+            :disabled="!player.hasPrev || (party.inParty && !party.canControl)"
+            @click="onPrev"
           >
             <SkipBack :size="20" />
           </button>
           <button
             data-testid="play-btn"
             class="size-[34px] rounded-full bg-foreground text-black flex items-center justify-center transition-transform hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="!player.currentTrack"
-            @click="player.togglePlay()"
+            :disabled="!player.currentTrack || (party.inParty && !party.canControl)"
+            @click="onTogglePlay"
           >
             <Play v-if="!player.isPlaying" :size="20" />
             <Pause v-else :size="20" />
@@ -181,8 +248,8 @@ function onVolume(e: Event) {
           <button
             data-testid="next-btn"
             class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="!player.hasNext"
-            @click="player.playNext()"
+            :disabled="!player.hasNext || (party.inParty && !party.canControl)"
+            @click="onNext"
           >
             <SkipForward :size="20" />
           </button>
@@ -207,6 +274,7 @@ function onVolume(e: Event) {
             class="flex-1 range-input"
             min="0"
             max="100"
+            :disabled="party.inParty && !party.canControl"
             :value="progressPercent"
             @input="onSeek"
           />
@@ -223,7 +291,7 @@ function onVolume(e: Event) {
           class="size-7 flex items-center justify-center transition-colors"
           :class="drawer.activePanel === 'queue' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
           title="Queue"
-          @click="drawer.toggle('queue')"
+          @click="openPanel('queue')"
         >
           <ListMusic :size="16" />
         </button>
@@ -231,9 +299,18 @@ function onVolume(e: Event) {
           class="size-7 flex items-center justify-center transition-colors"
           :class="drawer.activePanel === 'lyrics' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
           title="Lyrics"
-          @click="drawer.toggle('lyrics')"
+          @click="openPanel('lyrics')"
         >
           <Mic2 :size="16" />
+        </button>
+        <button
+          v-if="party.inParty"
+          class="size-7 flex items-center justify-center transition-colors"
+          :class="drawer.activePanel === 'party' ? 'text-primary' : 'text-dimmed hover:text-foreground'"
+          title="Party"
+          @click="openPanel('party')"
+        >
+          <Users2 :size="16" />
         </button>
         <Volume2 :size="16" class="text-dimmed shrink-0" />
         <input

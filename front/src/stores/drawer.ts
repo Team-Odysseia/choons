@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-export type DrawerPanel = 'queue' | 'lyrics'
+export type DrawerPanel = 'queue' | 'lyrics' | 'party'
 
 export const useDrawerStore = defineStore('drawer', () => {
   const activePanel = ref<DrawerPanel | null>(null)

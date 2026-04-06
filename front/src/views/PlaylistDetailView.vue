@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { usePlayerStore } from '@/stores/player'
+import { usePartyStore } from '@/stores/party'
 import { useAuthStore } from '@/stores/auth'
 import TrackRow from '@/components/music/TrackRow.vue'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,7 @@ import { toast } from 'vue-sonner'
 const route = useRoute()
 const playlists = usePlaylistsStore()
 const player = usePlayerStore()
+const party = usePartyStore()
 const auth = useAuthStore()
 
 const togglingVisibility = ref(false)
@@ -45,6 +47,19 @@ function copyLink() {
   navigator.clipboard.writeText(publicUrl.value)
   toast.success('Link copied!')
 }
+
+function addAllToQueue() {
+  if (!playlists.current) return
+  if (party.inParty) {
+    if (!party.canControl) {
+      toast.error('Only DJs can add tracks to party queue')
+      return
+    }
+    void party.addTracks(playlists.current.tracks)
+    return
+  }
+  player.addTracksToQueue(playlists.current.tracks)
+}
 </script>
 
 <template>
@@ -77,6 +92,7 @@ function copyLink() {
 
     <div class="flex items-center gap-2 mb-6 flex-wrap">
       <Button
+        v-if="!party.inParty"
         :disabled="playlists.current.tracks.length === 0"
         @click="player.playQueue(playlists.current!.tracks)"
       >
@@ -84,6 +100,7 @@ function copyLink() {
         Play all
       </Button>
       <Button
+        v-if="!party.inParty"
         variant="outline"
         :disabled="playlists.current.tracks.length === 0"
         @click="player.playQueueShuffled(playlists.current!.tracks)"
@@ -93,11 +110,11 @@ function copyLink() {
       </Button>
       <Button
         variant="outline"
-        :disabled="playlists.current.tracks.length === 0"
-        @click="player.addTracksToQueue(playlists.current!.tracks)"
+        :disabled="playlists.current.tracks.length === 0 || (party.inParty && !party.canControl)"
+        @click="addAllToQueue"
       >
         <ListPlus :size="16" />
-        Add to queue
+        {{ party.inParty ? 'Add to party queue' : 'Add to queue' }}
       </Button>
       <template v-if="isOwner">
         <Button

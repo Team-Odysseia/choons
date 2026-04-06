@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { streamUrl, recordStream } from '@/api/tracks'
+import { usePartyStore } from './party'
 import type { TrackResponse } from '@/api/types'
 
 export type LoopMode = 'none' | 'queue' | 'track'
@@ -78,6 +79,11 @@ export const usePlayerStore = defineStore('player', () => {
       audio.currentTime = 0
       audio.play().catch(() => { isPlaying.value = false })
     } else {
+      const party = usePartyStore()
+      if (party.inParty && party.canControl) {
+        void party.next()
+        return
+      }
       playNext()
     }
   })
@@ -255,6 +261,48 @@ export const usePlayerStore = defineStore('player', () => {
     streamRecorded.value = false
   }
 
+  function syncExternalState(
+    track: TrackResponse | null,
+    queueTracks: TrackResponse[],
+    playing: boolean,
+    positionSec: number,
+  ) {
+    queue.value = [...queueTracks]
+    originalQueue.value = [...queueTracks]
+
+    if (!track) {
+      currentTrack.value = null
+      currentIndex.value = -1
+      audio.pause()
+      isPlaying.value = false
+      return
+    }
+
+    currentTrack.value = track
+    const idx = queueTracks.findIndex((t) => t.id === track.id)
+    currentIndex.value = idx >= 0 ? idx : 0
+
+    const nextSrc = streamUrl(track.id)
+    if (audio.src !== nextSrc) {
+      audio.src = nextSrc
+    }
+
+    const safePos = Number.isFinite(positionSec) ? Math.max(0, positionSec) : 0
+    if (Math.abs(audio.currentTime - safePos) > 0.75) {
+      audio.currentTime = safePos
+      currentTime.value = safePos
+    }
+
+    if (playing && audio.paused) {
+      audio.play().catch(() => {
+        isPlaying.value = false
+      })
+    }
+    if (!playing && !audio.paused) {
+      audio.pause()
+    }
+  }
+
   return {
     currentTrack,
     queue,
@@ -283,5 +331,6 @@ export const usePlayerStore = defineStore('player', () => {
     reorderQueue,
     clearQueue,
     stop,
+    syncExternalState,
   }
 })
