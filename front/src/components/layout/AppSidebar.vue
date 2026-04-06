@@ -2,7 +2,7 @@
 import { useAuthStore } from '@/stores/auth'
 import { useDrawerStore } from '@/stores/drawer'
 import { useRouter } from 'vue-router'
-import { Library, ListMusic, LogOut, X } from 'lucide-vue-next'
+import { Library, ListMusic, LogOut, Send, X } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const drawer = useDrawerStore()
@@ -55,6 +55,16 @@ function logout() {
             Playlists
           </RouterLink>
         </li>
+        <li v-if="!auth.isAdmin">
+          <RouterLink
+            to="/playlists/requests"
+            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
+            @click="drawer.closeSidebar()"
+          >
+            <Send :size="20" />
+            Requests
+          </RouterLink>
+        </li>
       </ul>
 
       <template v-if="auth.isAdmin">
@@ -68,6 +78,7 @@ function logout() {
             { to: '/admin/listeners', label: 'Listeners' },
             { to: '/admin/artists', label: 'Artists' },
             { to: '/admin/albums', label: 'Albums' },
+            { to: '/admin/album-requests', label: 'Album Requests' },
           ]" :key="to">
             <RouterLink
               :to="to"

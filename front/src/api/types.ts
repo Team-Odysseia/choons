@@ -1,4 +1,5 @@
 export type UserRole = 'ADMIN' | 'LISTENER'
+export type AlbumRequestStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED'
 
 export interface UserResponse {
   id: string
@@ -55,4 +56,24 @@ export interface PlaylistResponse {
   isPublic: boolean
   createdAt: string
   updatedAt: string
+}
+
+export interface AlbumRequestResponse {
+  id: string
+  albumName: string
+  artistName: string
+  externalUrl: string
+  status: AlbumRequestStatus
+  requesterId: string
+  requesterUsername: string
+  requesterRequestsBlocked: boolean
+  adminNote: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListenerRequestBanResponse {
+  id: string
+  username: string
+  requestsBlocked: boolean
 }

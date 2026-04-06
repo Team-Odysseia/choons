@@ -23,7 +23,7 @@ export const useAlbumsQuery = (artistId?: Ref<string | undefined>) =>
 export const useRecentAlbumsQuery = () =>
   useQuery({
     queryKey: ['albums'],
-    queryFn: getAlbums,
+    queryFn: () => getAlbums(),
     select: (albums) =>
       [...albums]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -33,7 +33,7 @@ export const useRecentAlbumsQuery = () =>
 export const useAllAlbumsQuery = () =>
   useQuery({
     queryKey: ['albums'],
-    queryFn: getAlbums,
+    queryFn: () => getAlbums(),
     select: (albums) =>
       [...albums].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   })

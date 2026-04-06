@@ -15,10 +15,10 @@ export function parseLrc(lrc: string): ParsedLine[] {
   for (const raw of lrc.split('\n')) {
     const m = raw.match(regex)
     if (!m) continue
-    const text = m[3].trim()
+    const text = (m[3] ?? '').trim()
     if (!text) continue
-    const minutes = parseInt(m[1])
-    const seconds = parseFloat(m[2])
+    const minutes = Number.parseInt(m[1] ?? '0', 10)
+    const seconds = Number.parseFloat(m[2] ?? '0')
     result.push({ timeMs: (minutes * 60 + seconds) * 1000, text })
   }
   return result.sort((a, b) => a.timeMs - b.timeMs)
@@ -39,7 +39,9 @@ export const useLyricsStore = defineStore('lyrics', () => {
     const ms = player.currentTime * 1000
     let idx = -1
     for (let i = 0; i < lines.value.length; i++) {
-      if (lines.value[i].timeMs <= ms) idx = i
+      const line = lines.value[i]
+      if (!line) continue
+      if (line.timeMs <= ms) idx = i
       else break
     }
     return idx

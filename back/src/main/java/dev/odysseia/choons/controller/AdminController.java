@@ -2,9 +2,12 @@ package dev.odysseia.choons.controller;
 
 import dev.odysseia.choons.dto.AlbumResponse;
 import dev.odysseia.choons.dto.ArtistResponse;
+import dev.odysseia.choons.dto.ListenerRequestBanResponse;
 import dev.odysseia.choons.dto.TrackResponse;
+import dev.odysseia.choons.dto.UpdateRequestBanRequest;
 import dev.odysseia.choons.dto.UpdateLrclibIdRequest;
 import dev.odysseia.choons.dto.UpdateTrackRequest;
+import dev.odysseia.choons.service.AlbumRequestService;
 import dev.odysseia.choons.service.AlbumService;
 import dev.odysseia.choons.service.ArtistService;
 import dev.odysseia.choons.service.TrackService;
@@ -28,6 +31,14 @@ public class AdminController {
   @Autowired private ArtistService artistService;
   @Autowired private AlbumService albumService;
   @Autowired private TrackService trackService;
+  @Autowired private AlbumRequestService albumRequestService;
+
+  @PutMapping("/listeners/{id}/request-ban")
+  public ResponseEntity<ListenerRequestBanResponse> setRequestBan(
+          @PathVariable UUID id,
+          @RequestBody UpdateRequestBanRequest request) {
+    return ResponseEntity.ok(albumRequestService.setRequestBan(id, request));
+  }
 
   // ─── Artists ─────────────────────────────────────────────────────────────────
 

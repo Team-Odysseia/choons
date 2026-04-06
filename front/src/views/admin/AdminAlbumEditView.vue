@@ -196,6 +196,7 @@ async function save() {
       const startNumber = tracks.value.length + 1
       for (let i = 0; i < total; i++) {
         const pt = pendingTracks.value[i]
+        if (!pt) continue
         uploadStatus.value = `Uploading track ${i + 1} of ${total}…`
         uploadProgress.value = 0
         const formData = new FormData()

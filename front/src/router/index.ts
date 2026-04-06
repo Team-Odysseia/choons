@@ -56,6 +56,11 @@ const router = createRouter({
           name: 'playlist',
           component: () => import('@/views/PlaylistDetailView.vue'),
         },
+        {
+          path: 'requests',
+          name: 'album-requests',
+          component: () => import('@/views/AlbumRequestsView.vue'),
+        },
       ],
     },
     {
@@ -91,6 +96,11 @@ const router = createRouter({
           path: 'albums/:id/edit',
           name: 'admin-album-edit',
           component: () => import('@/views/admin/AdminAlbumEditView.vue'),
+        },
+        {
+          path: 'album-requests',
+          name: 'admin-album-requests',
+          component: () => import('@/views/admin/AdminAlbumRequestsView.vue'),
         },
       ],
     },

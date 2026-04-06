@@ -129,6 +129,40 @@ class SecurityConfigTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // ─── /album-requests/** — apenas LISTENER ─────────────────────────────────
+
+    @Test
+    void albumRequests_withListenerToken_isAllowed() throws Exception {
+        mockMvc.perform(get("/album-requests/mine").header("Authorization", listenerToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void albumRequests_withAdminToken_returns403() throws Exception {
+        mockMvc.perform(get("/album-requests/mine").header("Authorization", adminToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void albumRequests_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/album-requests/mine"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ─── /admin/album-requests/** — apenas ADMIN ──────────────────────────────
+
+    @Test
+    void adminAlbumRequests_withAdminToken_isAllowed() throws Exception {
+        mockMvc.perform(get("/admin/album-requests").header("Authorization", adminToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void adminAlbumRequests_withListenerToken_returns403() throws Exception {
+        mockMvc.perform(get("/admin/album-requests").header("Authorization", listenerToken))
+                .andExpect(status().isForbidden());
+    }
+
     // ─── /auth/me — qualquer autenticado ─────────────────────────────────────
 
     @Test

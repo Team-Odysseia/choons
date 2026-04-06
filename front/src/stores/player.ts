@@ -10,7 +10,11 @@ function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
+    const current = a[i]
+    const target = a[j]
+    if (current === undefined || target === undefined) continue
+    a[i] = target
+    a[j] = current
   }
   return a
 }
@@ -128,6 +132,7 @@ export const usePlayerStore = defineStore('player', () => {
     isShuffled.value = true
     const startIndex = Math.floor(Math.random() * tracks.length)
     const track = tracks[startIndex]
+    if (!track) return
     playTrack(track, tracks, startIndex)
   }
 
