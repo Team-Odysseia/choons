@@ -2,22 +2,20 @@ import axios from 'axios'
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
-})
-
-client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  withCredentials: true,
 })
 
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+      const requestUrl = String(error.config?.url ?? '')
+      const isAuthProbe = requestUrl.includes('/auth/me')
+      const isLoginRoute = window.location.pathname === '/login'
+
+      if (!isAuthProbe && !isLoginRoute) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   },

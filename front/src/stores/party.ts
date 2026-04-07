@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { toast } from 'vue-sonner'
 import {
   addPartyQueueTrack,
+  addPartyQueueTracks,
   createParty,
   endParty,
   getMyParty,
@@ -29,6 +30,12 @@ export const usePartyStore = defineStore('party', () => {
   const loading = ref(false)
   const syncing = ref(false)
   const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+  const eventSource = ref<EventSource | null>(null)
+  const reconnectTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectDelayMs = ref(1000)
+
+  const POLL_INTERVAL_MS = 12000
+  const RECONNECT_MAX_DELAY_MS = 15000
 
   const auth = useAuthStore()
 
@@ -49,6 +56,8 @@ export const usePartyStore = defineStore('party', () => {
     state.value = next
 
     if (!next && wasInParty) {
+      stopRealtime()
+      clearPolling()
       const drawer = useDrawerStore()
       if (drawer.activePanel === 'party') {
         drawer.close()
@@ -81,9 +90,11 @@ export const usePartyStore = defineStore('party', () => {
       const party = await getMyParty()
       applyState(party)
       startPolling()
+      startRealtime()
     } catch {
       applyState(null)
-      stopPolling()
+      clearPolling()
+      stopRealtime()
     }
   }
 
@@ -93,6 +104,7 @@ export const usePartyStore = defineStore('party', () => {
       const party = await createParty(name, queuePolicy)
       applyState(party)
       startPolling()
+      startRealtime()
       toast.success('Party created')
     } catch (e: any) {
       toast.error(e.response?.data?.error ?? 'Failed to create party')
@@ -108,6 +120,7 @@ export const usePartyStore = defineStore('party', () => {
       const party = await joinParty(code)
       applyState(party)
       startPolling()
+      startRealtime()
       toast.success(`Joined party ${party.name}`)
     } catch (e: any) {
       toast.error(e.response?.data?.error ?? 'Failed to join party')
@@ -126,7 +139,8 @@ export const usePartyStore = defineStore('party', () => {
     } catch (e: any) {
       if (e.response?.status === 404 || e.response?.status === 403) {
         applyState(null)
-        stopPolling()
+        clearPolling()
+        stopRealtime()
       }
     } finally {
       syncing.value = false
@@ -137,14 +151,16 @@ export const usePartyStore = defineStore('party', () => {
     if (!state.value) return
     await leaveParty(state.value.inviteCode)
     applyState(null)
-    stopPolling()
+    clearPolling()
+    stopRealtime()
   }
 
   async function end() {
     if (!state.value) return
     await endParty(state.value.inviteCode)
     applyState(null)
-    stopPolling()
+    clearPolling()
+    stopRealtime()
   }
 
   async function kick(userId: string) {
@@ -166,9 +182,12 @@ export const usePartyStore = defineStore('party', () => {
   }
 
   async function addTracks(tracks: TrackResponse[]) {
-    for (const track of tracks) {
-      await addTrack(track.id)
-    }
+    if (!state.value || tracks.length === 0) return
+    const next = await addPartyQueueTracks(
+      state.value.inviteCode,
+      tracks.map((track) => track.id),
+    )
+    applyState(next)
   }
 
   async function removeQueueItem(itemId: string) {
@@ -214,16 +233,86 @@ export const usePartyStore = defineStore('party', () => {
   }
 
   function startPolling() {
-    stopPolling()
+    clearPolling()
     pollTimer.value = setInterval(() => {
       void refreshState()
-    }, 1000)
+    }, POLL_INTERVAL_MS)
   }
 
-  function stopPolling() {
+  function clearPolling() {
     if (!pollTimer.value) return
     clearInterval(pollTimer.value)
     pollTimer.value = null
+  }
+
+  function clearReconnectTimer() {
+    if (!reconnectTimer.value) return
+    clearTimeout(reconnectTimer.value)
+    reconnectTimer.value = null
+  }
+
+  function stopRealtime() {
+    clearReconnectTimer()
+    if (!eventSource.value) return
+    eventSource.value.close()
+    eventSource.value = null
+  }
+
+  function scheduleReconnect() {
+    if (!state.value || reconnectTimer.value) return
+    reconnectTimer.value = setTimeout(() => {
+      reconnectTimer.value = null
+      connectRealtime()
+      reconnectDelayMs.value = Math.min(reconnectDelayMs.value * 2, RECONNECT_MAX_DELAY_MS)
+    }, reconnectDelayMs.value)
+  }
+
+  function connectRealtime() {
+    if (!state.value) return
+
+    stopRealtime()
+    const source = new EventSource(
+      `${import.meta.env.VITE_API_URL}/parties/${state.value.inviteCode}/events`,
+      { withCredentials: true },
+    )
+    eventSource.value = source
+
+    source.onopen = () => {
+      reconnectDelayMs.value = 1000
+      clearReconnectTimer()
+      clearPolling()
+    }
+
+    source.addEventListener('state', (event) => {
+      reconnectDelayMs.value = 1000
+      const message = event as MessageEvent<string>
+      const next = JSON.parse(message.data) as PartyStateResponse
+      applyState(next)
+      clearPolling()
+    })
+
+    source.addEventListener('ended', () => {
+      applyState(null)
+      stopRealtime()
+    })
+
+    source.onerror = () => {
+      if (eventSource.value !== source) return
+      stopRealtime()
+      startPolling()
+      scheduleReconnect()
+    }
+  }
+
+  function startRealtime() {
+    reconnectDelayMs.value = 1000
+    clearReconnectTimer()
+    connectRealtime()
+  }
+
+  function stopPolling() {
+    clearPolling()
+    stopRealtime()
   }
 
   return {

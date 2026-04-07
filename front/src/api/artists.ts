@@ -34,6 +34,5 @@ export const deleteArtistAvatar = (id: string) =>
   client.delete(`/admin/artists/${id}/avatar`)
 
 export const artistImageUrl = (artistId: string) => {
-  const token = localStorage.getItem('token')
-  return `${import.meta.env.VITE_API_URL}/media/images/artists/${artistId}?token=${token}`
+  return `${import.meta.env.VITE_API_URL}/media/images/artists/${artistId}`
 }

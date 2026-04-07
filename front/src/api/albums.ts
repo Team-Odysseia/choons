@@ -37,6 +37,5 @@ export const deleteAlbumCover = (id: string) =>
   client.delete(`/admin/albums/${id}/cover`)
 
 export const albumImageUrl = (albumId: string) => {
-  const token = localStorage.getItem('token')
-  return `${import.meta.env.VITE_API_URL}/media/images/albums/${albumId}?token=${token}`
+  return `${import.meta.env.VITE_API_URL}/media/images/albums/${albumId}`
 }

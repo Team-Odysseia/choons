@@ -8,9 +8,21 @@ const { recordStreamMock } = vi.hoisted(() => ({
   recordStreamMock: vi.fn().mockResolvedValue(undefined),
 }))
 
+const { partyStoreMock } = vi.hoisted(() => ({
+  partyStoreMock: {
+    inParty: false,
+    canControl: false,
+    next: vi.fn().mockResolvedValue(undefined),
+  },
+}))
+
 vi.mock('@/api/tracks', () => ({
   streamUrl: vi.fn((id: string) => `http://test/stream/${id}`),
   recordStream: recordStreamMock,
+}))
+
+vi.mock('@/stores/party', () => ({
+  usePartyStore: () => partyStoreMock,
 }))
 
 function makeTrack(n: number): TrackResponse {
@@ -33,6 +45,10 @@ beforeEach(() => {
   localStorage.clear()
   setActivePinia(createPinia())
   recordStreamMock.mockClear()
+  partyStoreMock.inParty = false
+  partyStoreMock.canControl = false
+  partyStoreMock.next.mockClear()
+  partyStoreMock.next.mockResolvedValue(undefined)
 })
 
 // ─── playTrack ────────────────────────────────────────────────────────────────
@@ -353,5 +369,43 @@ describe('evento ended', () => {
     store.playQueue([t1, t2], 1)
     audioMock._emit('ended')
     expect(store.currentTrack).toEqual(t2)
+  })
+
+  it('em party mode, evita next duplicado enquanto request anterior está em andamento', async () => {
+    let resolveNext: (() => void) | null = null
+    partyStoreMock.inParty = true
+    partyStoreMock.canControl = true
+    partyStoreMock.next.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveNext = resolve
+        }),
+    )
+
+    const store = usePlayerStore()
+    store.playQueue([t1, t2], 0)
+
+    audioMock._emit('ended')
+    audioMock._emit('ended')
+    expect(partyStoreMock.next).toHaveBeenCalledTimes(1)
+
+    resolveNext?.()
+    await Promise.resolve()
+    audioMock._emit('ended')
+    expect(partyStoreMock.next).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('syncExternalState', () => {
+  it('não troca referência de currentTrack quando id é igual', () => {
+    const store = usePlayerStore()
+    const first = { ...t1 }
+    const second = { ...t1, title: 'Track 1 copy' }
+
+    store.syncExternalState(first, [first, t2], true, 0)
+    const prevRef = store.currentTrack
+    store.syncExternalState(second, [second, t2], true, 0.2)
+
+    expect(store.currentTrack).toBe(prevRef)
   })
 })

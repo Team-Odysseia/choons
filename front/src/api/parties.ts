@@ -25,6 +25,9 @@ export const setPartyMemberDj = (inviteCode: string, userId: string, dj: boolean
 export const addPartyQueueTrack = (inviteCode: string, trackId: string) =>
   client.post<PartyStateResponse>(`/parties/${inviteCode}/queue`, { trackId }).then((r) => r.data)
 
+export const addPartyQueueTracks = (inviteCode: string, trackIds: string[]) =>
+  client.post<PartyStateResponse>(`/parties/${inviteCode}/queue/batch`, { trackIds }).then((r) => r.data)
+
 export const removePartyQueueTrack = (inviteCode: string, itemId: string) =>
   client.delete<PartyStateResponse>(`/parties/${inviteCode}/queue/${itemId}`).then((r) => r.data)
 

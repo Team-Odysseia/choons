@@ -35,6 +35,7 @@ export const usePlayerStore = defineStore('player', () => {
   const loopMode = ref<LoopMode>('none')
   const isShuffled = ref(false)
   const streamRecorded = ref(false)
+  const partyAdvanceInFlight = ref(false)
   audio.volume = volume.value
 
   // ─── Media Session ──────────────────────────────────────────────────────────
@@ -81,7 +82,11 @@ export const usePlayerStore = defineStore('player', () => {
     } else {
       const party = usePartyStore()
       if (party.inParty && party.canControl) {
-        void party.next()
+        if (partyAdvanceInFlight.value) return
+        partyAdvanceInFlight.value = true
+        void party.next().finally(() => {
+          partyAdvanceInFlight.value = false
+        })
         return
       }
       playNext()
@@ -106,7 +111,9 @@ export const usePlayerStore = defineStore('player', () => {
   )
 
   function playTrack(track: TrackResponse, trackQueue?: TrackResponse[], index?: number) {
-    currentTrack.value = track
+    if (!currentTrack.value || currentTrack.value.id !== track.id) {
+      currentTrack.value = track
+    }
     if (trackQueue) {
       originalQueue.value = trackQueue
       if (isShuffled.value) {
@@ -278,7 +285,9 @@ export const usePlayerStore = defineStore('player', () => {
       return
     }
 
-    currentTrack.value = track
+    if (!currentTrack.value || currentTrack.value.id !== track.id) {
+      currentTrack.value = track
+    }
     const idx = queueTracks.findIndex((t) => t.id === track.id)
     currentIndex.value = idx >= 0 ? idx : 0
 
@@ -288,7 +297,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     const safePos = Number.isFinite(positionSec) ? Math.max(0, positionSec) : 0
-    if (Math.abs(audio.currentTime - safePos) > 0.75) {
+    if (Math.abs(audio.currentTime - safePos) > 2) {
       audio.currentTime = safePos
       currentTime.value = safePos
     }

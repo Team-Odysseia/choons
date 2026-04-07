@@ -4,6 +4,8 @@ import type { AuthResponse, ListenerRequestBanResponse, UserResponse } from './t
 export const login = (username: string, password: string) =>
   client.post<AuthResponse>('/auth/login', { username, password }).then((r) => r.data)
 
+export const logout = () => client.post('/auth/logout')
+
 export const me = () => client.get<UserResponse>('/auth/me').then((r) => r.data)
 
 export const registerListener = (username: string, password: string) =>

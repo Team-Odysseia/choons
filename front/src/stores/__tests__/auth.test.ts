@@ -4,11 +4,13 @@ import { useAuthStore } from '../auth'
 
 const mockLogin = vi.fn()
 const mockMe = vi.fn()
+const mockLogout = vi.fn()
 const mockPlayerStop = vi.fn()
 
 vi.mock('@/api/auth', () => ({
   login: (...args: unknown[]) => mockLogin(...args),
   me: () => mockMe(),
+  logout: () => mockLogout(),
 }))
 
 vi.mock('@/stores/player', () => ({
@@ -22,19 +24,22 @@ beforeEach(() => {
   localStorage.clear()
   setActivePinia(createPinia())
   mockPlayerStop.mockClear()
+  mockLogout.mockReset()
+  mockLogout.mockResolvedValue(undefined)
 })
 
 // ─── estado inicial ───────────────────────────────────────────────────────────
 
 describe('estado inicial', () => {
-  it('isAuthenticated é false quando não há token', () => {
+  it('isAuthenticated é false quando não há user', () => {
     const store = useAuthStore()
     expect(store.isAuthenticated).toBe(false)
   })
 
-  it('isAuthenticated é true quando há token no localStorage', () => {
-    localStorage.setItem('token', 'meu-token')
+  it('isAuthenticated é true após fetchMe', async () => {
+    mockMe.mockResolvedValueOnce(adminUser)
     const store = useAuthStore()
+    await store.fetchMe()
     expect(store.isAuthenticated).toBe(true)
   })
 
@@ -54,8 +59,6 @@ describe('login', () => {
     const store = useAuthStore()
     await store.login('admin', 'pass')
 
-    expect(store.token).toBe('jwt-abc')
-    expect(store.token).toBe('jwt-abc')
     expect(store.user).toEqual(adminUser)
     expect(store.isAuthenticated).toBe(true)
   })
@@ -70,14 +73,13 @@ describe('login', () => {
     expect(store.loading).toBe(false)
   })
 
-  it('erro: não salva token e loading volta a false', async () => {
+  it('erro: não autentica e loading volta a false', async () => {
     mockLogin.mockRejectedValueOnce(new Error('Invalid credentials'))
 
     const store = useAuthStore()
     await expect(store.login('admin', 'wrong')).rejects.toThrow()
 
-    expect(store.token).toBeNull()
-    expect(store.token).toBeNull()
+    expect(store.user).toBeNull()
     expect(store.loading).toBe(false)
   })
 })
@@ -92,12 +94,11 @@ describe('logout', () => {
     const store = useAuthStore()
     await store.login('admin', 'pass')
 
-    store.logout()
+    await store.logout()
 
-    expect(store.token).toBeNull()
     expect(store.user).toBeNull()
     expect(store.isAuthenticated).toBe(false)
-    expect(store.token).toBeNull()
+    expect(mockLogout).toHaveBeenCalledOnce()
   })
 
   it('para o player ao fazer logout', async () => {
@@ -106,7 +107,7 @@ describe('logout', () => {
 
     const store = useAuthStore()
     await store.login('admin', 'pass')
-    store.logout()
+    await store.logout()
 
     expect(mockPlayerStop).toHaveBeenCalledOnce()
   })
@@ -116,7 +117,6 @@ describe('logout', () => {
 
 describe('fetchMe', () => {
   it('popula user com os dados da API', async () => {
-    localStorage.setItem('token', 'meu-token')
     mockMe.mockResolvedValueOnce(listenerUser)
 
     const store = useAuthStore()
@@ -125,21 +125,21 @@ describe('fetchMe', () => {
     expect(store.user).toEqual(listenerUser)
   })
 
-  it('não faz nada se não houver token', async () => {
+  it('consulta API mesmo sem estado local', async () => {
+    mockMe.mockResolvedValueOnce(listenerUser)
     const store = useAuthStore()
     await store.fetchMe()
-    expect(mockMe).not.toHaveBeenCalled()
+    expect(mockMe).toHaveBeenCalled()
   })
 
   it('em erro da API, chama logout', async () => {
-    localStorage.setItem('token', 'meu-token')
     mockMe.mockRejectedValueOnce(new Error('401'))
 
     const store = useAuthStore()
     await store.fetchMe()
 
-    expect(store.token).toBeNull()
     expect(store.user).toBeNull()
+    expect(mockLogout).toHaveBeenCalledOnce()
   })
 })
 
