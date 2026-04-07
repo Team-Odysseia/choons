@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -22,8 +23,11 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler({AccessDeniedException.class})
   public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException ex) {
+    String message = ex.getMessage() == null || ex.getMessage().isBlank()
+            ? "Access denied"
+            : ex.getMessage();
     return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(Map.of("error", "Access denied"));
+            .body(Map.of("error", message));
   }
 
   @ExceptionHandler(java.nio.file.AccessDeniedException.class)
@@ -42,6 +46,22 @@ public class GlobalExceptionHandler {
   public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException ex) {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(Map.of("error", ex.getMessage()));
+  }
+
+  @ExceptionHandler(IllegalStateException.class)
+  public ResponseEntity<Map<String, String>> handleConflict(IllegalStateException ex) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("error", ex.getMessage()));
+  }
+
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex) {
+    String message = ex.getBindingResult().getFieldErrors().stream()
+            .findFirst()
+            .map(fe -> fe.getField() + " " + fe.getDefaultMessage())
+            .orElse("Validation failed");
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(Map.of("error", message));
   }
 
   @ExceptionHandler(Exception.class)

@@ -27,4 +27,8 @@ public class User {
   
   @Enumerated(EnumType.STRING)
   private UserRole role;
+
+  @Builder.Default
+  @Column(name = "requests_blocked", nullable = false)
+  private boolean requestsBlocked = false;
 }

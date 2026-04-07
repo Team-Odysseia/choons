@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { useDrawerStore } from '@/stores/drawer'
+import { usePartyStore } from '@/stores/party'
 import QueuePanel from './QueuePanel.vue'
 import LyricsPanel from './LyricsPanel.vue'
+import PartyPanel from './PartyPanel.vue'
 import { ListMusic, Mic2, X } from 'lucide-vue-next'
 
 const drawer = useDrawerStore()
+const party = usePartyStore()
 </script>
 
 <template>
@@ -20,7 +23,7 @@ const drawer = useDrawerStore()
       <div
         v-if="drawer.activePanel"
         class="fixed right-0 top-0 w-full md:w-[300px] bg-card border-l border-border flex flex-col z-40"
-        style="height: calc(100vh - var(--player-h)); padding-top: var(--safe-area-top); padding-right: var(--safe-area-right)"
+        style="height: calc(var(--app-h) - var(--player-h)); padding-top: var(--safe-area-top); padding-right: var(--safe-area-right)"
       >
         <!-- Tab header -->
         <div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
@@ -45,6 +48,16 @@ const drawer = useDrawerStore()
               <Mic2 :size="14" />
               Lyrics
             </button>
+            <button
+              v-if="party.inParty"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded text-[13px] font-semibold transition-colors"
+              :class="drawer.activePanel === 'party'
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'"
+              @click="drawer.toggle('party')"
+            >
+              Party
+            </button>
           </div>
           <button
             class="size-7 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors rounded"
@@ -58,7 +71,8 @@ const drawer = useDrawerStore()
         <!-- Panel content -->
         <div class="flex-1 overflow-y-auto">
           <QueuePanel v-if="drawer.activePanel === 'queue'" />
-          <LyricsPanel v-else />
+          <LyricsPanel v-else-if="drawer.activePanel === 'lyrics'" />
+          <PartyPanel v-else />
         </div>
       </div>
     </Transition>

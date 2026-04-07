@@ -196,6 +196,7 @@ async function save() {
       const startNumber = tracks.value.length + 1
       for (let i = 0; i < total; i++) {
         const pt = pendingTracks.value[i]
+        if (!pt) continue
         uploadStatus.value = `Uploading track ${i + 1} of ${total}…`
         uploadProgress.value = 0
         const formData = new FormData()
@@ -402,24 +403,24 @@ async function save() {
 
 <style scoped>
 .edit-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
+  display: grid;
+  grid-template-columns: minmax(320px, 500px) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
 }
 
 .admin-form {
-  width: 380px;
-  flex-shrink: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .separator {
+  display: none;
   width: 1px;
   align-self: stretch;
   background: var(--border);
-  margin: 0 32px;
 }
 
 .tracks-column {
@@ -440,4 +441,23 @@ select option { background: var(--muted); }
 .no-spinner::-webkit-outer-spin-button,
 .no-spinner::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .no-spinner { -moz-appearance: textfield; }
+
+@media (max-width: 1023px) {
+  .edit-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .edit-layout {
+    grid-template-columns: minmax(320px, 460px) 1px minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .separator {
+    display: block;
+    margin: 0 24px;
+  }
+}
 </style>

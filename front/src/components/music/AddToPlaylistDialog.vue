@@ -21,8 +21,10 @@ const creating = ref(false)
 const addingTo = ref<string | null>(null)
 
 const subtitle = computed(() => {
-  if (props.tracks.length === 1) return `"${props.tracks[0].title}"`
-  return `${props.tracks.length} tracks from "${props.tracks[0].album.title}"`
+  const firstTrack = props.tracks[0]
+  if (!firstTrack) return 'No tracks selected'
+  if (props.tracks.length === 1) return `"${firstTrack.title}"`
+  return `${props.tracks.length} tracks from "${firstTrack.album.title}"`
 })
 
 async function addToPlaylist(playlistId: string) {

@@ -1,18 +1,123 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDrawerStore } from '@/stores/drawer'
-import { useRouter } from 'vue-router'
-import { Library, ListMusic, LogOut, X } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { Library, ListMusic, LogOut, PartyPopper, Send, X } from 'lucide-vue-next'
+import { listAllAlbumRequests } from '@/api/albumRequests'
 
 const auth = useAuthStore()
 const drawer = useDrawerStore()
 const router = useRouter()
+const route = useRoute()
 const appVersion = __APP_VERSION__
+const unseenRequests = ref(0)
+
+const LAST_SEEN_KEY = 'admin_album_requests_seen_at'
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function readLastSeen() {
+  try {
+    return localStorage.getItem(LAST_SEEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+function setLastSeen(value: string) {
+  try {
+    localStorage.setItem(LAST_SEEN_KEY, value)
+  } catch {
+    // ignore storage failures
+  }
+}
+
+function markRequestsSeen() {
+  setLastSeen(new Date().toISOString())
+  unseenRequests.value = 0
+}
+
+async function refreshUnseenRequests() {
+  if (!auth.isAdmin) {
+    unseenRequests.value = 0
+    return
+  }
+
+  try {
+    const all = await listAllAlbumRequests()
+    const lastSeen = readLastSeen()
+    const lastSeenMs = lastSeen ? new Date(lastSeen).getTime() : 0
+
+    unseenRequests.value = all.filter((req) => {
+      if (req.status !== 'PENDING') return false
+      const createdAtMs = new Date(req.createdAt).getTime()
+      return Number.isFinite(createdAtMs) && createdAtMs > lastSeenMs
+    }).length
+  } catch {
+    // ignore background polling failures
+  }
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = setInterval(() => {
+    void refreshUnseenRequests()
+  }, 30000)
+}
+
+function stopPolling() {
+  if (!pollTimer) return
+  clearInterval(pollTimer)
+  pollTimer = null
+}
 
 function logout() {
   auth.logout()
   router.push('/login')
 }
+
+onMounted(() => {
+  if (auth.isAdmin) {
+    if (!readLastSeen()) {
+      setLastSeen(new Date().toISOString())
+    }
+    if (route.path === '/admin/album-requests') {
+      markRequestsSeen()
+    } else {
+      void refreshUnseenRequests()
+    }
+    startPolling()
+  }
+})
+
+watch(
+  () => route.path,
+  (path) => {
+    if (!auth.isAdmin) return
+    if (path === '/admin/album-requests') {
+      markRequestsSeen()
+      return
+    }
+    void refreshUnseenRequests()
+  },
+)
+
+watch(
+  () => auth.isAdmin,
+  (isAdmin) => {
+    if (isAdmin) {
+      void refreshUnseenRequests()
+      startPolling()
+    } else {
+      unseenRequests.value = 0
+      stopPolling()
+    }
+  },
+)
+
+onBeforeUnmount(() => {
+  stopPolling()
+})
 </script>
 
 <template>
@@ -55,6 +160,26 @@ function logout() {
             Playlists
           </RouterLink>
         </li>
+        <li>
+          <RouterLink
+            to="/parties"
+            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
+            @click="drawer.closeSidebar()"
+          >
+            <PartyPopper :size="20" />
+            Parties
+          </RouterLink>
+        </li>
+        <li v-if="!auth.isAdmin">
+          <RouterLink
+            to="/playlists/requests"
+            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
+            @click="drawer.closeSidebar()"
+          >
+            <Send :size="20" />
+            Requests
+          </RouterLink>
+        </li>
       </ul>
 
       <template v-if="auth.isAdmin">
@@ -68,13 +193,20 @@ function logout() {
             { to: '/admin/listeners', label: 'Listeners' },
             { to: '/admin/artists', label: 'Artists' },
             { to: '/admin/albums', label: 'Albums' },
+            { to: '/admin/album-requests', label: 'Album Requests' },
           ]" :key="to">
             <RouterLink
               :to="to"
-              class="flex items-center px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
+              class="flex items-center justify-between px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
               @click="drawer.closeSidebar()"
             >
-              {{ label }}
+              <span>{{ label }}</span>
+              <span
+                v-if="to === '/admin/album-requests' && unseenRequests > 0"
+                class="ml-2 text-[10px] leading-none font-bold text-primary-foreground bg-primary rounded-full px-2 py-1"
+              >
+                {{ unseenRequests }}
+              </span>
             </RouterLink>
           </li>
         </ul>

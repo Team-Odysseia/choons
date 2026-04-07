@@ -1,10 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import MusicPlayer from './MusicPlayer.vue'
 import RightDrawer from './RightDrawer.vue'
 import { useDrawerStore } from '@/stores/drawer'
 
 const drawer = useDrawerStore()
+const route = useRoute()
+
+const shellClass = computed(() => {
+  const shell = route.meta.shell as string | undefined
+  if (shell === 'form') return 'page-shell page-shell--form'
+  return 'page-shell page-shell--wide'
+})
 </script>
 
 <template>
@@ -25,12 +34,15 @@ const drawer = useDrawerStore()
   </Transition>
 
   <div
-    class="grid h-screen [grid-template-columns:1fr] md:[grid-template-columns:var(--sidebar-w)_1fr] [grid-template-rows:1fr_var(--player-h)]"
+    class="grid [grid-template-columns:1fr] md:[grid-template-columns:var(--sidebar-w)_1fr] [grid-template-rows:minmax(0,1fr)_var(--player-h)]"
+    style="height: var(--app-h);"
   >
     <AppSidebar />
     <main class="col-start-1 md:col-start-2 row-start-1 overflow-hidden flex flex-col">
-      <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">
-        <RouterView />
+      <div class="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-6 md:py-6">
+        <div :class="shellClass">
+          <RouterView />
+        </div>
       </div>
     </main>
     <MusicPlayer />

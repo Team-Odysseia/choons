@@ -120,11 +120,7 @@ describe('controles de reprodução', () => {
     vi.spyOn(player, 'playNext')
     await wrapper.vm.$nextTick()
 
-    const nextBtn = wrapper.findAll('button').find((b) => !b.attributes('disabled') && b.find('svg').exists() && wrapper.findAll('button').indexOf(b) === 3)
-    // Localiza pelo título (SkipForward não tem texto; usa posição entre botões de controle)
-    const controlButtons = wrapper.findAll('button')
-    // Botões de controle: Menu(0), Shuffle(1), Prev(2), Play(3), Next(4), Loop(5)
-    await controlButtons[4].trigger('click')
+    await wrapper.find('[data-testid="next-btn"]').trigger('click')
     expect(player.playNext).toHaveBeenCalled()
   })
 
@@ -138,8 +134,7 @@ describe('controles de reprodução', () => {
     vi.spyOn(player, 'playPrev')
     await wrapper.vm.$nextTick()
 
-    const controlButtons = wrapper.findAll('button')
-    await controlButtons[2].trigger('click')
+    await wrapper.find('[data-testid="prev-btn"]').trigger('click')
     expect(player.playPrev).toHaveBeenCalled()
   })
 })
@@ -153,7 +148,7 @@ describe('barra de progresso', () => {
     await wrapper.vm.$nextTick()
 
     // input[type=range] da barra de progresso (primeiro range input)
-    const progressInput = wrapper.find('input[type="range"]')
+    const progressInput = wrapper.find('[data-testid="progress-range"]')
     expect(Number(progressInput.element.value)).toBeCloseTo(25) // 60/240 * 100
   })
 
@@ -163,7 +158,7 @@ describe('barra de progresso', () => {
     vi.spyOn(player, 'seek')
     await wrapper.vm.$nextTick()
 
-    const progressInput = wrapper.find('input[type="range"]')
+    const progressInput = wrapper.find('[data-testid="progress-range"]')
     await progressInput.setValue('50')
     await progressInput.trigger('input')
 
@@ -180,9 +175,7 @@ describe('volume', () => {
     vi.spyOn(player, 'setVolume')
     await wrapper.vm.$nextTick()
 
-    // Segundo input[type=range] é o volume
-    const inputs = wrapper.findAll('input[type="range"]')
-    const volumeInput = inputs[1]
+    const volumeInput = wrapper.find('[data-testid="volume-range"]')
     await volumeInput.setValue('0.5')
     await volumeInput.trigger('input')
 
@@ -206,8 +199,7 @@ describe('shuffle', () => {
     vi.spyOn(player, 'toggleShuffle')
     await wrapper.vm.$nextTick()
 
-    // Botão shuffle é o segundo botão (índice 1), após o hamburger mobile
-    await wrapper.findAll('button')[1].trigger('click')
+    await wrapper.find('[data-testid="shuffle-btn"]').trigger('click')
     expect(player.toggleShuffle).toHaveBeenCalled()
   })
 
@@ -216,7 +208,7 @@ describe('shuffle', () => {
     player.$patch({ isShuffled: true })
     await wrapper.vm.$nextTick()
 
-    const shuffleBtn = wrapper.findAll('button')[1]
+    const shuffleBtn = wrapper.find('[data-testid="shuffle-btn"]')
     expect(shuffleBtn.classes()).toContain('text-primary')
   })
 })
@@ -229,7 +221,7 @@ describe('loop', () => {
     vi.spyOn(player, 'cycleLoop')
     await wrapper.vm.$nextTick()
 
-    await wrapper.findAll('button')[5].trigger('click')
+    await wrapper.find('[data-testid="loop-btn"]').trigger('click')
     expect(player.cycleLoop).toHaveBeenCalled()
   })
 
@@ -238,7 +230,7 @@ describe('loop', () => {
     player.$patch({ loopMode: 'queue' })
     await wrapper.vm.$nextTick()
 
-    const loopBtn = wrapper.findAll('button')[5]
+    const loopBtn = wrapper.find('[data-testid="loop-btn"]')
     expect(loopBtn.classes()).toContain('text-primary')
   })
 })

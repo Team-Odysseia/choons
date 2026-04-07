@@ -1,5 +1,7 @@
 <script setup lang="ts">
-defineProps<{ open: boolean; title: string }>()
+withDefaults(defineProps<{ open: boolean; title: string; maxWidthClass?: string }>(), {
+  maxWidthClass: 'max-w-md',
+})
 defineEmits<{ close: [] }>()
 </script>
 
@@ -16,7 +18,8 @@ defineEmits<{ close: [] }>()
       <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/60" @click="$emit('close')" />
         <div
-          class="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 z-10 overflow-hidden"
+          class="relative bg-card border border-border rounded-xl shadow-2xl w-full mx-4 z-10 overflow-hidden"
+          :class="maxWidthClass"
           role="dialog"
           aria-modal="true"
           :aria-label="title"

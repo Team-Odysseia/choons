@@ -8,6 +8,7 @@ import { VueQueryPlugin } from '@tanstack/vue-query'
 import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/auth'
+import { usePartyStore } from './stores/party'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -19,5 +20,8 @@ app.use(VueQueryPlugin)
 // Restore session before first navigation
 const auth = useAuthStore()
 auth.fetchMe().finally(() => {
+  if (auth.isAuthenticated) {
+    void usePartyStore().fetchMyParty()
+  }
   app.mount('#app')
 })

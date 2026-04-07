@@ -104,6 +104,87 @@ class AdminControllerTest {
     // ─── POST /admin/artists ──────────────────────────────────────────────────
 
     @Test
+    void listListeners_returnsOnlyListenersAndSupportsSearch() throws Exception {
+        userRepository.save(User.builder()
+                .username("jane_listener")
+                .password(passwordEncoder.encode("pass"))
+                .role(UserRole.LISTENER)
+                .build());
+        userRepository.save(User.builder()
+                .username("zeta_listener")
+                .password(passwordEncoder.encode("pass"))
+                .role(UserRole.LISTENER)
+                .build());
+
+        mockMvc.perform(get("/admin/listeners")
+                        .header("Authorization", adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value("jane_listener"));
+
+        mockMvc.perform(get("/admin/listeners")
+                        .param("query", "zeta")
+                        .header("Authorization", adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value("zeta_listener"));
+    }
+
+    @Test
+    void updateListener_updatesUsernameAndPassword() throws Exception {
+        User listener = userRepository.findByUsername("listener_edit").orElseThrow();
+
+        mockMvc.perform(put("/admin/listeners/{id}", listener.getId())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"listener_renamed\",\"password\":\"newpass\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("listener_renamed"));
+
+        User updated = userRepository.findById(listener.getId()).orElseThrow();
+        assert passwordEncoder.matches("newpass", updated.getPassword());
+    }
+
+    @Test
+    void updateListener_withBlankUsername_returns400() throws Exception {
+        User listener = userRepository.findByUsername("listener_edit").orElseThrow();
+
+        mockMvc.perform(put("/admin/listeners/{id}", listener.getId())
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"   \",\"password\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteListener_removesListener() throws Exception {
+        User listener = userRepository.findByUsername("listener_edit").orElseThrow();
+
+        mockMvc.perform(delete("/admin/listeners/{id}", listener.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        assert userRepository.findById(listener.getId()).isEmpty();
+    }
+
+    @Test
+    void listenersEndpoints_asListener_returns403() throws Exception {
+        User listener = userRepository.findByUsername("listener_edit").orElseThrow();
+
+        mockMvc.perform(get("/admin/listeners")
+                        .header("Authorization", listenerToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/admin/listeners/{id}", listener.getId())
+                        .header("Authorization", listenerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"x\",\"password\":\"\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/admin/listeners/{id}", listener.getId())
+                        .header("Authorization", listenerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void createArtist_returnsCreatedWithNameAndNullAvatarUrl() throws Exception {
         mockMvc.perform(multipart("/admin/artists")
                         .param("name", "New Artist")
