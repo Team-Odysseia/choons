@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 
 import java.util.Map;
 
@@ -74,6 +75,19 @@ class AuthControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").isNotEmpty());
+    }
+
+    @Test
+    void login_withValidCredentials_setsHttpOnlyCookie() throws Exception {
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "admin",
+                                "password", "adminpass"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("CHOONS_AUTH"))
+                .andExpect(cookie().httpOnly("CHOONS_AUTH", true));
     }
 
     @Test
@@ -194,5 +208,23 @@ class AuthControllerTest {
         mockMvc.perform(get("/auth/me")
                         .header("Authorization", "Bearer this.is.not.a.valid.jwt"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void me_withValidAuthCookie_returns200() throws Exception {
+        String token = jwtService.generateToken(adminUser);
+
+        mockMvc.perform(get("/auth/me")
+                        .cookie(new Cookie("CHOONS_AUTH", token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("admin"));
+    }
+
+    @Test
+    void logout_clearsAuthCookie() throws Exception {
+        mockMvc.perform(post("/auth/logout"))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().exists("CHOONS_AUTH"))
+                .andExpect(cookie().value("CHOONS_AUTH", ""));
     }
 }

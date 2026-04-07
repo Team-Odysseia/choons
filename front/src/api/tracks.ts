@@ -59,6 +59,5 @@ export const recordStream = (trackId: string) =>
   client.post(`/stream/${trackId}/played`)
 
 export const streamUrl = (trackId: string) => {
-  const token = localStorage.getItem('token')
-  return `${import.meta.env.VITE_API_URL}/stream/${trackId}?token=${token}`
+  return `${import.meta.env.VITE_API_URL}/stream/${trackId}`
 }

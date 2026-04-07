@@ -73,10 +73,10 @@ export const useLyricsStore = defineStore('lyrics', () => {
   }
 
   watch(
-    () => player.currentTrack,
+    () => player.currentTrack?.id,
     (track) => {
-      if (track) {
-        fetchLyrics(track)
+      if (track && player.currentTrack) {
+        fetchLyrics(player.currentTrack)
       } else {
         loading.value = false
         error.value = false

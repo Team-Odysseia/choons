@@ -24,6 +24,7 @@ public class PartyService {
   @Autowired private PartyQueueItemRepository partyQueueItemRepository;
   @Autowired private PartyPlaybackStateRepository partyPlaybackStateRepository;
   @Autowired private TrackService trackService;
+  @Autowired private PartyEventsService partyEventsService;
 
   @Transactional
   public PartyStateResponse create(CreatePartyRequest request, User hostUser) {
@@ -58,7 +59,7 @@ public class PartyService {
             .anchorEpochMs(System.currentTimeMillis())
             .build());
 
-    return getStateForParty(party, hostUser);
+    return stateAndPublish(party, hostUser);
   }
 
   @Transactional
@@ -81,7 +82,7 @@ public class PartyService {
                             .build())
             );
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   public PartyStateResponse getMyParty(User user) {
@@ -107,6 +108,7 @@ public class PartyService {
     }
 
     partyMemberRepository.delete(member);
+    partyEventsService.publishState(party.getInviteCode(), getStateForParty(party, party.getHost()));
   }
 
   @Transactional
@@ -159,7 +161,7 @@ public class PartyService {
       throw new IllegalArgumentException("Host is always DJ");
     }
     target.setDj(request.dj());
-    return getStateForParty(party, hostUser);
+    return stateAndPublish(party, hostUser);
   }
 
   @Transactional
@@ -177,7 +179,7 @@ public class PartyService {
     }
 
     partyMemberRepository.delete(target);
-    return getStateForParty(party, hostUser);
+    return stateAndPublish(party, hostUser);
   }
 
   @Transactional
@@ -204,7 +206,43 @@ public class PartyService {
       partyPlaybackStateRepository.save(state);
     }
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
+  }
+
+  @Transactional
+  public PartyStateResponse addQueueTracks(String inviteCode, AddPartyQueueTracksRequest request, User user) {
+    if (request.trackIds().isEmpty()) {
+      throw new IllegalArgumentException("At least one track is required");
+    }
+
+    Party party = getActiveParty(inviteCode);
+    requireCanControl(party, user);
+
+    List<PartyQueueItem> queue = partyQueueItemRepository.findByPartyOrderByPositionAsc(party);
+    int nextPos = queue.size();
+
+    for (UUID trackId : request.trackIds()) {
+      partyQueueItemRepository.save(PartyQueueItem.builder()
+              .party(party)
+              .track(trackService.getTrackEntity(trackId))
+              .addedBy(user)
+              .position(nextPos++)
+              .build());
+    }
+
+    if (queue.isEmpty()) {
+      PartyPlaybackState state = getOrCreatePlayback(party);
+      List<PartyQueueItem> updatedQueue = partyQueueItemRepository.findByPartyOrderByPositionAsc(party);
+      if (!updatedQueue.isEmpty()) {
+        state.setTrack(updatedQueue.get(0).getTrack());
+        state.setPlaying(true);
+        state.setAnchorPositionSec(0);
+        state.setAnchorEpochMs(System.currentTimeMillis());
+        partyPlaybackStateRepository.save(state);
+      }
+    }
+
+    return stateAndPublish(party, user);
   }
 
   @Transactional
@@ -234,7 +272,7 @@ public class PartyService {
       partyPlaybackStateRepository.save(state);
     }
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   @Transactional
@@ -260,7 +298,7 @@ public class PartyService {
       partyQueueItemRepository.save(item);
     }
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   @Transactional
@@ -275,7 +313,7 @@ public class PartyService {
     state.setAnchorEpochMs(System.currentTimeMillis());
     partyPlaybackStateRepository.save(state);
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   @Transactional
@@ -289,7 +327,7 @@ public class PartyService {
     state.setAnchorEpochMs(System.currentTimeMillis());
     partyPlaybackStateRepository.save(state);
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   @Transactional
@@ -302,7 +340,7 @@ public class PartyService {
     state.setAnchorEpochMs(System.currentTimeMillis());
     partyPlaybackStateRepository.save(state);
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   @Transactional
@@ -319,7 +357,7 @@ public class PartyService {
       state.setAnchorPositionSec(0);
       state.setAnchorEpochMs(System.currentTimeMillis());
       partyPlaybackStateRepository.save(state);
-      return getStateForParty(party, user);
+      return stateAndPublish(party, user);
     }
 
     UUID currentTrackId = state.getTrack() == null ? null : state.getTrack().getId();
@@ -347,7 +385,7 @@ public class PartyService {
     state.setAnchorEpochMs(System.currentTimeMillis());
     partyPlaybackStateRepository.save(state);
 
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   @Transactional
@@ -357,7 +395,7 @@ public class PartyService {
 
     PartyPlaybackState state = getOrCreatePlayback(party);
     if (state.getTrack() == null) {
-      return getStateForParty(party, user);
+      return stateAndPublish(party, user);
     }
 
     state.setTrack(trackService.getTrackEntity(state.getTrack().getId()));
@@ -365,7 +403,7 @@ public class PartyService {
     state.setAnchorPositionSec(0);
     state.setAnchorEpochMs(System.currentTimeMillis());
     partyPlaybackStateRepository.save(state);
-    return getStateForParty(party, user);
+    return stateAndPublish(party, user);
   }
 
   private void normalizePositions(Party party) {
@@ -490,9 +528,17 @@ public class PartyService {
     if (party.getStatus() == PartyStatus.ENDED) {
       return;
     }
+    String inviteCode = party.getInviteCode();
     party.setStatus(PartyStatus.ENDED);
     partyRepository.save(party);
     partyQueueItemRepository.deleteByParty(party);
     partyMemberRepository.findByPartyOrderByJoinedAtAsc(party).forEach(partyMemberRepository::delete);
+    partyEventsService.publishEnded(inviteCode);
+  }
+
+  private PartyStateResponse stateAndPublish(Party party, User requester) {
+    PartyStateResponse state = getStateForParty(party, requester);
+    partyEventsService.publishState(party.getInviteCode(), state);
+    return state;
   }
 }

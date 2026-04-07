@@ -3,9 +3,11 @@ package dev.odysseia.choons.service;
 import dev.odysseia.choons.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -22,6 +24,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   @Autowired private JwtService jwtService;
   @Autowired private UserRepository userRepository;
+
+  @Value("${auth.cookie.name:CHOONS_AUTH}")
+  private String authCookieName;
 
   @Override
   protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -63,11 +68,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     if (authHeader != null && authHeader.startsWith("Bearer ")) {
       return authHeader.substring(7);
     }
-    // Fallback: query param for streaming endpoints (audio element can't set headers)
-    String tokenParam = request.getParameter("token");
-    if (tokenParam != null && !tokenParam.isEmpty()) {
-      return tokenParam;
+
+    Cookie[] cookies = request.getCookies();
+    if (cookies == null) {
+      return null;
     }
+
+    for (Cookie cookie : cookies) {
+      if (authCookieName.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+        return cookie.getValue();
+      }
+    }
+
     return null;
   }
 }

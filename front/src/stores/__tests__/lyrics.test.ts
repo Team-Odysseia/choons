@@ -2,11 +2,37 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { parseLrc, useLyricsStore } from '../lyrics'
 import { usePlayerStore } from '../player'
+import type { TrackResponse } from '@/api/types'
+
+const { fetchLyricsByLrclibIdMock, searchLyricsMock } = vi.hoisted(() => ({
+  fetchLyricsByLrclibIdMock: vi.fn().mockResolvedValue(null),
+  searchLyricsMock: vi.fn().mockResolvedValue(null),
+}))
 
 vi.mock('@/api/lyrics', () => ({
-  fetchLyricsByLrclibId: vi.fn().mockResolvedValue(null),
-  searchLyrics: vi.fn().mockResolvedValue(null),
+  fetchLyricsByLrclibId: fetchLyricsByLrclibIdMock,
+  searchLyrics: searchLyricsMock,
 }))
+
+function makeTrack(id: string): TrackResponse {
+  return {
+    id,
+    title: `Track ${id}`,
+    album: {
+      id: 'album-1',
+      title: 'Album',
+      artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '' },
+      releaseYear: 2024,
+      createdAt: '',
+    },
+    artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '' },
+    trackNumber: 1,
+    durationSeconds: 180,
+    createdAt: '',
+    hifi: false,
+    lrclibId: null,
+  }
+}
 
 describe('parseLrc', () => {
   it('parses timed lines correctly', () => {
@@ -53,6 +79,8 @@ describe('parseLrc', () => {
 describe('useLyricsStore activeLineIndex', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    fetchLyricsByLrclibIdMock.mockClear()
+    searchLyricsMock.mockClear()
   })
 
   it('returns -1 when there are no timed lines', () => {
@@ -92,5 +120,23 @@ describe('useLyricsStore activeLineIndex', () => {
     store.lines = [{ timeMs: 5000, text: 'Intro' }]
     ;(player as any).currentTime = 1
     expect(store.activeLineIndex).toBe(-1)
+  })
+
+  it('não busca letra de novo quando track id permanece igual', async () => {
+    const store = useLyricsStore()
+    const player = usePlayerStore()
+
+    player.currentTrack = makeTrack('1')
+    await Promise.resolve()
+    expect(searchLyricsMock).toHaveBeenCalledTimes(1)
+
+    player.currentTrack = { ...makeTrack('1'), title: 'Updated title' }
+    await Promise.resolve()
+    expect(searchLyricsMock).toHaveBeenCalledTimes(1)
+
+    player.currentTrack = makeTrack('2')
+    await Promise.resolve()
+    expect(searchLyricsMock).toHaveBeenCalledTimes(2)
+    expect(store.error).toBe(false)
   })
 })

@@ -71,8 +71,8 @@ function stopPolling() {
   pollTimer = null
 }
 
-function logout() {
-  auth.logout()
+async function logout() {
+  await auth.logout()
   router.push('/login')
 }
 
