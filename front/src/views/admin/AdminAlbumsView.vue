@@ -425,12 +425,12 @@ select option { background: var(--muted); }
 @media (min-width: 1024px) {
   .create-layout {
     grid-template-columns: minmax(320px, 460px) 1px minmax(0, 1fr);
-    gap: 0;
+    gap: 24px;
   }
 
   .separator {
     display: block;
-    margin: 0 24px;
+    margin: 0;
   }
 }
 </style>
