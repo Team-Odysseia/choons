@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.util.UUID;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/stream")
@@ -30,6 +31,8 @@ public class StreamController {
     StreamingResponseBody body = outputStream -> {
       try (var stream = result.stream()) {
         stream.transferTo(outputStream);
+      } catch (IOException ignored) {
+        // client disconnected mid-stream; nothing to do
       }
     };
 
