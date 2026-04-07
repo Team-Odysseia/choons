@@ -297,7 +297,8 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     const safePos = Number.isFinite(positionSec) ? Math.max(0, positionSec) : 0
-    if (Math.abs(audio.currentTime - safePos) > 2) {
+    const driftThreshold = playing ? 1.2 : 0.25
+    if (Math.abs(audio.currentTime - safePos) > driftThreshold) {
       audio.currentTime = safePos
       currentTime.value = safePos
     }

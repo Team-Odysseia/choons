@@ -1,6 +1,8 @@
 package dev.odysseia.choons.exception;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -65,7 +67,13 @@ public class GlobalExceptionHandler {
   }
 
   @ExceptionHandler(Exception.class)
-  public ResponseEntity<Map<String, String>> handleGeneric(Exception ex) {
+  public ResponseEntity<Map<String, String>> handleGeneric(Exception ex, HttpServletResponse response) {
+    String contentType = response.getContentType();
+    if (contentType != null
+            && (contentType.startsWith("audio/") || contentType.startsWith(MediaType.TEXT_EVENT_STREAM_VALUE))) {
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+
     String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage();
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(Map.of("error", msg));

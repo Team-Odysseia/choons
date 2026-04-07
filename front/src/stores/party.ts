@@ -280,7 +280,6 @@ export const usePartyStore = defineStore('party', () => {
     source.onopen = () => {
       reconnectDelayMs.value = 1000
       clearReconnectTimer()
-      clearPolling()
     }
 
     source.addEventListener('state', (event) => {
@@ -288,7 +287,6 @@ export const usePartyStore = defineStore('party', () => {
       const message = event as MessageEvent<string>
       const next = JSON.parse(message.data) as PartyStateResponse
       applyState(next)
-      clearPolling()
     })
 
     source.addEventListener('ended', () => {
@@ -299,7 +297,6 @@ export const usePartyStore = defineStore('party', () => {
     source.onerror = () => {
       if (eventSource.value !== source) return
       stopRealtime()
-      startPolling()
       scheduleReconnect()
     }
   }
