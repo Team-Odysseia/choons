@@ -1,9 +1,9 @@
 package dev.odysseia.choons.controller;
 
+import dev.odysseia.choons.exception.RangeNotSatisfiableException;
 import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.service.StreamTrackingService;
 import dev.odysseia.choons.service.StreamingService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,15 +18,28 @@ import java.io.IOException;
 @RequestMapping("/stream")
 public class StreamController {
 
-  @Autowired private StreamingService streamingService;
-  @Autowired private StreamTrackingService streamTrackingService;
+  private final StreamingService streamingService;
+  private final StreamTrackingService streamTrackingService;
+
+  public StreamController(StreamingService streamingService, StreamTrackingService streamTrackingService) {
+    this.streamingService = streamingService;
+    this.streamTrackingService = streamTrackingService;
+  }
 
   @GetMapping("/{trackId}")
   public ResponseEntity<StreamingResponseBody> stream(
           @PathVariable UUID trackId,
           @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
-
-    StreamingService.StreamingResult result = streamingService.stream(trackId, rangeHeader);
+    StreamingService.StreamingResult result;
+    try {
+      result = streamingService.stream(trackId, rangeHeader);
+    } catch (RangeNotSatisfiableException ex) {
+      HttpHeaders headers = new HttpHeaders();
+      headers.set(HttpHeaders.CONTENT_RANGE, "bytes */" + ex.getTotalSize());
+      return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+              .headers(headers)
+              .build();
+    }
 
     StreamingResponseBody body = outputStream -> {
       try (var stream = result.stream()) {

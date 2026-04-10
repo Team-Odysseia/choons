@@ -2,7 +2,6 @@ package dev.odysseia.choons.config;
 
 import dev.odysseia.choons.filter.RateLimitFilter;
 import dev.odysseia.choons.service.JwtAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -33,8 +32,13 @@ import java.util.Arrays;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-  @Autowired private JwtAuthenticationFilter jwtAuthenticationFilter;
-  @Autowired private RateLimitFilter rateLimitFilter;
+  private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final RateLimitFilter rateLimitFilter;
+
+  public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, RateLimitFilter rateLimitFilter) {
+    this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    this.rateLimitFilter = rateLimitFilter;
+  }
 
   @Value("${cors.allowed-origins:http://localhost:5173}")
   private String corsAllowedOrigins;
@@ -53,7 +57,7 @@ public class SecurityConfig {
                     .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                     .requestMatchers("/auth/login").permitAll()
                     .requestMatchers("/auth/logout").permitAll()
-                    .requestMatchers("/public/**").permitAll()
+                    .requestMatchers("/public/covers").permitAll()
                     .requestMatchers("/media/images/albums/**").permitAll()
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     .requestMatchers("/stream/**").authenticated()

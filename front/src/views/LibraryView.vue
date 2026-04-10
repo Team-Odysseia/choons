@@ -6,10 +6,12 @@ import { useArtistsQuery, useRecentAlbumsQuery, useMostPlayedQuery } from '@/com
 import { albumImageUrl } from '@/api/albums'
 import { artistImageUrl } from '@/api/artists'
 import TrackRow from '@/components/music/TrackRow.vue'
+import { Input } from '@/components/ui/input'
 
 const router = useRouter()
 const playlists = usePlaylistsStore()
 
+const globalSearch = ref('')
 const { data: artists, isPending: artistsLoading } = useArtistsQuery()
 const { data: recentAlbums } = useRecentAlbumsQuery()
 const { data: mostPlayed } = useMostPlayedQuery()
@@ -41,10 +43,26 @@ function scrollCommunity(direction: 'left' | 'right') {
   if (!communityRef.value) return
   communityRef.value.scrollBy({ left: direction === 'left' ? -480 : 480, behavior: 'smooth' })
 }
+
+function goToSearch() {
+  const query = globalSearch.value.trim()
+  if (!query) return
+  router.push({ name: 'search', query: { q: query } })
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-10">
+
+    <section>
+      <div class="max-w-[760px]">
+        <Input
+          v-model="globalSearch"
+          placeholder="Search public playlists, songs, albums, artists"
+          @keydown.enter="goToSearch"
+        />
+      </div>
+    </section>
 
     <!-- Playlists quick access -->
     <section v-if="recentPlaylists.length > 0">

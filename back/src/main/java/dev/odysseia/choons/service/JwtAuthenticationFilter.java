@@ -6,7 +6,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,8 +21,13 @@ import java.util.UUID;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-  @Autowired private JwtService jwtService;
-  @Autowired private UserRepository userRepository;
+  private final JwtService jwtService;
+  private final UserRepository userRepository;
+
+  public JwtAuthenticationFilter(JwtService jwtService, UserRepository userRepository) {
+    this.jwtService = jwtService;
+    this.userRepository = userRepository;
+  }
 
   @Value("${auth.cookie.name:CHOONS_AUTH}")
   private String authCookieName;

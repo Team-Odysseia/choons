@@ -1,12 +1,21 @@
 import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { getArtists, getArtist } from '@/api/artists'
-import { getAlbums, getAlbum } from '@/api/albums'
+import { getArtists, getArtist, searchArtists } from '@/api/artists'
+import { getAlbums, getAlbum, searchAlbums } from '@/api/albums'
 import { getTracks, getMostPlayedTracks } from '@/api/tracks'
 import type { Ref } from 'vue'
 
-export const useArtistsQuery = () =>
-  useQuery({ queryKey: ['artists'], queryFn: getArtists })
+export const useArtistsQuery = (query?: Ref<string | undefined>, page?: Ref<number>, size = 100) =>
+  useQuery({
+    queryKey: computed(() => ['artists', query?.value ?? '', page?.value ?? 0, size]),
+    queryFn: () => {
+      const normalized = query?.value?.trim() ?? ''
+      if (!normalized) {
+        return getArtists()
+      }
+      return searchArtists(normalized, page?.value ?? 0, size)
+    },
+  })
 
 export const useArtistQuery = (id: Ref<string>) =>
   useQuery({
@@ -14,10 +23,21 @@ export const useArtistQuery = (id: Ref<string>) =>
     queryFn: () => getArtist(id.value),
   })
 
-export const useAlbumsQuery = (artistId?: Ref<string | undefined>) =>
+export const useAlbumsQuery = (
+  artistId?: Ref<string | undefined>,
+  query?: Ref<string | undefined>,
+  page?: Ref<number>,
+  size = 100,
+) =>
   useQuery({
-    queryKey: computed(() => ['albums', artistId?.value]),
-    queryFn: () => getAlbums(artistId?.value),
+    queryKey: computed(() => ['albums', artistId?.value, query?.value ?? '', page?.value ?? 0, size]),
+    queryFn: () => {
+      const normalized = query?.value?.trim() ?? ''
+      if (!normalized) {
+        return getAlbums(artistId?.value)
+      }
+      return searchAlbums(normalized, { artistId: artistId?.value, page: page?.value ?? 0, size })
+    },
   })
 
 export const useRecentAlbumsQuery = () =>
@@ -30,10 +50,16 @@ export const useRecentAlbumsQuery = () =>
         .slice(0, 10),
   })
 
-export const useAllAlbumsQuery = () =>
+export const useAllAlbumsQuery = (query?: Ref<string | undefined>, page?: Ref<number>, size = 100) =>
   useQuery({
-    queryKey: ['albums'],
-    queryFn: () => getAlbums(),
+    queryKey: computed(() => ['albums', 'all', query?.value ?? '', page?.value ?? 0, size]),
+    queryFn: () => {
+      const normalized = query?.value?.trim() ?? ''
+      if (!normalized) {
+        return getAlbums()
+      }
+      return searchAlbums(normalized, { page: page?.value ?? 0, size })
+    },
     select: (albums) =>
       [...albums].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   })

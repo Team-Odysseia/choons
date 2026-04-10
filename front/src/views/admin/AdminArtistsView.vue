@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { getArtists, createArtist, deleteArtist } from '@/api/artists'
+import { getArtists, searchArtists, createArtist, deleteArtist } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,28 +22,34 @@ const pendingAvatar = ref<File | null>(null)
 const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
 const addDialogOpen = ref(false)
 const search = ref('')
-
-const filteredArtists = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  if (!q) return artists.value
-  return artists.value.filter((a) => a.name.toLowerCase().includes(q))
-})
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(load)
+onBeforeUnmount(() => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+})
+
+watch(search, () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => {
+    void load()
+  }, 220)
+})
 
 async function load() {
-  artists.value = await getArtists()
+  const query = search.value.trim()
+  artists.value = query ? await searchArtists(query, 0, 200) : await getArtists()
 }
 
 async function confirmDelete() {
   const artist = confirmTarget.value
   if (!artist) return
   confirmTarget.value = null
-  deletingId.value = artist.id
-  try {
-    await deleteArtist(artist.id)
-    artists.value = artists.value.filter((a) => a.id !== artist.id)
-    toast.success(`"${artist.name}" deleted`)
+    deletingId.value = artist.id
+    try {
+      await deleteArtist(artist.id)
+      await load()
+      toast.success(`"${artist.name}" deleted`)
   } catch (e: any) {
     toast.error(e.response?.data?.error ?? 'Failed to delete artist')
   } finally {
@@ -55,7 +61,7 @@ async function submit() {
   loading.value = true
   try {
     const created = await createArtist(name.value, bio.value, pendingAvatar.value)
-    artists.value.unshift(created)
+    await load()
     name.value = ''
     bio.value = ''
     pendingAvatar.value = null
@@ -82,9 +88,9 @@ async function submit() {
     </div>
 
     <div class="list-section">
-      <div v-if="filteredArtists.length === 0" class="text-[13px] text-dimmed">No artists found.</div>
+      <div v-if="artists.length === 0" class="text-[13px] text-dimmed">No artists found.</div>
       <div v-else class="item-list">
-        <div v-for="a in filteredArtists" :key="a.id" class="list-item">
+        <div v-for="a in artists" :key="a.id" class="list-item">
           <div class="flex items-center justify-between gap-3">
             <span class="item-name">{{ a.name }}</span>
             <div class="flex items-center gap-1">

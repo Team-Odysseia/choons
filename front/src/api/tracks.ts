@@ -6,6 +6,21 @@ export const getTracks = (albumId?: string) =>
     .get<TrackResponse[]>('/music/tracks', { params: albumId ? { albumId } : {} })
     .then((r) => r.data)
 
+export const searchTracks = (
+  query: string,
+  opts?: { albumId?: string; page?: number; size?: number },
+) =>
+  client
+    .get<TrackResponse[]>('/music/tracks', {
+      params: {
+        query,
+        albumId: opts?.albumId,
+        page: opts?.page ?? 0,
+        size: opts?.size ?? 100,
+      },
+    })
+    .then((r) => r.data)
+
 export const getMostPlayedTracks = (limit = 10) =>
   client
     .get<TrackResponse[]>('/music/tracks/most-played', { params: { limit } })

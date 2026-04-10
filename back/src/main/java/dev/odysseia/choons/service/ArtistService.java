@@ -104,6 +104,18 @@ public class ArtistService {
             .toList();
   }
 
+  public List<ArtistResponse> search(String query) {
+    String normalized = query == null ? "" : query.trim().toLowerCase();
+    if (normalized.isBlank()) {
+      return findAll();
+    }
+    return artistRepository.findAllByOrderByNameAsc().stream()
+            .filter(artist -> artist.getName() != null
+                    && artist.getName().toLowerCase().contains(normalized))
+            .map(this::toResponse)
+            .toList();
+  }
+
   public ArtistResponse findById(UUID id) {
     return artistRepository.findById(id)
             .map(this::toResponse)

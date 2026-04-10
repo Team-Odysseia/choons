@@ -5,7 +5,6 @@ import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.service.PartyEventsService;
 import dev.odysseia.choons.service.PartyService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,8 +17,13 @@ import java.util.UUID;
 @RequestMapping("/parties")
 public class PartyController {
 
-  @Autowired private PartyService partyService;
-  @Autowired private PartyEventsService partyEventsService;
+  private final PartyService partyService;
+  private final PartyEventsService partyEventsService;
+
+  public PartyController(PartyService partyService, PartyEventsService partyEventsService) {
+    this.partyService = partyService;
+    this.partyEventsService = partyEventsService;
+  }
 
   @PostMapping
   public ResponseEntity<PartyStateResponse> create(
@@ -81,7 +85,7 @@ public class PartyController {
   public ResponseEntity<PartyStateResponse> setDj(
           @PathVariable String inviteCode,
           @PathVariable UUID userId,
-          @RequestBody UpdatePartyMemberDjRequest request,
+          @Valid @RequestBody UpdatePartyMemberDjRequest request,
           @AuthenticationPrincipal User user) {
     return ResponseEntity.ok(partyService.setDj(inviteCode, userId, request, user));
   }
@@ -129,7 +133,7 @@ public class PartyController {
   @PostMapping("/{inviteCode}/playback/pause")
   public ResponseEntity<PartyStateResponse> pause(
           @PathVariable String inviteCode,
-          @RequestBody PartyPauseRequest request,
+          @Valid @RequestBody PartyPauseRequest request,
           @AuthenticationPrincipal User user) {
     return ResponseEntity.ok(partyService.pause(inviteCode, request, user));
   }
@@ -137,7 +141,7 @@ public class PartyController {
   @PostMapping("/{inviteCode}/playback/seek")
   public ResponseEntity<PartyStateResponse> seek(
           @PathVariable String inviteCode,
-          @RequestBody PartySeekRequest request,
+          @Valid @RequestBody PartySeekRequest request,
           @AuthenticationPrincipal User user) {
     return ResponseEntity.ok(partyService.seek(inviteCode, request, user));
   }

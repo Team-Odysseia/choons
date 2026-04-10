@@ -43,6 +43,12 @@ const router = createRouter({
           component: () => import('@/views/AlbumView.vue'),
           meta: { shell: 'wide' },
         },
+        {
+          path: 'search',
+          name: 'search',
+          component: () => import('@/views/SearchView.vue'),
+          meta: { shell: 'wide' },
+        },
       ],
     },
     {

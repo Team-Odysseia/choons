@@ -147,6 +147,19 @@ public class TrackService {
             .toList();
   }
 
+  public List<TrackResponse> search(UUID albumId, String query) {
+    String normalized = query == null ? "" : query.trim().toLowerCase();
+    List<TrackResponse> source = albumId != null ? findByAlbum(albumId) : findAll();
+    if (normalized.isBlank()) {
+      return source;
+    }
+    return source.stream()
+            .filter(track -> track.title().toLowerCase().contains(normalized)
+                    || track.artist().name().toLowerCase().contains(normalized)
+                    || track.album().title().toLowerCase().contains(normalized))
+            .toList();
+  }
+
   public List<TrackResponse> findMostPlayed(int limit) {
     return streamEventRepository.findTopTracks(PageRequest.of(0, limit)).stream()
             .map(this::toResponse)

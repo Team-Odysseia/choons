@@ -25,6 +25,10 @@ public class PartyService {
   @Autowired private PartyPlaybackStateRepository partyPlaybackStateRepository;
   @Autowired private TrackService trackService;
   @Autowired private PartyEventsService partyEventsService;
+  @Autowired private PartyAccessService partyAccessService;
+  @Autowired private PartyQueueService partyQueueService;
+  @Autowired private PartyPlaybackService partyPlaybackService;
+  @Autowired private PartyStateAssembler partyStateAssembler;
 
   @Transactional
   public PartyStateResponse create(CreatePartyRequest request, User hostUser) {
@@ -407,24 +411,11 @@ public class PartyService {
   }
 
   private void normalizePositions(Party party) {
-    List<PartyQueueItem> queue = partyQueueItemRepository.findByPartyOrderByPositionAsc(party);
-    for (int i = 0; i < queue.size(); i++) {
-      PartyQueueItem item = queue.get(i);
-      if (item.getPosition() != i) {
-        item.setPosition(i);
-        partyQueueItemRepository.save(item);
-      }
-    }
+    partyQueueService.normalizePositions(party);
   }
 
   private PartyPlaybackState getOrCreatePlayback(Party party) {
-    return partyPlaybackStateRepository.findByParty(party)
-            .orElseGet(() -> partyPlaybackStateRepository.save(PartyPlaybackState.builder()
-                    .party(party)
-                    .playing(false)
-                    .anchorPositionSec(0)
-                    .anchorEpochMs(System.currentTimeMillis())
-                    .build()));
+    return partyPlaybackService.getOrCreatePlayback(party);
   }
 
   private Party getActiveParty(String inviteCode) {
@@ -433,71 +424,19 @@ public class PartyService {
   }
 
   private PartyMember requireMember(Party party, User user) {
-    return partyMemberRepository.findByPartyAndUser(party, user)
-            .orElseThrow(() -> new AccessDeniedException("User is not in party"));
+    return partyAccessService.requireMember(party, user);
   }
 
   private void requireHost(Party party, User user) {
-    PartyMember member = requireMember(party, user);
-    if (!member.isHost()) {
-      throw new AccessDeniedException("Only host can perform this action");
-    }
+    partyAccessService.requireHost(party, user);
   }
 
   private void requireCanControl(Party party, User user) {
-    PartyMember member = requireMember(party, user);
-    if (member.isHost()) return;
-    if (party.getQueuePolicy() == PartyQueuePolicy.EVERYONE) return;
-    if (member.isDj()) return;
-    throw new AccessDeniedException("Only DJs can control queue in this party");
+    partyAccessService.requireCanControl(party, user);
   }
 
   private PartyStateResponse getStateForParty(Party party, User requester) {
-    List<PartyMember> members = partyMemberRepository.findByPartyOrderByJoinedAtAsc(party);
-    List<PartyQueueItem> queue = partyQueueItemRepository.findByPartyOrderByPositionAsc(party);
-    PartyPlaybackState playback = getOrCreatePlayback(party);
-
-    boolean canControl = false;
-    for (PartyMember member : members) {
-      if (member.getUser().getId().equals(requester.getId())) {
-        canControl = member.isHost() || party.getQueuePolicy() == PartyQueuePolicy.EVERYONE || member.isDj();
-      }
-    }
-
-    TrackResponse playbackTrack = playback.getTrack() == null ? null : trackService.toResponse(playback.getTrack());
-
-    return new PartyStateResponse(
-            party.getId(),
-            party.getInviteCode(),
-            party.getName(),
-            party.getQueuePolicy(),
-            party.getHost().getId(),
-            members.stream()
-                    .map(m -> new PartyMemberResponse(
-                            m.getUser().getId(),
-                            m.getUser().getUsername(),
-                            m.isHost(),
-                            m.isDj(),
-                            m.isConnected()
-                    ))
-                    .toList(),
-            queue.stream()
-                    .map(item -> new PartyQueueItemResponse(
-                            item.getId(),
-                            item.getPosition(),
-                            trackService.toResponse(item.getTrack()),
-                            item.getAddedBy().getId(),
-                            item.getAddedBy().getUsername()
-                    ))
-                    .toList(),
-            new PartyPlaybackResponse(
-                    playbackTrack,
-                    playback.isPlaying(),
-                    playback.getAnchorPositionSec(),
-                    playback.getAnchorEpochMs()
-            ),
-            canControl
-    );
+    return partyStateAssembler.assemble(party);
   }
 
   private String generateInviteCode() {

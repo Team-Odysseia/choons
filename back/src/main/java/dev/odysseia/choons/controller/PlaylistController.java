@@ -3,7 +3,7 @@ package dev.odysseia.choons.controller;
 import dev.odysseia.choons.dto.*;
 import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.service.PlaylistService;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,11 +17,15 @@ import java.util.UUID;
 @RequestMapping("/playlists")
 public class PlaylistController {
 
-  @Autowired private PlaylistService playlistService;
+  private final PlaylistService playlistService;
+
+  public PlaylistController(PlaylistService playlistService) {
+    this.playlistService = playlistService;
+  }
 
   @PostMapping
   public ResponseEntity<PlaylistResponse> create(
-          @RequestBody CreatePlaylistRequest request,
+          @Valid @RequestBody CreatePlaylistRequest request,
           @AuthenticationPrincipal User user) throws AccessDeniedException {
     return ResponseEntity.status(HttpStatus.CREATED).body(playlistService.create(request, user));
   }
@@ -54,7 +58,7 @@ public class PlaylistController {
   @PostMapping("/{id}/tracks")
   public ResponseEntity<PlaylistResponse> addTrack(
           @PathVariable UUID id,
-          @RequestBody AddTrackToPlaylistRequest request,
+          @Valid @RequestBody AddTrackToPlaylistRequest request,
           @AuthenticationPrincipal User user) throws AccessDeniedException {
     return ResponseEntity.ok(playlistService.addTrack(id, request, user));
   }
@@ -70,7 +74,7 @@ public class PlaylistController {
   @PutMapping("/{id}/visibility")
   public ResponseEntity<PlaylistResponse> setVisibility(
           @PathVariable UUID id,
-          @RequestBody VisibilityRequest request,
+          @Valid @RequestBody VisibilityRequest request,
           @AuthenticationPrincipal User user) throws AccessDeniedException {
     return ResponseEntity.ok(playlistService.setVisibility(id, request.isPublic(), user));
   }
@@ -78,7 +82,7 @@ public class PlaylistController {
   @PutMapping("/{id}/tracks/order")
   public ResponseEntity<PlaylistResponse> reorder(
           @PathVariable UUID id,
-          @RequestBody ReorderPlaylistRequest request,
+          @Valid @RequestBody ReorderPlaylistRequest request,
           @AuthenticationPrincipal User user) throws AccessDeniedException {
     return ResponseEntity.ok(playlistService.reorder(id, request, user));
   }

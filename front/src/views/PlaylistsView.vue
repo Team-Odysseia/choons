@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import BaseDialog from '@/components/ui/dialog/BaseDialog.vue'
 import { Trash2 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -12,6 +13,7 @@ const playlists = usePlaylistsStore()
 const newName = ref('')
 const creating = ref(false)
 const showForm = ref(false)
+const deleteTarget = ref<{ id: string; name: string } | null>(null)
 
 onMounted(() => playlists.fetchMyPlaylists())
 
@@ -28,9 +30,14 @@ async function create() {
   }
 }
 
-async function remove(id: string, name: string) {
-  if (!confirm(`Delete "${name}"?`)) return
-  await playlists.deletePlaylist(id)
+function askRemove(id: string, name: string) {
+  deleteTarget.value = { id, name }
+}
+
+async function removeConfirmed() {
+  if (!deleteTarget.value) return
+  await playlists.deletePlaylist(deleteTarget.value.id)
+  deleteTarget.value = null
 }
 </script>
 
@@ -74,11 +81,23 @@ async function remove(id: string, name: string) {
         <button
           class="size-8 rounded-full flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
           title="Delete"
-          @click.stop="remove(pl.id, pl.name)"
+          @click.stop="askRemove(pl.id, pl.name)"
         >
           <Trash2 :size="16" />
         </button>
       </div>
     </div>
   </div>
+
+  <BaseDialog :open="!!deleteTarget" title="Delete playlist" @close="deleteTarget = null">
+    <div class="px-5 pb-5">
+      <p class="text-sm text-muted-foreground mb-5">
+        Delete <span class="font-semibold text-foreground">{{ deleteTarget?.name }}</span>?
+      </p>
+      <div class="flex justify-end gap-2">
+        <Button variant="outline" @click="deleteTarget = null">Cancel</Button>
+        <Button variant="destructive" @click="removeConfirmed">Delete</Button>
+      </div>
+    </div>
+  </BaseDialog>
 </template>

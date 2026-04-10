@@ -7,7 +7,7 @@ import { usePartyStore } from '@/stores/party'
 import { useAuthStore } from '@/stores/auth'
 import TrackRow from '@/components/music/TrackRow.vue'
 import { Button } from '@/components/ui/button'
-import { X, Play, Shuffle, ListPlus, Globe, Lock, Link } from 'lucide-vue-next'
+import { X, Play, Shuffle, ListPlus, Globe, Lock } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 
 const route = useRoute()
@@ -21,11 +21,6 @@ const togglingVisibility = ref(false)
 const isOwner = computed(
   () => !!auth.user && playlists.current?.ownerId === auth.user.id,
 )
-
-const publicUrl = computed(() => {
-  const id = playlists.current?.id
-  return id ? `${window.location.origin}/p/${id}` : ''
-})
 
 onMounted(() => playlists.fetchPlaylist(route.params.id as string))
 
@@ -41,11 +36,6 @@ async function toggleVisibility() {
   } finally {
     togglingVisibility.value = false
   }
-}
-
-function copyLink() {
-  navigator.clipboard.writeText(publicUrl.value)
-  toast.success('Link copied!')
 }
 
 function addAllToQueue() {
@@ -129,10 +119,10 @@ function addAllToQueue() {
         <Button
           v-if="playlists.current.isPublic"
           variant="outline"
-          @click="copyLink"
+          @click="toast.info('This playlist is shared only inside this Choons instance')"
         >
-          <Link :size="16" />
-          Copy link
+          <Globe :size="16" />
+          Internal shared
         </Button>
       </template>
     </div>

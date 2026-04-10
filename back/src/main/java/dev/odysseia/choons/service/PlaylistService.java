@@ -8,7 +8,6 @@ import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.repository.PlaylistRepository;
 import dev.odysseia.choons.repository.PlaylistTrackRepository;
 import dev.odysseia.choons.repository.TrackRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,10 +19,20 @@ import java.util.UUID;
 @Service
 public class PlaylistService {
 
-  @Autowired private PlaylistRepository playlistRepository;
-  @Autowired private PlaylistTrackRepository playlistTrackRepository;
-  @Autowired private TrackRepository trackRepository;
-  @Autowired private TrackService trackService;
+  private final PlaylistRepository playlistRepository;
+  private final PlaylistTrackRepository playlistTrackRepository;
+  private final TrackRepository trackRepository;
+  private final TrackService trackService;
+
+  public PlaylistService(PlaylistRepository playlistRepository,
+                         PlaylistTrackRepository playlistTrackRepository,
+                         TrackRepository trackRepository,
+                         TrackService trackService) {
+    this.playlistRepository = playlistRepository;
+    this.playlistTrackRepository = playlistTrackRepository;
+    this.trackRepository = trackRepository;
+    this.trackService = trackService;
+  }
 
   public PlaylistResponse create(CreatePlaylistRequest request, User owner) {
     Playlist playlist = playlistRepository.save(Playlist.builder()
@@ -97,6 +106,22 @@ public class PlaylistService {
     getAndVerifyOwner(playlistId, user);
     List<PlaylistTrack> entries = playlistTrackRepository.findByPlaylistIdOrderByPositionAsc(playlistId);
 
+    if (entries.size() != request.orderedTrackIds().size()) {
+      throw new IllegalArgumentException("Reorder list size mismatch");
+    }
+
+    java.util.Set<UUID> uniqueRequested = new java.util.HashSet<>(request.orderedTrackIds());
+    if (uniqueRequested.size() != request.orderedTrackIds().size()) {
+      throw new IllegalArgumentException("Reorder list contains duplicate track IDs");
+    }
+
+    java.util.Set<UUID> existingTrackIds = entries.stream()
+            .map(e -> e.getTrack().getId())
+            .collect(java.util.stream.Collectors.toSet());
+    if (!existingTrackIds.equals(uniqueRequested)) {
+      throw new IllegalArgumentException("Reorder list must contain all playlist tracks exactly once");
+    }
+
     for (int i = 0; i < request.orderedTrackIds().size(); i++) {
       UUID trackId = request.orderedTrackIds().get(i);
       final int pos = i;
@@ -127,11 +152,7 @@ public class PlaylistService {
     Playlist playlist = playlistRepository.findById(playlistId)
             .orElseThrow(() -> new NoSuchElementException("Playlist not found: " + playlistId));
     if (!playlist.getOwner().getId().equals(user.getId())) {
-      try {
-        throw new AccessDeniedException("Not your playlist");
-      } catch (AccessDeniedException e) {
-        throw e;
-      }
+      throw new AccessDeniedException("Not your playlist");
     }
     return playlist;
   }

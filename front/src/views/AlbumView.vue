@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useAlbumQuery, useAlbumTracksQuery } from '@/composables/queries'
@@ -23,6 +23,8 @@ const { data: album, isPending } = useAlbumQuery(id)
 const { data: tracks } = useAlbumTracksQuery(id)
 
 const albumDialogOpen = ref(false)
+const focusedTrackId = ref<string | null>(null)
+let focusTimer: ReturnType<typeof setTimeout> | null = null
 
 const trackList = computed(() => tracks.value ?? [])
 
@@ -37,6 +39,36 @@ function addAllToQueue() {
   }
   player.addTracksToQueue(trackList.value)
 }
+
+function clearFocusTimer() {
+  if (!focusTimer) return
+  clearTimeout(focusTimer)
+  focusTimer = null
+}
+
+async function focusTrackFromRoute() {
+  const trackId = typeof route.query.track === 'string' ? route.query.track : null
+  if (!trackId || !trackList.value.some((track) => track.id === trackId)) return
+
+  await nextTick()
+  const target = document.getElementById(`track-${trackId}`)
+  if (!target) return
+
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  focusedTrackId.value = trackId
+  clearFocusTimer()
+  focusTimer = setTimeout(() => {
+    if (focusedTrackId.value === trackId) focusedTrackId.value = null
+  }, 1300)
+}
+
+watch([trackList, () => route.query.track], () => {
+  void focusTrackFromRoute()
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  clearFocusTimer()
+})
 </script>
 
 <template>
@@ -98,15 +130,21 @@ function addAllToQueue() {
       No tracks in this album yet.
     </div>
     <div v-else class="mt-2">
-      <TrackRow
+      <div
         v-for="(track, i) in trackList"
+        :id="`track-${track.id}`"
         :key="track.id"
-        :track="track"
-        :queue="trackList"
-        :index="i"
-        :show-add-to-queue="true"
-        :show-add-to-playlist="true"
-      />
+        class="track-anchor"
+        :class="focusedTrackId === track.id ? 'track-anchor--focused' : ''"
+      >
+        <TrackRow
+          :track="track"
+          :queue="trackList"
+          :index="i"
+          :show-add-to-queue="true"
+          :show-add-to-playlist="true"
+        />
+      </div>
     </div>
   </div>
   <div v-else class="text-[13px] text-dimmed">Loading…</div>
@@ -117,3 +155,30 @@ function addAllToQueue() {
     @close="albumDialogOpen = false"
   />
 </template>
+
+<style scoped>
+.track-anchor {
+  border-radius: 10px;
+}
+
+.track-anchor--focused {
+  animation: track-shine 1.1s ease-out;
+}
+
+@keyframes track-shine {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    outline: 1px solid transparent;
+  }
+  35% {
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 45%, transparent);
+    outline: 1px solid color-mix(in oklab, var(--primary) 70%, white 10%);
+    background: color-mix(in oklab, var(--primary) 12%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    outline: 1px solid transparent;
+    background: transparent;
+  }
+}
+</style>

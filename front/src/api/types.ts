@@ -111,5 +111,4 @@ export interface PartyStateResponse {
   members: PartyMemberResponse[]
   queue: PartyQueueItemResponse[]
   playback: PartyPlaybackResponse
-  canControlQueue: boolean
 }

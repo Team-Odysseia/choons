@@ -7,7 +7,7 @@ import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.model.user.UserRole;
 import dev.odysseia.choons.repository.UserRepository;
 import dev.odysseia.choons.service.JwtService;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -26,10 +26,20 @@ public class AuthController {
 
   private static final int AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 3;
 
-  @Autowired private AuthenticationManager authenticationManager;
-  @Autowired private UserRepository userRepository;
-  @Autowired private JwtService jwtService;
-  @Autowired private PasswordEncoder passwordEncoder;
+  private final AuthenticationManager authenticationManager;
+  private final UserRepository userRepository;
+  private final JwtService jwtService;
+  private final PasswordEncoder passwordEncoder;
+
+  public AuthController(AuthenticationManager authenticationManager,
+                        UserRepository userRepository,
+                        JwtService jwtService,
+                        PasswordEncoder passwordEncoder) {
+    this.authenticationManager = authenticationManager;
+    this.userRepository = userRepository;
+    this.jwtService = jwtService;
+    this.passwordEncoder = passwordEncoder;
+  }
 
   @Value("${auth.cookie.name:CHOONS_AUTH}")
   private String authCookieName;
@@ -38,7 +48,7 @@ public class AuthController {
   private boolean authCookieSecure;
 
   @PostMapping("/login")
-  public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+  public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
     authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.username(), request.password())
     );
@@ -70,9 +80,14 @@ public class AuthController {
 
   @PostMapping("/register")
   @PreAuthorize("hasRole('ADMIN')")
-  public ResponseEntity<UserResponse> register(@RequestBody LoginRequest request) {
+  public ResponseEntity<UserResponse> register(@Valid @RequestBody LoginRequest request) {
+    String username = request.username().trim();
+    if (userRepository.existsByUsername(username)) {
+      throw new IllegalStateException("Username already exists");
+    }
+
     User user = userRepository.save(User.builder()
-            .username(request.username())
+            .username(username)
             .password(passwordEncoder.encode(request.password()))
             .role(UserRole.LISTENER)
             .build());

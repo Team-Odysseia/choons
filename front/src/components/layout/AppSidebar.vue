@@ -3,8 +3,10 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDrawerStore } from '@/stores/drawer'
 import { useRoute, useRouter } from 'vue-router'
-import { Library, ListMusic, LogOut, PartyPopper, Send, X } from 'lucide-vue-next'
+import { Library, ListMusic, LogOut, PartyPopper, Search, Send, X } from 'lucide-vue-next'
 import { listAllAlbumRequests } from '@/api/albumRequests'
+import { Input } from '@/components/ui/input'
+import BaseDialog from '@/components/ui/dialog/BaseDialog.vue'
 
 const auth = useAuthStore()
 const drawer = useDrawerStore()
@@ -12,6 +14,8 @@ const router = useRouter()
 const route = useRoute()
 const appVersion = __APP_VERSION__
 const unseenRequests = ref(0)
+const searchDialogOpen = ref(false)
+const searchQuery = ref('')
 
 const LAST_SEEN_KEY = 'admin_album_requests_seen_at'
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -74,6 +78,20 @@ function stopPolling() {
 async function logout() {
   await auth.logout()
   router.push('/login')
+}
+
+function openSearchDialog() {
+  const q = route.name === 'search' && typeof route.query.q === 'string' ? route.query.q : ''
+  searchQuery.value = q
+  searchDialogOpen.value = true
+  drawer.closeSidebar()
+}
+
+function submitSearch() {
+  const query = searchQuery.value.trim()
+  if (!query) return
+  router.push({ name: 'search', query: { q: query } })
+  searchDialogOpen.value = false
 }
 
 onMounted(() => {
@@ -149,6 +167,15 @@ onBeforeUnmount(() => {
             <Library :size="20" />
             Library
           </RouterLink>
+        </li>
+        <li>
+          <button
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all"
+            @click="openSearchDialog"
+          >
+            <Search :size="20" />
+            Search
+          </button>
         </li>
         <li>
           <RouterLink
@@ -236,4 +263,14 @@ onBeforeUnmount(() => {
       >Made by Odysseia</a>
     </div>
   </nav>
+
+  <BaseDialog :open="searchDialogOpen" title="Search" @close="searchDialogOpen = false">
+    <div class="px-5 pb-5">
+      <Input
+        v-model="searchQuery"
+        placeholder="Search public playlists, songs, albums, artists"
+        @keydown.enter="submitSearch"
+      />
+    </div>
+  </BaseDialog>
 </template>

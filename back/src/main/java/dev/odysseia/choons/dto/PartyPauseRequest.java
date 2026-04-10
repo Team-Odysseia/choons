@@ -1,3 +1,5 @@
 package dev.odysseia.choons.dto;
 
-public record PartyPauseRequest(double positionSec) {}
+import jakarta.validation.constraints.PositiveOrZero;
+
+public record PartyPauseRequest(@PositiveOrZero double positionSec) {}

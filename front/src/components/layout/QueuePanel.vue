@@ -58,7 +58,7 @@ function removeAt(index: number) {
         :list="player.queue"
         item-key="id"
         handle=".drag-handle"
-        :disabled="party.inParty"
+        :disabled="party.inParty && !party.canControl"
         @change="onDragChange"
       >
         <template #item="{ element, index }">
@@ -69,6 +69,7 @@ function removeAt(index: number) {
             <GripVertical
               :size="14"
               class="drag-handle text-dimmed cursor-grab active:cursor-grabbing shrink-0"
+              :class="party.inParty && !party.canControl ? 'opacity-40 cursor-not-allowed' : ''"
             />
             <div class="flex flex-col min-w-0 flex-1 gap-0.5">
               <span
