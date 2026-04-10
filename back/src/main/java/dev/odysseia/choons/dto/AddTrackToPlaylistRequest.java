@@ -1,5 +1,7 @@
 package dev.odysseia.choons.dto;
 
+import jakarta.validation.constraints.NotNull;
+
 import java.util.UUID;
 
-public record AddTrackToPlaylistRequest(UUID trackId) {}
+public record AddTrackToPlaylistRequest(@NotNull UUID trackId) {}

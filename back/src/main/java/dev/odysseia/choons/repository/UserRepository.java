@@ -10,8 +10,7 @@ import java.util.List;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
   Optional<User> findByUsername(String username);
-  Optional<User> findById(UUID id);
+  boolean existsByUsername(String username);
   List<User> findByRoleOrderByUsernameAsc(UserRole role);
   List<User> findByRoleAndUsernameContainingIgnoreCaseOrderByUsernameAsc(UserRole role, String username);
-  User save(User user);
 }

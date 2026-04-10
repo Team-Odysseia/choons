@@ -1,5 +1,6 @@
 package dev.odysseia.choons.controller;
 
+import dev.odysseia.choons.exception.RangeNotSatisfiableException;
 import dev.odysseia.choons.model.music.Album;
 import dev.odysseia.choons.model.music.Artist;
 import dev.odysseia.choons.model.music.Track;
@@ -170,6 +171,18 @@ class StreamControllerTest {
                         .header(HttpHeaders.RANGE, "bytes=512-"))
                 .andExpect(request().asyncStarted())
                 .andReturn();
+    }
+
+    @Test
+    void stream_withUnsatisfiableRange_returns416() throws Exception {
+        when(streamingService.stream(trackId, "bytes=999999-"))
+                .thenThrow(new RangeNotSatisfiableException(AUDIO_BYTES.length));
+
+        mockMvc.perform(get("/stream/{id}", trackId)
+                        .header(HttpHeaders.AUTHORIZATION, listenerToken)
+                        .header(HttpHeaders.RANGE, "bytes=999999-"))
+                .andExpect(status().isRequestedRangeNotSatisfiable())
+                .andExpect(header().string(HttpHeaders.CONTENT_RANGE, "bytes */" + AUDIO_BYTES.length));
     }
 
     // ─── Query token no longer supported ──────────────────────────────────────

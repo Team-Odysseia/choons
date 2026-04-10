@@ -160,8 +160,6 @@ class AuthControllerTest {
     void register_withDuplicateUsername_returnsError() throws Exception {
         String token = jwtService.generateToken(adminUser);
 
-        // "admin" already exists — DataIntegrityViolationException hits the generic handler → 500
-        // Known gap: ideally the API should return 409
         mockMvc.perform(post("/auth/register")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -169,7 +167,8 @@ class AuthControllerTest {
                                 "username", "admin",
                                 "password", "anotherpass"
                         ))))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Username already exists"));
     }
 
     // ─── GET /auth/me ─────────────────────────────────────────────────────────

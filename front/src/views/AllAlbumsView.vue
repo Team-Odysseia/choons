@@ -1,10 +1,27 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAllAlbumsQuery } from '@/composables/queries'
 import { albumImageUrl } from '@/api/albums'
+import { Input } from '@/components/ui/input'
 
 const router = useRouter()
-const { data: albums, isPending } = useAllAlbumsQuery()
+const search = ref('')
+const debouncedSearch = ref('')
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
+
+watch(search, () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => {
+    debouncedSearch.value = search.value.trim()
+  }, 220)
+})
+
+onBeforeUnmount(() => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+})
+
+const { data: albums, isPending } = useAllAlbumsQuery(debouncedSearch)
 
 function isNew(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
@@ -14,6 +31,10 @@ function isNew(createdAt: string) {
 <template>
   <div>
     <h1 class="text-2xl font-extrabold mb-6">All Albums</h1>
+
+    <div class="max-w-[520px] mb-5">
+      <Input v-model="search" placeholder="Search album or artist" />
+    </div>
 
     <div v-if="isPending" class="text-[13px] text-dimmed">Loading…</div>
     <div v-else-if="!albums?.length" class="text-[13px] text-dimmed">

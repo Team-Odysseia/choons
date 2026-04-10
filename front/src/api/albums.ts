@@ -6,6 +6,21 @@ export const getAlbums = (artistId?: string) =>
     .get<AlbumResponse[]>('/music/albums', { params: artistId ? { artistId } : {} })
     .then((r) => r.data)
 
+export const searchAlbums = (
+  query: string,
+  opts?: { artistId?: string; page?: number; size?: number },
+) =>
+  client
+    .get<AlbumResponse[]>('/music/albums', {
+      params: {
+        query,
+        artistId: opts?.artistId,
+        page: opts?.page ?? 0,
+        size: opts?.size ?? 100,
+      },
+    })
+    .then((r) => r.data)
+
 export const getAlbum = (id: string) =>
   client.get<AlbumResponse>(`/music/albums/${id}`).then((r) => r.data)
 

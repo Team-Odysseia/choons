@@ -4,6 +4,11 @@ import type { ArtistResponse } from './types'
 export const getArtists = () =>
   client.get<ArtistResponse[]>('/music/artists').then((r) => r.data)
 
+export const searchArtists = (query: string, page = 0, size = 100) =>
+  client
+    .get<ArtistResponse[]>('/music/artists', { params: { query, page, size } })
+    .then((r) => r.data)
+
 export const getArtist = (id: string) =>
   client.get<ArtistResponse>(`/music/artists/${id}`).then((r) => r.data)
 

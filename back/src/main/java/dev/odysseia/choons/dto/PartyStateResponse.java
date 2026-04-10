@@ -13,6 +13,5 @@ public record PartyStateResponse(
         UUID hostUserId,
         List<PartyMemberResponse> members,
         List<PartyQueueItemResponse> queue,
-        PartyPlaybackResponse playback,
-        boolean canControlQueue
+        PartyPlaybackResponse playback
 ) {}

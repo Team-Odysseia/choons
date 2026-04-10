@@ -71,7 +71,7 @@ class SecurityConfigTest {
         // POST sem token deve chegar ao endpoint (vai retornar 401 de credenciais, não de auth)
         mockMvc.perform(post("/auth/login")
                         .contentType("application/json")
-                        .content("{\"username\":\"x\",\"password\":\"x\"}"))
+                        .content("{\"username\":\"x\",\"password\":\"xxxxxx\"}"))
                 .andExpect(status().isUnauthorized()); // credenciais inválidas, mas não 403
     }
 

@@ -128,6 +128,18 @@ public class AlbumService {
             .toList();
   }
 
+  public List<AlbumResponse> search(UUID artistId, String query) {
+    String normalized = query == null ? "" : query.trim().toLowerCase();
+    List<AlbumResponse> source = artistId != null ? findByArtist(artistId) : findAll();
+    if (normalized.isBlank()) {
+      return source;
+    }
+    return source.stream()
+            .filter(album -> album.title().toLowerCase().contains(normalized)
+                    || album.artist().name().toLowerCase().contains(normalized))
+            .toList();
+  }
+
   public AlbumResponse findById(UUID id) {
     return albumRepository.findById(id)
             .map(this::toResponse)

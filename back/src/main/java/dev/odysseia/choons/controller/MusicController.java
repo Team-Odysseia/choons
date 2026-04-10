@@ -22,8 +22,11 @@ public class MusicController {
   @Autowired private TrackService trackService;
 
   @GetMapping("/artists")
-  public ResponseEntity<List<ArtistResponse>> listArtists() {
-    return ResponseEntity.ok(artistService.findAll());
+  public ResponseEntity<List<ArtistResponse>> listArtists(
+          @RequestParam(required = false) String query,
+          @RequestParam(defaultValue = "0") int page,
+          @RequestParam(defaultValue = "100") int size) {
+    return ResponseEntity.ok(paginate(artistService.search(query), page, size));
   }
 
   @GetMapping("/artists/{id}")
@@ -32,11 +35,12 @@ public class MusicController {
   }
 
   @GetMapping("/albums")
-  public ResponseEntity<List<AlbumResponse>> listAlbums(@RequestParam(required = false) UUID artistId) {
-    List<AlbumResponse> albums = artistId != null
-            ? albumService.findByArtist(artistId)
-            : albumService.findAll();
-    return ResponseEntity.ok(albums);
+  public ResponseEntity<List<AlbumResponse>> listAlbums(
+          @RequestParam(required = false) UUID artistId,
+          @RequestParam(required = false) String query,
+          @RequestParam(defaultValue = "0") int page,
+          @RequestParam(defaultValue = "100") int size) {
+    return ResponseEntity.ok(paginate(albumService.search(artistId, query), page, size));
   }
 
   @GetMapping("/albums/{id}")
@@ -50,16 +54,28 @@ public class MusicController {
   }
 
   @GetMapping("/tracks")
-  public ResponseEntity<List<TrackResponse>> listTracks(@RequestParam(required = false) UUID albumId) {
-    List<TrackResponse> tracks = albumId != null
-            ? trackService.findByAlbum(albumId)
-            : trackService.findAll();
-    return ResponseEntity.ok(tracks);
+  public ResponseEntity<List<TrackResponse>> listTracks(
+          @RequestParam(required = false) UUID albumId,
+          @RequestParam(required = false) String query,
+          @RequestParam(defaultValue = "0") int page,
+          @RequestParam(defaultValue = "100") int size) {
+    return ResponseEntity.ok(paginate(trackService.search(albumId, query), page, size));
   }
 
   @GetMapping("/tracks/most-played")
   public ResponseEntity<List<TrackResponse>> mostPlayedTracks(
           @RequestParam(defaultValue = "10") int limit) {
     return ResponseEntity.ok(trackService.findMostPlayed(limit));
+  }
+
+  private <T> List<T> paginate(List<T> values, int page, int size) {
+    int safePage = Math.max(page, 0);
+    int safeSize = Math.max(1, Math.min(size, 200));
+    int start = safePage * safeSize;
+    if (start >= values.size()) {
+      return List.of();
+    }
+    int end = Math.min(start + safeSize, values.size());
+    return values.subList(start, end);
   }
 }

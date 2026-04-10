@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getArtists } from '@/api/artists'
-import { getAlbums, createAlbum, deleteAlbum } from '@/api/albums'
+import { getAlbums, searchAlbums, createAlbum, deleteAlbum } from '@/api/albums'
 import { uploadTrack } from '@/api/tracks'
 import type { ArtistResponse, AlbumResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -39,19 +39,28 @@ const deletingId = ref<string | null>(null)
 const confirmTarget = ref<AlbumResponse | null>(null)
 const addDialogOpen = ref(false)
 const search = ref('')
-
-const filteredAlbums = computed(() => {
-  const q = search.value.trim().toLowerCase()
-  if (!q) return albums.value
-  return albums.value.filter((al) =>
-    al.title.toLowerCase().includes(q) || al.artist.name.toLowerCase().includes(q),
-  )
-})
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   artists.value = await getArtists()
-  albums.value = await getAlbums()
+  await loadAlbums()
 })
+
+onBeforeUnmount(() => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+})
+
+watch(search, () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => {
+    void loadAlbums()
+  }, 220)
+})
+
+async function loadAlbums() {
+  const query = search.value.trim()
+  albums.value = query ? await searchAlbums(query, { page: 0, size: 300 }) : await getAlbums()
+}
 
 function formatDuration(secs: number) {
   const m = Math.floor(secs / 60)
@@ -113,7 +122,7 @@ async function confirmDelete() {
   deletingId.value = al.id
   try {
     await deleteAlbum(al.id)
-    albums.value = albums.value.filter((a) => a.id !== al.id)
+    await loadAlbums()
     toast.success(`"${al.title}" deleted`)
   } catch (e: any) {
     toast.error(e.response?.data?.error ?? 'Failed to delete album')
@@ -155,7 +164,7 @@ async function submit() {
       toast.success(`Album "${album.title}" created`)
     }
 
-    albums.value.unshift(album)
+    await loadAlbums()
     title.value = ''
     artistId.value = ''
     releaseYear.value = new Date().getFullYear()
@@ -186,9 +195,9 @@ async function submit() {
 
     <!-- Albums list -->
     <div class="list-section">
-      <div v-if="filteredAlbums.length === 0" class="text-[13px] text-dimmed">No albums found.</div>
+      <div v-if="albums.length === 0" class="text-[13px] text-dimmed">No albums found.</div>
       <div v-else class="item-list">
-        <div v-for="al in filteredAlbums" :key="al.id" class="list-item">
+        <div v-for="al in albums" :key="al.id" class="list-item">
           <div class="flex items-center justify-between gap-3">
             <span class="item-name">{{ al.title }}</span>
             <div class="flex items-center gap-1">

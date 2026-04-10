@@ -254,6 +254,48 @@ class PlaylistServiceTest {
                 .isInstanceOf(AccessDeniedException.class);
     }
 
+    @Test
+    void reorder_throwsWhenOrderMissingTracks() {
+        PlaylistTrack pt1 = PlaylistTrack.builder()
+                .id(UUID.randomUUID()).playlist(playlist).track(track).position(0).build();
+        Track track2 = Track.builder().id(UUID.randomUUID()).title("Track 2")
+                .r2Key("k").contentType("audio/mpeg").build();
+        PlaylistTrack pt2 = PlaylistTrack.builder()
+                .id(UUID.randomUUID()).playlist(playlist).track(track2).position(1).build();
+
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistTrackRepository.findByPlaylistIdOrderByPositionAsc(playlist.getId()))
+                .thenReturn(new ArrayList<>(List.of(pt1, pt2)));
+
+        assertThatThrownBy(() -> playlistService.reorder(
+                playlist.getId(),
+                new ReorderPlaylistRequest(List.of(track.getId())),
+                owner
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Reorder list size mismatch");
+    }
+
+    @Test
+    void reorder_throwsWhenOrderContainsDuplicates() {
+        PlaylistTrack pt1 = PlaylistTrack.builder()
+                .id(UUID.randomUUID()).playlist(playlist).track(track).position(0).build();
+        Track track2 = Track.builder().id(UUID.randomUUID()).title("Track 2")
+                .r2Key("k").contentType("audio/mpeg").build();
+        PlaylistTrack pt2 = PlaylistTrack.builder()
+                .id(UUID.randomUUID()).playlist(playlist).track(track2).position(1).build();
+
+        when(playlistRepository.findById(playlist.getId())).thenReturn(Optional.of(playlist));
+        when(playlistTrackRepository.findByPlaylistIdOrderByPositionAsc(playlist.getId()))
+                .thenReturn(new ArrayList<>(List.of(pt1, pt2)));
+
+        assertThatThrownBy(() -> playlistService.reorder(
+                playlist.getId(),
+                new ReorderPlaylistRequest(List.of(track.getId(), track.getId())),
+                owner
+        )).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Reorder list contains duplicate track IDs");
+    }
+
     // ─── setVisibility ────────────────────────────────────────────────────────
 
     @Test

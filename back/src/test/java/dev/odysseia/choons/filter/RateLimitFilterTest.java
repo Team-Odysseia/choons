@@ -36,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class RateLimitFilterTest {
 
+    private static final String LOGIN_PAYLOAD = "{\"username\":\"unknown\",\"password\":\"secret1\"}";
+
     @Autowired WebApplicationContext wac;
     @Autowired UserRepository userRepository;
 
@@ -63,7 +65,7 @@ class RateLimitFilterTest {
             mockMvc.perform(post("/auth/login")
                             .header("X-Forwarded-For", ip)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"username\":\"x\",\"password\":\"y\"}"))
+                            .content(LOGIN_PAYLOAD))
                     .andExpect(status().isUnauthorized()); // 401 — passed the rate limiter
         }
     }
@@ -75,12 +77,12 @@ class RateLimitFilterTest {
             mockMvc.perform(post("/auth/login")
                     .header("X-Forwarded-For", ip)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\":\"x\",\"password\":\"y\"}"));
+                    .content(LOGIN_PAYLOAD));
         }
         mockMvc.perform(post("/auth/login")
                         .header("X-Forwarded-For", ip)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"x\",\"password\":\"y\"}"))
+                        .content(LOGIN_PAYLOAD))
                 .andExpect(status().is(429));
     }
 
@@ -91,12 +93,12 @@ class RateLimitFilterTest {
             mockMvc.perform(post("/auth/login")
                     .header("X-Forwarded-For", ip)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\":\"x\",\"password\":\"y\"}"));
+                    .content(LOGIN_PAYLOAD));
         }
         mockMvc.perform(post("/auth/login")
                         .header("X-Forwarded-For", ip)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"x\",\"password\":\"y\"}"))
+                        .content(LOGIN_PAYLOAD))
                 .andExpect(status().is(429))
                 .andExpect(header().string("Retry-After", "60"));
     }
@@ -152,21 +154,21 @@ class RateLimitFilterTest {
             mockMvc.perform(post("/auth/login")
                     .header("X-Forwarded-For", ip1)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"username\":\"x\",\"password\":\"y\"}"));
+                    .content(LOGIN_PAYLOAD));
         }
 
         // ip1 is rate limited
         mockMvc.perform(post("/auth/login")
                         .header("X-Forwarded-For", ip1)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"x\",\"password\":\"y\"}"))
+                        .content(LOGIN_PAYLOAD))
                 .andExpect(status().is(429));
 
         // ip2 still has its own fresh bucket
         mockMvc.perform(post("/auth/login")
                         .header("X-Forwarded-For", ip2)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"x\",\"password\":\"y\"}"))
+                        .content(LOGIN_PAYLOAD))
                 .andExpect(status().isUnauthorized()); // 401, not 429
     }
 }
