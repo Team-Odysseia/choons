@@ -2,16 +2,17 @@
 
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app
+ARG CACHE_KEY=choons-back
 
 COPY gradle gradle
 COPY gradlew .
 COPY build.gradle settings.gradle ./
 
 RUN chmod +x ./gradlew
-RUN --mount=type=cache,id=gradle-cache,target=/root/.gradle ./gradlew --no-daemon -q dependencies
+RUN --mount=type=cache,id=${CACHE_KEY}-gradle-cache,target=/root/.gradle ./gradlew --no-daemon -q dependencies
 
 COPY src src
-RUN --mount=type=cache,id=gradle-cache,target=/root/.gradle ./gradlew --no-daemon bootJar -x test
+RUN --mount=type=cache,id=${CACHE_KEY}-gradle-cache,target=/root/.gradle ./gradlew --no-daemon bootJar -x test
 
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
