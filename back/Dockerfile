@@ -20,7 +20,7 @@ RUN groupadd --system choons && useradd --system --gid choons --create-home --ho
 
 COPY --from=build --chown=choons:choons /app/build/libs/choons-*.jar /app/app.jar
 
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -Xms128m -Xmx320m -XX:MaxMetaspaceSize=96m -XX:MaxDirectMemorySize=32m -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom"
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:InitialRAMPercentage=10.0 -XX:MaxRAMPercentage=60.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:os+container=info -Xlog:gc*:stdout:time,level,tags -Djava.security.egd=file:/dev/./urandom"
 
 USER choons
 EXPOSE 8080
