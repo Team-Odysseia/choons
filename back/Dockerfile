@@ -8,10 +8,10 @@ COPY gradlew .
 COPY build.gradle settings.gradle ./
 
 RUN chmod +x ./gradlew
-RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon -q dependencies
+RUN --mount=type=cache,id=gradle-cache,target=/root/.gradle ./gradlew --no-daemon -q dependencies
 
 COPY src src
-RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon bootJar -x test
+RUN --mount=type=cache,id=gradle-cache,target=/root/.gradle ./gradlew --no-daemon bootJar -x test
 
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
