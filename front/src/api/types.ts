@@ -59,6 +59,11 @@ export interface PlaylistResponse {
   updatedAt: string
 }
 
+export interface FavoriteTrackResponse {
+  track: TrackResponse
+  favoritedAt: string
+}
+
 export interface AlbumRequestResponse {
   id: string
   albumName: string

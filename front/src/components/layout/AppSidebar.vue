@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDrawerStore } from '@/stores/drawer'
 import { useRoute, useRouter } from 'vue-router'
-import { Library, ListMusic, LogOut, PartyPopper, Search, Send, X } from 'lucide-vue-next'
+import { Heart, Library, ListMusic, LogOut, PartyPopper, Search, Send, X } from 'lucide-vue-next'
 import { listAllAlbumRequests } from '@/api/albumRequests'
 import { Input } from '@/components/ui/input'
 import BaseDialog from '@/components/ui/dialog/BaseDialog.vue'
@@ -176,6 +176,16 @@ onBeforeUnmount(() => {
             <Search :size="20" />
             Search
           </button>
+        </li>
+        <li>
+          <RouterLink
+            to="/favorites"
+            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
+            @click="drawer.closeSidebar()"
+          >
+            <Heart :size="20" />
+            Favorites
+          </RouterLink>
         </li>
         <li>
           <RouterLink

@@ -63,6 +63,7 @@ public class SecurityConfig {
                     .requestMatchers("/stream/**").authenticated()
                     .requestMatchers("/music/**").authenticated()
                     .requestMatchers("/playlists/**").authenticated()
+                    .requestMatchers("/favorites/**").authenticated()
                     .requestMatchers("/auth/**").authenticated()
                     .anyRequest().authenticated()
             );

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
+import { useFavoritesStore } from '@/stores/favorites'
 import { usePlayerStore } from '@/stores/player'
 import { usePartyStore } from '@/stores/party'
 import { useAuthStore } from '@/stores/auth'
@@ -12,6 +13,7 @@ import { toast } from 'vue-sonner'
 
 const route = useRoute()
 const playlists = usePlaylistsStore()
+const favorites = useFavoritesStore()
 const player = usePlayerStore()
 const party = usePartyStore()
 const auth = useAuthStore()
@@ -22,7 +24,16 @@ const isOwner = computed(
   () => !!auth.user && playlists.current?.ownerId === auth.user.id,
 )
 
-onMounted(() => playlists.fetchPlaylist(route.params.id as string))
+onMounted(() => {
+  void playlists.fetchPlaylist(route.params.id as string)
+})
+
+watch(
+  () => playlists.current?.tracks,
+  (tracks) => {
+    if (tracks?.length) void favorites.fetchStatus(tracks.map((t) => t.id))
+  },
+)
 
 async function removeTrack(trackId: string) {
   await playlists.removeTrack(playlists.current!.id, trackId)

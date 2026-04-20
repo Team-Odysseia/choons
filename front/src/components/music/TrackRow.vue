@@ -5,8 +5,9 @@ import { toast } from 'vue-sonner'
 import { usePlayerStore } from '@/stores/player'
 import { usePartyStore } from '@/stores/party'
 import type { TrackResponse } from '@/api/types'
-import { Play, Plus, ListPlus } from 'lucide-vue-next'
+import { Play, Plus, ListPlus, Heart } from 'lucide-vue-next'
 import AddToPlaylistDialog from './AddToPlaylistDialog.vue'
+import { useFavoritesStore } from '@/stores/favorites'
 
 const props = defineProps<{
   track: TrackResponse
@@ -18,6 +19,7 @@ const props = defineProps<{
 
 const player = usePlayerStore()
 const party = usePartyStore()
+const favorites = useFavoritesStore()
 const router = useRouter()
 const dialogOpen = ref(false)
 
@@ -80,6 +82,15 @@ const isActive = () => player.currentTrack?.id === props.track.id
         @click.stop="play"
       >
         <Play :size="16" />
+      </button>
+
+      <button
+        class="size-8 rounded-full flex items-center justify-center transition-colors"
+        :class="favorites.isFavorited(track.id) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+        :title="favorites.isFavorited(track.id) ? 'Remove from favorites' : 'Add to favorites'"
+        @click.stop="favorites.toggle(track.id)"
+      >
+        <Heart :size="16" :fill="favorites.isFavorited(track.id) ? 'currentColor' : 'none'" />
       </button>
 
       <button
