@@ -92,7 +92,7 @@ describe('usePlaylistsStore', () => {
 
       expect(mockSetPlaylistVisibility).toHaveBeenCalledWith('pl-1', true)
       expect(store.current?.isPublic).toBe(true)
-      expect(store.playlists[0].isPublic).toBe(true)
+      expect(store.playlists[0]!.isPublic).toBe(true)
     })
 
     it('can make a playlist private', async () => {
@@ -104,7 +104,7 @@ describe('usePlaylistsStore', () => {
       await store.setVisibility('pl-1', false)
 
       expect(store.current?.isPublic).toBe(false)
-      expect(store.playlists[0].isPublic).toBe(false)
+      expect(store.playlists[0]!.isPublic).toBe(false)
     })
   })
 })

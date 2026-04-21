@@ -16,8 +16,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import dev.odysseia.choons.service.JwtAuthenticationFilter;
 
 /**
  * Verifica que o RBAC está correto: quem pode acessar o quê.
@@ -31,6 +35,9 @@ class SecurityConfigTest {
     @Autowired UserRepository userRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired JwtService jwtService;
+
+    @Autowired(required = false)
+    private FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthFilterRegistration;
 
     private MockMvc mockMvc;
     private String adminToken;
@@ -211,5 +218,11 @@ class SecurityConfigTest {
                         .contentType("application/json")
                         .content("{\"name\":\"Artist\",\"bio\":\"\"}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void jwtAuthenticationFilter_isDisabledInServletChain() {
+        assertThat(jwtAuthFilterRegistration).isNotNull();
+        assertThat(jwtAuthFilterRegistration.isEnabled()).isFalse();
     }
 }

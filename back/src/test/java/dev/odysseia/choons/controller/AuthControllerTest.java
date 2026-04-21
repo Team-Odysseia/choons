@@ -66,7 +66,7 @@ class AuthControllerTest {
     // ─── POST /auth/login ─────────────────────────────────────────────────────
 
     @Test
-    void login_withValidCredentials_returns200AndToken() throws Exception {
+    void login_withValidCredentials_returns200AndDoesNotExposeTokenInBody() throws Exception {
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
@@ -74,7 +74,7 @@ class AuthControllerTest {
                                 "password", "adminpass"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isNotEmpty());
+                .andExpect(jsonPath("$.token").doesNotExist());
     }
 
     @Test

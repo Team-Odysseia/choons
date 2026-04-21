@@ -127,6 +127,7 @@ function goToSearch() {
             <img
               v-if="album.coverUrl"
               :src="albumImageUrl(album.id)"
+              :alt="album.title + ' cover'"
               class="w-full aspect-square rounded object-cover"
             />
             <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[36px]">
@@ -209,6 +210,7 @@ function goToSearch() {
           <img
             v-if="artist.avatarUrl"
             :src="artistImageUrl(artist.id)"
+            :alt="artist.name + ' avatar'"
             class="w-full aspect-square rounded-full object-cover mb-3"
           />
           <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[40px] font-extrabold text-muted-foreground mb-3">

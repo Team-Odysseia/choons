@@ -171,4 +171,20 @@ class RateLimitFilterTest {
                         .content(LOGIN_PAYLOAD))
                 .andExpect(status().isUnauthorized()); // 401, not 429
     }
+
+    @Test
+    void login_withoutXForwardedFor_usesRemoteAddr() throws Exception {
+        String ip = "10.0.5.1";
+        // Exhaust bucket using remoteAddr simulation (MockMvc uses localhost by default)
+        // This test verifies the filter does not require X-Forwarded-For to function
+        for (int i = 0; i < 3; i++) {
+            mockMvc.perform(post("/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(LOGIN_PAYLOAD));
+        }
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_PAYLOAD))
+                .andExpect(status().is(429));
+    }
 }

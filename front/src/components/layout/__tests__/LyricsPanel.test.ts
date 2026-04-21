@@ -64,8 +64,8 @@ describe('LyricsPanel', () => {
     const wrapper = mount(LyricsPanel)
     const paragraphs = wrapper.findAll('p')
     expect(paragraphs).toHaveLength(2)
-    expect(paragraphs[0].text()).toBe('First line')
-    expect(paragraphs[1].text()).toBe('Second line')
+    expect(paragraphs[0]!.text()).toBe('First line')
+    expect(paragraphs[1]!.text()).toBe('Second line')
   })
 
   it('seeks to line timestamp on click', async () => {
@@ -83,7 +83,7 @@ describe('LyricsPanel', () => {
 
     const { default: LyricsPanel } = await import('../LyricsPanel.vue')
     const wrapper = mount(LyricsPanel)
-    await wrapper.findAll('p')[1].trigger('click')
+    await wrapper.findAll('p')[1]!.trigger('click')
     expect(seekSpy).toHaveBeenCalledWith(7.5)
   })
 
@@ -103,8 +103,8 @@ describe('LyricsPanel', () => {
     const { default: LyricsPanel } = await import('../LyricsPanel.vue')
     const wrapper = mount(LyricsPanel)
     const paragraphs = wrapper.findAll('p')
-    expect(paragraphs[1].classes()).toContain('text-foreground')
-    expect(paragraphs[1].classes()).toContain('font-semibold')
-    expect(paragraphs[0].classes()).toContain('text-muted-foreground')
+    expect(paragraphs[1]!.classes()).toContain('text-foreground')
+    expect(paragraphs[1]!.classes()).toContain('font-semibold')
+    expect(paragraphs[0]!.classes()).toContain('text-muted-foreground')
   })
 })

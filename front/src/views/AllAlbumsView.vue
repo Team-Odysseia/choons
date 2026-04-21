@@ -51,6 +51,7 @@ function isNew(createdAt: string) {
           <img
             v-if="album.coverUrl"
             :src="albumImageUrl(album.id)"
+            :alt="album.title + ' cover'"
             class="w-full aspect-square rounded object-cover"
           />
           <div

@@ -1,3 +1,5 @@
 package dev.odysseia.choons.dto;
 
-public record UpdateListenerRequest(String username, String password) {}
+import jakarta.validation.constraints.NotBlank;
+
+public record UpdateListenerRequest(@NotBlank String username, String password) {}

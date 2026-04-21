@@ -36,6 +36,7 @@ const albumsRef = ref<HTMLElement | null>(null)
 const artistsRef = ref<HTMLElement | null>(null)
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
+let abortController: AbortController | null = null
 
 watch(
   () => route.query.q,
@@ -48,6 +49,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (searchDebounce) clearTimeout(searchDebounce)
+  if (abortController) abortController.abort()
 })
 
 const playlistsPreview = computed(() =>
@@ -112,20 +114,28 @@ async function runSearch(rawQuery: string) {
     return
   }
 
+  if (abortController) abortController.abort()
+  abortController = new AbortController()
+  const signal = abortController.signal
+
   loading.value = true
   try {
     const [publicPlaylists, trackResults, albumResults, artistResults] = await Promise.all([
-      getPublicPlaylists(),
-      searchTracks(query, { page: 0, size: 200 }),
-      searchAlbums(query, { page: 0, size: 200 }),
-      searchArtists(query, 0, 200),
+      getPublicPlaylists(signal),
+      searchTracks(query, { page: 0, size: 200, signal }),
+      searchAlbums(query, { page: 0, size: 200, signal }),
+      searchArtists(query, 0, 200, signal),
     ])
+
+    if (signal.aborted) return
 
     const q = query.toLowerCase()
     playlists.value = publicPlaylists.filter((pl) => pl.name.toLowerCase().includes(q))
     tracks.value = trackResults
     albums.value = albumResults
     artists.value = artistResults
+  } catch (e: any) {
+    if (e.name !== 'AbortError' && e.name !== 'CanceledError') throw e
   } finally {
     loading.value = false
   }
@@ -284,7 +294,7 @@ async function runSearch(rawQuery: string) {
           class="shrink-0 w-[180px] bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
           @click="router.push(`/library/albums/${album.id}`)"
         >
-          <img v-if="album.coverUrl" :src="albumImageUrl(album.id)" class="w-full aspect-square rounded object-cover mb-2" />
+          <img v-if="album.coverUrl" :src="albumImageUrl(album.id)" :alt="album.title + ' cover'" class="w-full aspect-square rounded object-cover mb-2" />
           <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[38px] mb-2">♪</div>
           <div class="text-sm font-semibold truncate">{{ album.title }}</div>
           <div class="text-xs text-muted-foreground truncate">{{ album.artist.name }}</div>
@@ -297,7 +307,7 @@ async function runSearch(rawQuery: string) {
           class="bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
           @click="router.push(`/library/albums/${album.id}`)"
         >
-          <img v-if="album.coverUrl" :src="albumImageUrl(album.id)" class="w-full aspect-square rounded object-cover mb-2" />
+          <img v-if="album.coverUrl" :src="albumImageUrl(album.id)" :alt="album.title + ' cover'" class="w-full aspect-square rounded object-cover mb-2" />
           <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[38px] mb-2">♪</div>
           <div class="text-sm font-semibold truncate">{{ album.title }}</div>
           <div class="text-xs text-muted-foreground truncate">{{ album.artist.name }}</div>
@@ -334,7 +344,7 @@ async function runSearch(rawQuery: string) {
           class="shrink-0 w-[170px] bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
           @click="router.push(`/library/artists/${artist.id}`)"
         >
-          <img v-if="artist.avatarUrl" :src="artistImageUrl(artist.id)" class="w-full aspect-square rounded-full object-cover mb-2" />
+          <img v-if="artist.avatarUrl" :src="artistImageUrl(artist.id)" :alt="artist.name + ' avatar'" class="w-full aspect-square rounded-full object-cover mb-2" />
           <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[36px] font-extrabold text-muted-foreground mb-2">
             {{ artist.name[0]?.toUpperCase() }}
           </div>
@@ -348,7 +358,7 @@ async function runSearch(rawQuery: string) {
           class="bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
           @click="router.push(`/library/artists/${artist.id}`)"
         >
-          <img v-if="artist.avatarUrl" :src="artistImageUrl(artist.id)" class="w-full aspect-square rounded-full object-cover mb-2" />
+          <img v-if="artist.avatarUrl" :src="artistImageUrl(artist.id)" :alt="artist.name + ' avatar'" class="w-full aspect-square rounded-full object-cover mb-2" />
           <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[36px] font-extrabold text-muted-foreground mb-2">
             {{ artist.name[0]?.toUpperCase() }}
           </div>

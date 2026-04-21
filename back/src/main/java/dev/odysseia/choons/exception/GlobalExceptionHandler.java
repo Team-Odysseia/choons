@@ -1,6 +1,8 @@
 package dev.odysseia.choons.exception;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -8,15 +10,19 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 import java.util.Map;
 import java.util.NoSuchElementException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+  private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
   @ExceptionHandler(NoSuchElementException.class)
   public ResponseEntity<Map<String, String>> handleNotFound(NoSuchElementException ex) {
@@ -73,8 +79,29 @@ public class GlobalExceptionHandler {
             .body(Map.of("error", message));
   }
 
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<Map<String, String>> handleConstraintViolation(ConstraintViolationException ex) {
+    String message = ex.getConstraintViolations().stream()
+            .findFirst()
+            .map(v -> v.getPropertyPath() + " " + v.getMessage())
+            .orElse("Validation failed");
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(Map.of("error", message));
+  }
+
+  @ExceptionHandler(AsyncRequestTimeoutException.class)
+  public ResponseEntity<Void> handleAsyncTimeout(AsyncRequestTimeoutException ex, HttpServletResponse response) {
+    logger.debug("Async request timed out");
+    if (response.isCommitted()) {
+      return null;
+    }
+    return ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).build();
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Map<String, String>> handleGeneric(Exception ex, HttpServletResponse response) {
+    logger.error("Unhandled exception occurred: {}", ex.getMessage(), ex);
+
     String contentType = response.getContentType();
     if (contentType != null
             && (contentType.startsWith("audio/") || contentType.startsWith(MediaType.TEXT_EVENT_STREAM_VALUE))) {

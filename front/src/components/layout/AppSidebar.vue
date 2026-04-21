@@ -63,8 +63,10 @@ async function refreshUnseenRequests() {
 }
 
 function startPolling() {
-  if (pollTimer) clearInterval(pollTimer)
+  stopPolling()
+  if (document.visibilityState === 'hidden') return
   pollTimer = setInterval(() => {
+    if (document.visibilityState === 'hidden') return
     void refreshUnseenRequests()
   }, 30000)
 }
@@ -73,6 +75,15 @@ function stopPolling() {
   if (!pollTimer) return
   clearInterval(pollTimer)
   pollTimer = null
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible' && auth.isAdmin) {
+    void refreshUnseenRequests()
+    startPolling()
+  } else {
+    stopPolling()
+  }
 }
 
 async function logout() {
@@ -106,6 +117,7 @@ onMounted(() => {
     }
     startPolling()
   }
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 watch(
@@ -135,6 +147,7 @@ watch(
 
 onBeforeUnmount(() => {
   stopPolling()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 

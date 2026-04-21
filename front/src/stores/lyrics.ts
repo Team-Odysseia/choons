@@ -24,6 +24,24 @@ export function parseLrc(lrc: string): ParsedLine[] {
   return result.sort((a, b) => a.timeMs - b.timeMs)
 }
 
+function binarySearchLineIndex(lines: ParsedLine[], ms: number): number {
+  let left = 0
+  let right = lines.length - 1
+  let result = -1
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2)
+    if (lines[mid]!.timeMs <= ms) {
+      result = mid
+      left = mid + 1
+    } else {
+      right = mid - 1
+    }
+  }
+
+  return result
+}
+
 export const useLyricsStore = defineStore('lyrics', () => {
   const player = usePlayerStore()
 
@@ -31,23 +49,21 @@ export const useLyricsStore = defineStore('lyrics', () => {
   const error = ref(false)
   const plainLyrics = ref<string | null>(null)
   const lines = ref<ParsedLine[]>([])
+  let abortController: AbortController | null = null
 
   const hasTimedLyrics = computed(() => lines.value.length > 0)
 
   const activeLineIndex = computed(() => {
     if (!hasTimedLyrics.value) return -1
     const ms = player.currentTime * 1000
-    let idx = -1
-    for (let i = 0; i < lines.value.length; i++) {
-      const line = lines.value[i]
-      if (!line) continue
-      if (line.timeMs <= ms) idx = i
-      else break
-    }
-    return idx
+    return binarySearchLineIndex(lines.value, ms)
   })
 
   async function fetchLyrics(track: TrackResponse) {
+    if (abortController) abortController.abort()
+    abortController = new AbortController()
+    const signal = abortController.signal
+
     loading.value = true
     error.value = false
     plainLyrics.value = null
@@ -55,17 +71,19 @@ export const useLyricsStore = defineStore('lyrics', () => {
     try {
       let data = null
       if (track.lrclibId != null) {
-        data = await fetchLyricsByLrclibId(track.lrclibId)
+        data = await fetchLyricsByLrclibId(track.lrclibId, signal)
       }
       if (!data) {
-        data = await searchLyrics(track.title, track.artist.name, track.album.title, track.durationSeconds)
+        data = await searchLyrics(track.title, track.artist.name, track.album.title, track.durationSeconds, signal)
       }
+      if (signal.aborted) return
       if (!data || data.instrumental) return
       if (data.syncedLyrics) {
         lines.value = parseLrc(data.syncedLyrics)
       }
       plainLyrics.value = data.plainLyrics
-    } catch {
+    } catch (e: any) {
+      if (e.name === 'AbortError') return
       error.value = true
     } finally {
       loading.value = false
@@ -78,6 +96,7 @@ export const useLyricsStore = defineStore('lyrics', () => {
       if (track && player.currentTrack) {
         fetchLyrics(player.currentTrack)
       } else {
+        if (abortController) abortController.abort()
         loading.value = false
         error.value = false
         plainLyrics.value = null

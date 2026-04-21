@@ -89,7 +89,7 @@ describe('file selection', () => {
     await input.trigger('change')
     const emitted = wrapper.emitted('select')
     expect(emitted).toBeTruthy()
-    expect(emitted![0][0]).toBe(file)
+    expect(emitted![0]![0]).toBe(file)
   })
 
   it('creates object URL for preview after file selected', async () => {
@@ -187,7 +187,7 @@ describe('drag and drop', () => {
       dataTransfer: { files: [file] },
     })
     expect(wrapper.emitted('select')).toBeTruthy()
-    expect(wrapper.emitted('select')![0][0]).toBe(file)
+    expect(wrapper.emitted('select')![0]![0]).toBe(file)
   })
 
   it('does not emit select when dropped file is not an image', async () => {

@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Service
 public class PartyEventsService {
 
-  private static final long SSE_TIMEOUT_MS = 0L;
+  private static final long SSE_TIMEOUT_MS = 300_000L;
   private final Map<String, CopyOnWriteArrayList<SseEmitter>> emittersByParty = new ConcurrentHashMap<>();
 
   public SseEmitter subscribe(String inviteCode) {

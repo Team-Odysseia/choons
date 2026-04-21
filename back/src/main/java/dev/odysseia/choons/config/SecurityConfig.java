@@ -86,11 +86,18 @@ public class SecurityConfig {
     return source;
   }
 
-  // Prevents Spring Boot from also registering RateLimitFilter in the main servlet chain.
-  // It only runs inside the Spring Security filter chain (added via addFilterBefore above).
+  // Prevents Spring Boot from also registering these filters in the main servlet chain.
+  // They only run inside the Spring Security filter chain (added via addFilterBefore above).
   @Bean
   public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration() {
     FilterRegistrationBean<RateLimitFilter> reg = new FilterRegistrationBean<>(rateLimitFilter);
+    reg.setEnabled(false);
+    return reg;
+  }
+
+  @Bean
+  public FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthenticationFilterRegistration() {
+    FilterRegistrationBean<JwtAuthenticationFilter> reg = new FilterRegistrationBean<>(jwtAuthenticationFilter);
     reg.setEnabled(false);
     return reg;
   }

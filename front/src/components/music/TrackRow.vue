@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { usePlayerStore } from '@/stores/player'
@@ -46,7 +46,7 @@ function formatDuration(secs: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-const isActive = () => player.currentTrack?.id === props.track.id
+const isActive = computed(() => player.currentTrack?.id === props.track.id)
 </script>
 
 <template>
@@ -59,7 +59,7 @@ const isActive = () => player.currentTrack?.id === props.track.id
       class="flex flex-col gap-0.5 min-w-0 cursor-pointer"
       @click.stop="play"
     >
-      <span class="text-sm font-medium truncate" :class="isActive() ? 'text-primary' : 'text-foreground'">{{ track.title }}</span>
+      <span class="text-sm font-medium truncate" :class="isActive ? 'text-primary' : 'text-foreground'">{{ track.title }}</span>
       <span class="text-xs text-muted-foreground truncate">{{ track.artist.name }}</span>
     </div>
 
@@ -96,7 +96,6 @@ const isActive = () => player.currentTrack?.id === props.track.id
       <button
         v-if="showAddToQueue"
         class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-        :disabled="party.inParty && !party.canControl"
         :title="party.inParty ? 'Add to party queue' : 'Add to queue'"
         @click.stop="addToQueue"
       >

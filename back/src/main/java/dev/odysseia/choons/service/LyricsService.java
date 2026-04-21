@@ -3,10 +3,8 @@ package dev.odysseia.choons.service;
 import dev.odysseia.choons.repository.TrackRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
@@ -22,13 +20,17 @@ public class LyricsService {
 
   private static final Logger log = LoggerFactory.getLogger(LyricsService.class);
 
-  @Autowired private TrackRepository trackRepository;
-  @Autowired private ObjectMapper objectMapper;
+  private final TrackRepository trackRepository;
+  private final ObjectMapper objectMapper;
 
   private final HttpClient httpClient = HttpClient.newHttpClient();
 
+  public LyricsService(TrackRepository trackRepository, ObjectMapper objectMapper) {
+    this.trackRepository = trackRepository;
+    this.objectMapper = objectMapper;
+  }
+
   @Async
-  @Transactional
   public void tryFetchAndSave(UUID trackId, String title, String artistName, String albumName, int durationSeconds) {
     try {
       String query = "track_name=" + URLEncoder.encode(title, StandardCharsets.UTF_8)
@@ -36,16 +38,10 @@ public class LyricsService {
               + "&album_name=" + URLEncoder.encode(albumName, StandardCharsets.UTF_8)
               + "&duration=" + durationSeconds;
 
-      HttpRequest request = HttpRequest.newBuilder()
-              .uri(URI.create("https://lrclib.net/api/get?" + query))
-              .GET()
-              .header("User-Agent", "Choons/1.0 (self-hosted music server)")
-              .build();
+      String body = fetchLrclibResponse(query);
 
-      HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-      if (response.statusCode() == 200) {
-        LrclibResponse result = objectMapper.readValue(response.body(), LrclibResponse.class);
+      if (body != null) {
+        LrclibResponse result = objectMapper.readValue(body, LrclibResponse.class);
         if (result.id() != null) {
           trackRepository.findById(trackId).ifPresent(track -> {
             track.setLrclibId(result.id());
@@ -57,6 +53,17 @@ public class LyricsService {
     } catch (Exception e) {
       log.warn("Could not auto-fetch lyrics for track '{}': {}", title, e.getMessage());
     }
+  }
+
+  String fetchLrclibResponse(String query) throws Exception {
+    HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://lrclib.net/api/get?" + query))
+            .GET()
+            .header("User-Agent", "Choons/1.0 (self-hosted music server)")
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    return response.statusCode() == 200 ? response.body() : null;
   }
 
   private record LrclibResponse(Integer id) {}

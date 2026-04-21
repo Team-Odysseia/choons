@@ -78,9 +78,9 @@ describe('AlbumRequestsView', () => {
     await flushPromises()
 
     const inputs = wrapper.findAll('input')
-    await inputs[0].setValue('Dummy')
-    await inputs[1].setValue('Portishead')
-    await inputs[2].setValue('https://open.spotify.com/album/abc')
+    await inputs[0]!.setValue('Dummy')
+    await inputs[1]!.setValue('Portishead')
+    await inputs[2]!.setValue('https://open.spotify.com/album/abc')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

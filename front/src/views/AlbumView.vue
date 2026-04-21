@@ -80,6 +80,7 @@ onBeforeUnmount(() => {
       <img
         v-if="album.coverUrl"
         :src="albumImageUrl(album.id)"
+        :alt="album.title + ' cover'"
         class="size-[120px] md:size-[160px] rounded-lg object-cover shrink-0"
       />
       <div
@@ -113,7 +114,7 @@ onBeforeUnmount(() => {
       </Button>
       <Button
         variant="outline"
-        :disabled="trackList.length === 0 || (party.inParty && !party.canControl)"
+        :disabled="trackList.length === 0"
         @click="addAllToQueue"
       >
         <ListPlus :size="16" />

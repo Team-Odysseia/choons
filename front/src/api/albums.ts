@@ -8,7 +8,7 @@ export const getAlbums = (artistId?: string) =>
 
 export const searchAlbums = (
   query: string,
-  opts?: { artistId?: string; page?: number; size?: number },
+  opts?: { artistId?: string; page?: number; size?: number; signal?: AbortSignal },
 ) =>
   client
     .get<AlbumResponse[]>('/music/albums', {
@@ -18,6 +18,7 @@ export const searchAlbums = (
         page: opts?.page ?? 0,
         size: opts?.size ?? 100,
       },
+      signal: opts?.signal,
     })
     .then((r) => r.data)
 

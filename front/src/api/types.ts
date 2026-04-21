@@ -8,10 +8,6 @@ export interface UserResponse {
   role: UserRole
 }
 
-export interface AuthResponse {
-  token: string
-}
-
 export interface ArtistResponse {
   id: string
   name: string

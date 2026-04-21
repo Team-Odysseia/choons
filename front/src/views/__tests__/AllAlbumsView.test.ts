@@ -79,6 +79,16 @@ describe('rendering', () => {
     expect(wrapper.text()).toContain('Great Album')
     expect(wrapper.text()).toContain('Test Artist')
   })
+
+  it('album cover image has alt text', async () => {
+    const album = { ...makeAlbum('al-1', 'Great Album', 5), coverUrl: '/cover.jpg' }
+    mockGetAlbums.mockResolvedValue([album])
+    const { wrapper } = mountView()
+    await flushPromises()
+    const img = wrapper.find('img')
+    expect(img.attributes('alt')).toBeDefined()
+    expect(img.attributes('alt')).not.toBe('')
+  })
 })
 
 // ─── NEW badge ────────────────────────────────────────────────────────────────

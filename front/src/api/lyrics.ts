@@ -11,8 +11,8 @@ export interface LrclibResponse {
 
 const BASE = 'https://lrclib.net/api'
 
-export async function fetchLyricsByLrclibId(lrclibId: number): Promise<LrclibResponse | null> {
-  const res = await fetch(`${BASE}/get/${lrclibId}`)
+export async function fetchLyricsByLrclibId(lrclibId: number, signal?: AbortSignal): Promise<LrclibResponse | null> {
+  const res = await fetch(`${BASE}/get/${lrclibId}`, { signal })
   if (!res.ok) return null
   return res.json()
 }
@@ -22,6 +22,7 @@ export async function searchLyrics(
   artistName: string,
   albumName: string,
   duration: number,
+  signal?: AbortSignal,
 ): Promise<LrclibResponse | null> {
   const params = new URLSearchParams({
     track_name: trackName,
@@ -29,7 +30,7 @@ export async function searchLyrics(
     album_name: albumName,
     duration: String(duration),
   })
-  const res = await fetch(`${BASE}/get?${params}`)
+  const res = await fetch(`${BASE}/get?${params}`, { signal })
   if (!res.ok) return null
   return res.json()
 }

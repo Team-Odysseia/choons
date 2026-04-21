@@ -21,7 +21,9 @@ app.use(VueQueryPlugin)
 const auth = useAuthStore()
 auth.fetchMe().finally(() => {
   if (auth.isAuthenticated) {
-    void usePartyStore().fetchMyParty()
+    const party = usePartyStore()
+    party.setCurrentUserId(auth.user!.id)
+    void party.fetchMyParty()
   }
   app.mount('#app')
 })

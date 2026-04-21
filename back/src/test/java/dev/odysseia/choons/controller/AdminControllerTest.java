@@ -198,7 +198,8 @@ class AdminControllerTest {
     @Test
     void createArtist_withAvatar_returnsAvatarUrl() throws Exception {
         MockMultipartFile img = new MockMultipartFile(
-                "avatarFile", "avatar.jpg", "image/jpeg", new byte[]{1, 2, 3});
+                "avatarFile", "avatar.jpg", "image/jpeg",
+                new byte[]{ (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00 });
 
         mockMvc.perform(multipart("/admin/artists")
                         .file(img)
@@ -226,7 +227,8 @@ class AdminControllerTest {
     @Test
     void createAlbum_withCover_returnsCoverUrl() throws Exception {
         MockMultipartFile img = new MockMultipartFile(
-                "coverFile", "cover.png", "image/png", new byte[]{1, 2, 3});
+                "coverFile", "cover.png", "image/png",
+                new byte[]{ (byte) 0x89, 0x50, 0x4E, 0x47 });
 
         mockMvc.perform(multipart("/admin/albums")
                         .file(img)
@@ -274,7 +276,8 @@ class AdminControllerTest {
     @Test
     void updateArtist_withAvatar_returnsAvatarUrl() throws Exception {
         MockMultipartFile img = new MockMultipartFile(
-                "avatarFile", "avatar.jpg", "image/jpeg", new byte[]{1, 2, 3});
+                "avatarFile", "avatar.jpg", "image/jpeg",
+                new byte[]{ (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00 });
 
         mockMvc.perform(multipart("/admin/artists/{id}", artist.getId())
                         .file(img)
@@ -322,7 +325,8 @@ class AdminControllerTest {
     @Test
     void updateAlbum_withCover_returnsCoverUrl() throws Exception {
         MockMultipartFile img = new MockMultipartFile(
-                "coverFile", "cover.png", "image/png", new byte[]{1, 2, 3});
+                "coverFile", "cover.png", "image/png",
+                new byte[]{ (byte) 0x89, 0x50, 0x4E, 0x47 });
 
         mockMvc.perform(multipart("/admin/albums/{id}", album.getId())
                         .file(img)

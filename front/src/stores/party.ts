@@ -21,8 +21,7 @@ import {
   setPartyMemberDj,
 } from '@/api/parties'
 import type { PartyQueuePolicy, PartyStateResponse, TrackResponse } from '@/api/types'
-import { useAuthStore } from './auth'
-import { usePlayerStore } from './player'
+import { emitter } from '@/lib/emitter'
 import { useDrawerStore } from './drawer'
 
 export const usePartyStore = defineStore('party', () => {
@@ -33,22 +32,31 @@ export const usePartyStore = defineStore('party', () => {
   const eventSource = ref<EventSource | null>(null)
   const reconnectTimer = ref<ReturnType<typeof setTimeout> | null>(null)
   const reconnectDelayMs = ref(1000)
+  const currentUserId = ref<string | null>(null)
 
   const POLL_INTERVAL_MS = 12000
   const RECONNECT_MAX_DELAY_MS = 15000
 
-  const auth = useAuthStore()
-
   const inParty = computed(() => !!state.value)
   const inviteCode = computed(() => state.value?.inviteCode ?? null)
-  const isHost = computed(() => !!state.value && auth.user?.id === state.value.hostUserId)
+  const isHost = computed(() => !!state.value && currentUserId.value === state.value.hostUserId)
   const canControl = computed(() => {
-    if (!state.value || !auth.user) return false
-    const member = state.value.members.find((m) => m.userId === auth.user!.id)
+    if (!state.value || !currentUserId.value) return false
+    const member = state.value.members.find((m) => m.userId === currentUserId.value)
     if (!member || !member.connected) return false
     if (member.host) return true
     if (state.value.queuePolicy === 'EVERYONE') return true
     return member.dj
+  })
+
+  emitter.on('auth:login', (payload) => {
+    setCurrentUserId(payload.userId)
+    void fetchMyParty()
+  })
+
+  emitter.on('auth:logout', () => {
+    setCurrentUserId(null)
+    stopPolling()
   })
 
   function applyState(next: PartyStateResponse | null) {
@@ -62,27 +70,25 @@ export const usePartyStore = defineStore('party', () => {
       if (drawer.activePanel === 'party') {
         drawer.close()
       }
-      usePlayerStore().stop()
+      emitter.emit('party:left')
+      emitter.emit('party:stateChanged', null)
       return
     }
 
-    syncPlayerFromState()
-  }
-
-  function syncPlayerFromState() {
-    const player = usePlayerStore()
-    const party = state.value
-    if (!party) return
-
-    const queueTracks = party.queue.map((item) => item.track)
-    const playbackTrack = party.playback.track
-    const now = Date.now()
-    const elapsedSec = Math.max(0, (now - party.playback.anchorEpochMs) / 1000)
-    const position = party.playback.playing
-      ? party.playback.anchorPositionSec + elapsedSec
-      : party.playback.anchorPositionSec
-
-    player.syncExternalState(playbackTrack, queueTracks, party.playback.playing, position)
+    if (next) {
+      if (!wasInParty) {
+        emitter.emit('party:joined', {
+          next: async () => {
+            if (canControl.value) {
+              await partyNext(state.value!.inviteCode)
+              return true
+            }
+            return false
+          },
+        })
+      }
+      emitter.emit('party:stateChanged', next)
+    }
   }
 
   async function fetchMyParty() {
@@ -312,9 +318,14 @@ export const usePartyStore = defineStore('party', () => {
     stopRealtime()
   }
 
+  function setCurrentUserId(userId: string | null) {
+    currentUserId.value = userId
+  }
+
   return {
     state,
     loading,
+    currentUserId,
     inParty,
     inviteCode,
     isHost,
@@ -337,5 +348,6 @@ export const usePartyStore = defineStore('party', () => {
     next,
     prev,
     stopPolling,
+    setCurrentUserId,
   }
 })

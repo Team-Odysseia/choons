@@ -1,8 +1,14 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ open: boolean; title: string; maxWidthClass?: string }>(), {
+import { ref } from 'vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
+
+const props = withDefaults(defineProps<{ open: boolean; title: string; maxWidthClass?: string }>(), {
   maxWidthClass: 'max-w-md',
 })
 defineEmits<{ close: [] }>()
+
+const dialogRef = ref<HTMLElement | null>(null)
+useFocusTrap(dialogRef, () => props.open)
 </script>
 
 <template>
@@ -18,11 +24,13 @@ defineEmits<{ close: [] }>()
       <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="absolute inset-0 bg-black/60" @click="$emit('close')" />
         <div
+          ref="dialogRef"
           class="relative bg-card border border-border rounded-xl shadow-2xl w-full mx-4 z-10 overflow-hidden"
           :class="maxWidthClass"
           role="dialog"
           aria-modal="true"
           :aria-label="title"
+          tabindex="-1"
         >
           <div class="flex items-center justify-between px-5 pt-5 pb-3">
             <h2 class="text-base font-bold">{{ title }}</h2>

@@ -192,6 +192,7 @@ function onTogglePlay() {
         <input
           data-testid="progress-range"
           type="range"
+          aria-label="Progress"
           class="flex-1 range-input"
           min="0"
           max="100"
@@ -268,19 +269,20 @@ function onTogglePlay() {
 
         <div class="flex items-center gap-2 w-full max-w-[340px]">
           <span class="text-[11px] text-dimmed min-w-[32px] text-center">{{ formatTime(player.currentTime) }}</span>
-          <input
-            data-testid="progress-range"
-            type="range"
-            class="flex-1 range-input"
-            min="0"
-            max="100"
-            :disabled="party.inParty && !party.canControl"
-            :value="progressPercent"
-            @input="onSeek"
-          />
-          <span class="text-[11px] text-dimmed min-w-[32px] text-center">{{ formatTime(player.duration) }}</span>
-        </div>
+        <input
+          data-testid="progress-range"
+          type="range"
+          aria-label="Progress"
+          class="flex-1 range-input"
+          min="0"
+          max="100"
+          :disabled="party.inParty && !party.canControl"
+          :value="progressPercent"
+          @input="onSeek"
+        />
+        <span class="text-[11px] text-dimmed min-w-[32px] text-center">{{ formatTime(player.duration) }}</span>
       </div>
+    </div>
 
       <div
         class="flex items-center gap-2 justify-end"
@@ -316,6 +318,7 @@ function onTogglePlay() {
         <input
           data-testid="volume-range"
           type="range"
+          aria-label="Volume"
           class="w-[90px] range-input"
           min="0"
           max="1"

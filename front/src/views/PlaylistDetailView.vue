@@ -111,7 +111,7 @@ function addAllToQueue() {
       </Button>
       <Button
         variant="outline"
-        :disabled="playlists.current.tracks.length === 0 || (party.inParty && !party.canControl)"
+        :disabled="playlists.current.tracks.length === 0"
         @click="addAllToQueue"
       >
         <ListPlus :size="16" />

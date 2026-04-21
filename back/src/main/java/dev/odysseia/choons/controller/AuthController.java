@@ -1,6 +1,5 @@
 package dev.odysseia.choons.controller;
 
-import dev.odysseia.choons.dto.AuthResponse;
 import dev.odysseia.choons.dto.LoginRequest;
 import dev.odysseia.choons.dto.UserResponse;
 import dev.odysseia.choons.model.user.User;
@@ -48,7 +47,7 @@ public class AuthController {
   private boolean authCookieSecure;
 
   @PostMapping("/login")
-  public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+  public ResponseEntity<Void> login(@Valid @RequestBody LoginRequest request) {
     authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.username(), request.password())
     );
@@ -57,7 +56,7 @@ public class AuthController {
     ResponseCookie cookie = authCookie(token, AUTH_COOKIE_MAX_AGE_SECONDS);
     return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, cookie.toString())
-            .body(new AuthResponse(token));
+            .build();
   }
 
   @PostMapping("/logout")

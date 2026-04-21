@@ -4,9 +4,11 @@ import dev.odysseia.choons.dto.FavoriteTrackResponse;
 import dev.odysseia.choons.dto.TrackResponse;
 import dev.odysseia.choons.model.user.User;
 import dev.odysseia.choons.service.FavoriteService;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,6 +16,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/favorites")
+@Validated
 public class FavoriteController {
 
     private final FavoriteService favoriteService;
@@ -41,7 +44,7 @@ public class FavoriteController {
     }
 
     @GetMapping("/check")
-    public ResponseEntity<List<UUID>> check(@RequestParam List<UUID> trackIds,
+    public ResponseEntity<List<UUID>> check(@RequestParam @Size(max = 500) List<UUID> trackIds,
                                             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(favoriteService.checkFavorited(trackIds, user));
     }

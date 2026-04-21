@@ -16,7 +16,7 @@ import dev.odysseia.choons.service.AlbumRequestService;
 import dev.odysseia.choons.service.AlbumService;
 import dev.odysseia.choons.service.ArtistService;
 import dev.odysseia.choons.service.TrackService;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,12 +35,23 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-  @Autowired private ArtistService artistService;
-  @Autowired private AlbumService albumService;
-  @Autowired private TrackService trackService;
-  @Autowired private AlbumRequestService albumRequestService;
-  @Autowired private UserRepository userRepository;
-  @Autowired private PasswordEncoder passwordEncoder;
+  private final ArtistService artistService;
+  private final AlbumService albumService;
+  private final TrackService trackService;
+  private final AlbumRequestService albumRequestService;
+  private final UserRepository userRepository;
+  private final PasswordEncoder passwordEncoder;
+
+  public AdminController(ArtistService artistService, AlbumService albumService,
+                         TrackService trackService, AlbumRequestService albumRequestService,
+                         UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    this.artistService = artistService;
+    this.albumService = albumService;
+    this.trackService = trackService;
+    this.albumRequestService = albumRequestService;
+    this.userRepository = userRepository;
+    this.passwordEncoder = passwordEncoder;
+  }
 
   @GetMapping("/listeners")
   public ResponseEntity<List<AdminListenerResponse>> listListeners(@RequestParam(required = false) String query) {
@@ -56,7 +67,7 @@ public class AdminController {
   @PutMapping("/listeners/{id}")
   public ResponseEntity<AdminListenerResponse> updateListener(
           @PathVariable UUID id,
-          @RequestBody UpdateListenerRequest request) {
+          @Valid @RequestBody UpdateListenerRequest request) {
     User listener = userRepository.findById(id)
             .filter(u -> u.getRole() == UserRole.LISTENER)
             .orElseThrow(() -> new NoSuchElementException("Listener not found: " + id));
@@ -94,7 +105,7 @@ public class AdminController {
   @PutMapping("/listeners/{id}/request-ban")
   public ResponseEntity<ListenerRequestBanResponse> setRequestBan(
           @PathVariable UUID id,
-          @RequestBody UpdateRequestBanRequest request) {
+          @Valid @RequestBody UpdateRequestBanRequest request) {
     return ResponseEntity.ok(albumRequestService.setRequestBan(id, request));
   }
 
@@ -188,7 +199,7 @@ public class AdminController {
   @PutMapping("/albums/{albumId}/tracks")
   public ResponseEntity<List<TrackResponse>> updateAlbumTracks(
           @PathVariable UUID albumId,
-          @RequestBody List<UpdateTrackRequest> tracks) {
+          @Valid @RequestBody List<UpdateTrackRequest> tracks) {
     return ResponseEntity.ok(trackService.updateAll(albumId, tracks));
   }
 
@@ -228,14 +239,14 @@ public class AdminController {
   @PutMapping("/tracks/{id}")
   public ResponseEntity<TrackResponse> updateTrack(
           @PathVariable UUID id,
-          @RequestBody UpdateTrackRequest request) {
+          @Valid @RequestBody UpdateTrackRequest request) {
     return ResponseEntity.ok(trackService.update(id, request.title(), request.trackNumber()));
   }
 
   @PutMapping("/tracks/{id}/lrclib-id")
   public ResponseEntity<TrackResponse> updateTrackLrclibId(
           @PathVariable UUID id,
-          @RequestBody UpdateLrclibIdRequest request) {
+          @Valid @RequestBody UpdateLrclibIdRequest request) {
     return ResponseEntity.ok(trackService.updateLrclibId(id, request.lrclibId()));
   }
 

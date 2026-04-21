@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as apiLogin, logout as apiLogout, me as apiMe } from '@/api/auth'
-import { usePlayerStore } from '@/stores/player'
-import { usePartyStore } from '@/stores/party'
+import { emitter } from '@/lib/emitter'
 import type { UserResponse } from '@/api/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -15,12 +14,11 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(username: string, password: string) {
     loading.value = true
     try {
-      const data = await apiLogin(username, password)
-      if (!data.token) {
-        throw new Error('Missing auth token in login response')
-      }
+      await apiLogin(username, password)
       await fetchMe()
-      await usePartyStore().fetchMyParty()
+      if (user.value) {
+        emitter.emit('auth:login', { userId: user.value.id })
+      }
     } finally {
       loading.value = false
     }
@@ -40,8 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // ignore logout API failures; still clear client state
     }
-    usePartyStore().stopPolling()
-    usePlayerStore().stop()
+    emitter.emit('auth:logout')
     user.value = null
   }
 
