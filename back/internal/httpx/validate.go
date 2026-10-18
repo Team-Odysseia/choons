@@ -3,6 +3,7 @@ package httpx
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -106,6 +107,10 @@ func fieldMessage(fe validator.FieldError) string {
 }
 
 func ValidationError(err error) error {
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		return apperr.New(http.StatusRequestEntityTooLarge, "Request body too large")
+	}
 	var ve validator.ValidationErrors
 	if errors.As(err, &ve) && len(ve) > 0 {
 		fe := ve[0]

@@ -89,7 +89,7 @@ func (h *Handler) queueTrack(c *gin.Context) {
 
 func (h *Handler) queueTracks(c *gin.Context) {
 	var req struct {
-		TrackIDs []uuid.UUID `json:"trackIds" binding:"required,notempty"`
+		TrackIDs []uuid.UUID `json:"trackIds" binding:"required,notempty,max=2000"`
 	}
 	if !httpx.BindJSON(c, &req) {
 		return
@@ -109,7 +109,7 @@ func (h *Handler) removeQueueItem(c *gin.Context) {
 
 func (h *Handler) reorderQueue(c *gin.Context) {
 	var req struct {
-		OrderedItemIDs []uuid.UUID `json:"orderedItemIds" binding:"required"`
+		OrderedItemIDs []uuid.UUID `json:"orderedItemIds" binding:"required,max=2000"`
 	}
 	if !httpx.BindJSON(c, &req) {
 		return

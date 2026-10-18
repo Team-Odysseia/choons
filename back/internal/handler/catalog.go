@@ -309,7 +309,11 @@ func (h *Handler) updateAlbumTracks(c *gin.Context) {
 	}
 	var updates []service.TrackUpdate
 	if err := json.NewDecoder(c.Request.Body).Decode(&updates); err != nil {
-		httpx.Fail(c, apperr.BadRequest("Malformed request body"))
+		httpx.Fail(c, httpx.ValidationError(err))
+		return
+	}
+	if len(updates) > maxBatchItems {
+		httpx.Fail(c, apperr.BadRequest("At most %d tracks can be updated at once", maxBatchItems))
 		return
 	}
 	for i := range updates {
