@@ -53,6 +53,9 @@ func (s *Users) Authenticate(ctx context.Context, username, password string) (*m
 
 func (s *Users) Register(ctx context.Context, username, password string, role model.Role) (dto.User, error) {
 	username = strings.TrimSpace(username)
+	if err := auth.ValidatePassword(password); err != nil {
+		return dto.User{}, err
+	}
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		return dto.User{}, err
@@ -118,6 +121,11 @@ func (s *Users) UpdateListener(ctx context.Context, id uuid.UUID, username, pass
 	username = strings.TrimSpace(username)
 	if username == "" {
 		return dto.Listener{}, apperr.BadRequest("Username is required")
+	}
+	if strings.TrimSpace(password) != "" {
+		if err := auth.ValidatePassword(password); err != nil {
+			return dto.Listener{}, err
+		}
 	}
 	var out *model.User
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

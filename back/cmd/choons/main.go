@@ -102,8 +102,8 @@ func openDB(ctx context.Context) (*service.Users, error) {
 }
 
 func createAdmin(ctx context.Context, username, password string) error {
-	if len(password) < 6 {
-		return errors.New("password must be at least 6 characters")
+	if err := auth.ValidatePassword(password); err != nil {
+		return err
 	}
 	users, err := openDB(ctx)
 	if err != nil {
