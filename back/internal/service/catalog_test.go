@@ -506,6 +506,22 @@ func TestUpdateAlbumTracksValidatesOwnershipAtomically(t *testing.T) {
 	if err != nil || out[0].Title != "renamed" || out[0].TrackNumber != 5 {
 		t.Fatalf("%+v %v", out, err)
 	}
+
+	missing := uuid.New()
+	_, err = e.catalog.UpdateAlbumTracks(e.ctx, al1.ID, []TrackUpdate{{ID: &missing, Title: "x"}})
+	wantAppErr(t, err, 404, "Track not found: "+missing.String())
+
+	t3 := e.track(t, al1, "t3", 2)
+	out, err = e.catalog.UpdateAlbumTracks(e.ctx, al1.ID, []TrackUpdate{
+		{ID: &t3.ID, Title: "first", TrackNumber: 1},
+		{ID: &t1.ID, Title: "second", TrackNumber: 2},
+	})
+	if err != nil || len(out) != 2 || out[0].ID != t3.ID || out[0].Title != "first" || out[1].ID != t1.ID || out[1].TrackNumber != 2 || out[1].Album.Artist.Name != "A" {
+		t.Fatalf("batch update keeps input order and loads relations: %+v %v", out, err)
+	}
+	if out, err := e.catalog.UpdateAlbumTracks(e.ctx, al1.ID, nil); err != nil || out == nil || len(out) != 0 {
+		t.Fatalf("empty update: %v %v", out, err)
+	}
 }
 
 func TestUpdateTrackAndLrclib(t *testing.T) {

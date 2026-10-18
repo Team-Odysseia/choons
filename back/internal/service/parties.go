@@ -503,14 +503,15 @@ func (s *Parties) AddTracks(ctx context.Context, user *model.User, code string, 
 		if err != nil {
 			return err
 		}
+		if err := requireTracks(tx, trackIDs); err != nil {
+			return err
+		}
+		added := make([]model.PartyQueueItem, len(trackIDs))
 		for i, id := range trackIDs {
-			if _, err := first[model.Track](tx.Select("id"), "Track", id); err != nil {
-				return err
-			}
-			item := model.PartyQueueItem{PartyID: p.ID, TrackID: id, AddedByUserID: user.ID, Position: len(items) + i}
-			if err := tx.Omit("Track", "AddedBy").Create(&item).Error; err != nil {
-				return err
-			}
+			added[i] = model.PartyQueueItem{PartyID: p.ID, TrackID: id, AddedByUserID: user.ID, Position: len(items) + i}
+		}
+		if err := tx.Omit("Track", "AddedBy").Create(&added).Error; err != nil {
+			return err
 		}
 		if len(items) > 0 {
 			return nil

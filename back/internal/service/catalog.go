@@ -437,13 +437,9 @@ func (s *Catalog) MostPlayed(ctx context.Context, limit int) ([]dto.Track, error
 	for i, r := range ranked {
 		ids[i] = r.TrackID
 	}
-	var tracks []model.Track
-	if err := tracksQuery(s.db.WithContext(ctx)).Where("id IN ?", ids).Find(&tracks).Error; err != nil {
+	byID, err := s.tracksByID(ctx, ids)
+	if err != nil {
 		return nil, err
-	}
-	byID := make(map[uuid.UUID]*model.Track, len(tracks))
-	for i := range tracks {
-		byID[tracks[i].ID] = &tracks[i]
 	}
 	out := make([]dto.Track, 0, len(ids))
 	for _, id := range ids {
@@ -581,33 +577,94 @@ func (s *Catalog) UpdateTrack(ctx context.Context, id uuid.UUID, title string, t
 }
 
 func (s *Catalog) UpdateAlbumTracks(ctx context.Context, albumID uuid.UUID, updates []TrackUpdate) ([]dto.Track, error) {
+	if len(updates) == 0 {
+		return []dto.Track{}, nil
+	}
+	latest := make(map[uuid.UUID]TrackUpdate, len(updates))
+	ids := make([]uuid.UUID, 0, len(updates))
+	for _, u := range updates {
+		if _, seen := latest[*u.ID]; !seen {
+			ids = append(ids, *u.ID)
+		}
+		latest[*u.ID] = u
+	}
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var owners []struct {
+			ID      uuid.UUID
+			AlbumID uuid.UUID
+		}
+		if err := tx.Model(&model.Track{}).Select("id", "album_id").Where("id IN ?", ids).Scan(&owners).Error; err != nil {
+			return err
+		}
+		albumOf := make(map[uuid.UUID]uuid.UUID, len(owners))
+		for _, o := range owners {
+			albumOf[o.ID] = o.AlbumID
+		}
 		for _, u := range updates {
-			t, err := first[model.Track](tx, "Track", *u.ID)
-			if err != nil {
-				return err
+			owner, ok := albumOf[*u.ID]
+			if !ok {
+				return notFound("Track", *u.ID)
 			}
-			if t.AlbumID != albumID {
+			if owner != albumID {
 				return apperr.BadRequest("Track %s does not belong to album %s", *u.ID, albumID)
 			}
-			if err := tx.Model(t).Updates(map[string]any{"title": u.Title, "track_number": u.TrackNumber}).Error; err != nil {
-				return err
-			}
 		}
-		return nil
+		rows := make([]string, len(ids))
+		args := make([]any, 0, len(ids)*3)
+		for i, id := range ids {
+			rows[i] = "(?::uuid, ?, ?::int)"
+			args = append(args, id, latest[id].Title, latest[id].TrackNumber)
+		}
+		return tx.Exec(`UPDATE tracks AS t SET title = v.title, track_number = v.num
+			FROM (VALUES `+strings.Join(rows, ", ")+`) AS v(id, title, num)
+			WHERE t.id = v.id`, args...).Error
 	})
+	if err != nil {
+		return nil, err
+	}
+	tracks, err := s.tracksByID(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]dto.Track, 0, len(updates))
 	for _, u := range updates {
-		t, err := s.GetTrack(ctx, *u.ID)
-		if err != nil {
-			return nil, err
+		if t, ok := tracks[*u.ID]; ok {
+			out = append(out, dto.FromTrack(t))
 		}
-		out = append(out, t)
 	}
 	return out, nil
+}
+
+func (s *Catalog) tracksByID(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*model.Track, error) {
+	var tracks []model.Track
+	if err := tracksQuery(s.db.WithContext(ctx)).Where("tracks.id IN ?", ids).Find(&tracks).Error; err != nil {
+		return nil, err
+	}
+	byID := make(map[uuid.UUID]*model.Track, len(tracks))
+	for i := range tracks {
+		byID[tracks[i].ID] = &tracks[i]
+	}
+	return byID, nil
+}
+
+func requireTracks(tx *gorm.DB, ids []uuid.UUID) error {
+	var found []uuid.UUID
+	if err := tx.Model(&model.Track{}).Where("id IN ?", ids).Pluck("id", &found).Error; err != nil {
+		return err
+	}
+	if len(found) == len(ids) {
+		return nil
+	}
+	exists := make(map[uuid.UUID]bool, len(found))
+	for _, id := range found {
+		exists[id] = true
+	}
+	for _, id := range ids {
+		if !exists[id] {
+			return notFound("Track", id)
+		}
+	}
+	return nil
 }
 
 func (s *Catalog) UpdateLrclibID(ctx context.Context, id uuid.UUID, lrclibID *int) (dto.Track, error) {
