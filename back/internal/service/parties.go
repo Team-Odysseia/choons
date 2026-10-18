@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	inviteAlphabet  = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	inviteLength    = 8
-	partyIdleWindow = 5 * time.Minute
+	inviteAlphabet     = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	inviteLength       = 8
+	partyIdleWindow    = 5 * time.Minute
+	unknownDurationCap = 2 * time.Hour
 )
 
 type PartyPublisher interface {
@@ -674,7 +675,8 @@ func (s *Parties) CloseIdle(ctx context.Context) (int, error) {
 	if err := s.db.WithContext(ctx).Where("status = ?", model.PartyActive).Find(&parties).Error; err != nil {
 		return 0, err
 	}
-	cutoff := s.now().Add(-partyIdleWindow).UnixMilli()
+	nowMs := s.nowMs()
+	cutoff := nowMs - partyIdleWindow.Milliseconds()
 	closed := 0
 	for i := range parties {
 		code := parties[i].InviteCode
@@ -690,7 +692,12 @@ func (s *Parties) CloseIdle(ctx context.Context) (int, error) {
 			case errors.Is(err, gorm.ErrRecordNotFound):
 			case err != nil:
 				return err
-			case st.Playing || st.AnchorEpochMs > cutoff:
+			case st.Playing:
+				end, err := s.playbackEndMs(tx, &st)
+				if err != nil || end > cutoff {
+					return err
+				}
+			case st.AnchorEpochMs > cutoff:
 				return nil
 			}
 			didClose = true
@@ -704,6 +711,20 @@ func (s *Parties) CloseIdle(ctx context.Context) (int, error) {
 		}
 	}
 	return closed, nil
+}
+
+func (s *Parties) playbackEndMs(tx *gorm.DB, st *model.PartyPlaybackState) (int64, error) {
+	remaining := unknownDurationCap.Seconds()
+	if st.TrackID != nil {
+		var duration int
+		if err := tx.Model(&model.Track{}).Where("id = ?", *st.TrackID).Pluck("duration_seconds", &duration).Error; err != nil {
+			return 0, err
+		}
+		if duration > 0 {
+			remaining = max(float64(duration)-st.AnchorPositionSec, 0)
+		}
+	}
+	return st.AnchorEpochMs + int64(remaining*1000), nil
 }
 
 func (s *Parties) RunCleanup(ctx context.Context, every time.Duration) {

@@ -473,3 +473,40 @@ func TestGenerateInviteCode(t *testing.T) {
 		t.Fatalf("codes not random enough: %d unique", len(seen))
 	}
 }
+
+func TestCloseIdleClosesAbandonedPlayingParty(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyEveryone).InviteCode
+	pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{pe.tracks[0].ID})
+	pe.parties.Seek(pe.ctx, pe.host, code, 40)
+
+	pe.clock = pe.clock.Add(60*time.Second + partyIdleWindow - time.Second)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 0 {
+		t.Fatal("party closed before track end + idle window")
+	}
+	pe.clock = pe.clock.Add(2 * time.Second)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 1 {
+		t.Fatal("playing party whose track ended long ago must close")
+	}
+
+	unknown := untimedTrack(t, pe, 0)
+	code = pe.create(t, model.PolicyEveryone).InviteCode
+	pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{unknown.ID})
+	pe.clock = pe.clock.Add(time.Hour)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 0 {
+		t.Fatal("unknown-duration track must get the fallback cap")
+	}
+	pe.clock = pe.clock.Add(time.Hour + partyIdleWindow + time.Second)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 1 {
+		t.Fatal("unknown-duration party must close after fallback cap")
+	}
+}
+
+func untimedTrack(t *testing.T, pe *partyEnv, duration int) *model.Track {
+	t.Helper()
+	tr := pe.track(t, &model.Album{Base: model.Base{ID: pe.tracks[0].AlbumID}, ArtistID: pe.tracks[0].ArtistID}, "untimed", 9)
+	if err := pe.db.Model(tr).Update("duration_seconds", duration).Error; err != nil {
+		t.Fatal(err)
+	}
+	return tr
+}
