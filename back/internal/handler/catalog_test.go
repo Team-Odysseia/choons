@@ -198,6 +198,15 @@ func TestBatchUpload(t *testing.T) {
 		field("titles", "One"), field("durations", "1"), field("durations", "2"),
 		filePart("files", "audio/mpeg", mp3),
 	).errorIs(400, "Mismatched batch upload lists: files=1 titles=1 durations=2")
+	admin.multipart(http.MethodPost, "/admin/tracks/batch",
+		field("albumId", ids.album), field("artistId", ids.artist),
+		field("titles", "One"), field("durations", "long"),
+		filePart("files", "audio/mpeg", mp3),
+	).errorIs(400, "durations must be numbers")
+	admin.raw(http.MethodPost, "/admin/tracks/batch", "multipart/form-data; boundary=x", strings.NewReader("garbage")).
+		errorIs(400, "Malformed multipart request")
+	admin.raw(http.MethodPut, "/admin/albums/"+ids.album+"/tracks", "application/json", strings.NewReader("{")).
+		errorIs(400, "Malformed request body")
 }
 
 func TestAdminListenersAndRequests(t *testing.T) {
