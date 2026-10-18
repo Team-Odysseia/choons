@@ -70,6 +70,31 @@ func requireDeferredPlaylistPosition(t *testing.T, gdb *gorm.DB) {
 	}
 }
 
+func requireIndexes(t *testing.T, gdb *gorm.DB) {
+	t.Helper()
+	want := []struct{ table, cols string }{
+		{"party_queue_items", "track_id"},
+		{"party_queue_items", "added_by_user_id"},
+		{"party_playback_state", "track_id"},
+		{"parties", "host_user_id"},
+		{"tracks", "created_at,id"},
+	}
+	for _, w := range want {
+		var n int64
+		err := gdb.Raw(`SELECT count(*) FROM pg_index x
+			WHERE x.indrelid = ?::regclass
+			  AND (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+			       FROM unnest(x.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
+			       JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum) = ?`, w.table, w.cols).Scan(&n).Error
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == 0 {
+			t.Errorf("missing index on %s(%s)", w.table, w.cols)
+		}
+	}
+}
+
 func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 	fresh := pgtest.NewDB(t)
 
@@ -110,6 +135,8 @@ func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 	}
 	requireDeferredPlaylistPosition(t, fresh)
 	requireDeferredPlaylistPosition(t, legacy)
+	requireIndexes(t, fresh)
+	requireIndexes(t, legacy)
 }
 
 //go:embed testdata/prod_schema.sql
@@ -142,6 +169,7 @@ func TestMigrateProductionSchema(t *testing.T) {
 		t.Errorf("cascading FKs = %d, want 19", n)
 	}
 	requireDeferredPlaylistPosition(t, gdb)
+	requireIndexes(t, gdb)
 
 	user, artist, album, track, playlist := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	must := func(sql string, args ...any) {
