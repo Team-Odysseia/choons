@@ -147,6 +147,7 @@ type Party struct {
 	HostUserID  uuid.UUID `gorm:"type:uuid"`
 	QueuePolicy QueuePolicy
 	Status      PartyStatus
+	Revision    int64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

@@ -26,12 +26,13 @@ type Subscriber struct {
 }
 
 type Hub struct {
-	mu   sync.Mutex
-	subs map[string]map[*Subscriber]struct{}
+	mu       sync.Mutex
+	subs     map[string]map[*Subscriber]struct{}
+	revision map[string]int64
 }
 
 func NewHub() *Hub {
-	return &Hub{subs: map[string]map[*Subscriber]struct{}{}}
+	return &Hub{subs: map[string]map[*Subscriber]struct{}{}, revision: map[string]int64{}}
 }
 
 func normalize(code string) string { return strings.ToUpper(code) }
@@ -71,10 +72,8 @@ func (h *Hub) removeLocked(s *Subscriber) {
 
 var endedEvent = Event{Name: "ended", Data: []byte("{}")}
 
-func (h *Hub) broadcast(code string, ev Event) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for s := range h.subs[normalize(code)] {
+func (h *Hub) broadcastLocked(code string, ev Event) {
+	for s := range h.subs[code] {
 		h.sendLocked(s, ev)
 	}
 }
@@ -94,14 +93,23 @@ func (h *Hub) PublishState(code string, state dto.PartyState) {
 		slog.Error("marshal party state", "err", err)
 		return
 	}
-	h.broadcast(code, Event{Name: "state", Data: data})
+	code = normalize(code)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if last, ok := h.revision[code]; ok && state.Revision <= last {
+		return
+	}
+	h.revision[code] = state.Revision
+	h.broadcastLocked(code, Event{Name: "state", Data: data})
 }
 
 func (h *Hub) PublishEnded(code string) {
-	h.broadcast(code, endedEvent)
+	code = normalize(code)
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for s := range h.subs[normalize(code)] {
+	delete(h.revision, code)
+	h.broadcastLocked(code, endedEvent)
+	for s := range h.subs[code] {
 		h.removeLocked(s)
 	}
 }

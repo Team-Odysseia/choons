@@ -52,8 +52,8 @@ func TestPublishEndedClosesSubscribers(t *testing.T) {
 func TestSlowSubscriberIsDropped(t *testing.T) {
 	h := NewHub()
 	slow := h.Subscribe("CODE0002", uuid.New())
-	for range subscriberBuffer + 1 {
-		h.PublishState("CODE0002", dto.PartyState{})
+	for i := range subscriberBuffer + 1 {
+		h.PublishState("CODE0002", dto.PartyState{Revision: int64(i + 1)})
 	}
 	if h.Count("CODE0002") != 0 {
 		t.Fatal("slow subscriber kept")
@@ -105,5 +105,37 @@ func TestPublishRemovedEndsOnlyThatUsersStreams(t *testing.T) {
 	}
 	if h.Count("CODE0004") != 1 {
 		t.Fatal(h.Count("CODE0004"))
+	}
+}
+
+func TestStaleStateIsDropped(t *testing.T) {
+	h := NewHub()
+	s := h.Subscribe("CODE0006", uuid.New())
+	h.PublishState("CODE0006", dto.PartyState{Revision: 2})
+	h.PublishState("code0006", dto.PartyState{Revision: 1})
+	h.PublishState("CODE0006", dto.PartyState{Revision: 2})
+	h.PublishState("CODE0006", dto.PartyState{Revision: 3})
+	var got []int64
+	for range 2 {
+		var st dto.PartyState
+		if err := json.Unmarshal((<-s.C).Data, &st); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, st.Revision)
+	}
+	select {
+	case ev := <-s.C:
+		t.Fatalf("stale event delivered: %s", ev.Data)
+	default:
+	}
+	if got[0] != 2 || got[1] != 3 {
+		t.Fatalf("revisions %v", got)
+	}
+
+	h.PublishEnded("CODE0006")
+	again := h.Subscribe("CODE0006", uuid.New())
+	h.PublishState("CODE0006", dto.PartyState{Revision: 1})
+	if ev := <-again.C; ev.Name != "state" {
+		t.Fatalf("revision tracking must reset after ended: %+v", ev)
 	}
 }

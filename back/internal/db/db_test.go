@@ -49,6 +49,8 @@ func cascadeCount(t *testing.T, gdb *gorm.DB) int64 {
 	return n
 }
 
+var addedColumns = []string{"parties.revision"}
+
 func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 	fresh := pgtest.NewDB(t)
 
@@ -62,6 +64,12 @@ func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 		t.Fatalf("migrate legacy schema: %v", err)
 	}
 	got := columns(t, fresh)
+	for _, key := range addedColumns {
+		if _, ok := got[key]; !ok {
+			t.Errorf("missing added column %s", key)
+		}
+		delete(got, key)
+	}
 	if len(got) != len(want) {
 		t.Fatalf("column count: fresh=%d hibernate=%d", len(got), len(want))
 	}

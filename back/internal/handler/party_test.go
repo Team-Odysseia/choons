@@ -23,7 +23,7 @@ func TestPartyEndpoints(t *testing.T) {
 	host.json(http.MethodPost, "/parties", map[string]string{"name": "x"}).errorIs(400, "queuePolicy must not be null")
 	host.json(http.MethodPost, "/parties", map[string]string{"name": "x", "queuePolicy": "ANYONE"}).errorIs(400, "queuePolicy must be one of [DJ_ONLY, EVERYONE]")
 	st := host.json(http.MethodPost, "/parties", map[string]string{"name": "Friday", "queuePolicy": "DJ_ONLY"}).status(http.StatusCreated).keys()
-	if sortedKeys(st) != "hostUserId,id,inviteCode,members,name,playback,queue,queuePolicy" {
+	if sortedKeys(st) != "hostUserId,id,inviteCode,members,name,playback,queue,queuePolicy,revision" {
 		t.Fatalf("state keys %s", sortedKeys(st))
 	}
 	pb := st["playback"].(map[string]any)

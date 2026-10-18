@@ -31,6 +31,7 @@ type PartyPlayback struct {
 
 type PartyState struct {
 	ID          uuid.UUID         `json:"id"`
+	Revision    int64             `json:"revision"`
 	InviteCode  string            `json:"inviteCode"`
 	Name        string            `json:"name"`
 	QueuePolicy model.QueuePolicy `json:"queuePolicy"`

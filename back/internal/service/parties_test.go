@@ -247,6 +247,23 @@ func TestRemovedMembersLoseTheirStream(t *testing.T) {
 	}
 }
 
+func TestStateRevisionIncreasesPerMutation(t *testing.T) {
+	pe := newPartyEnv(t)
+	created := pe.create(t, model.PolicyEveryone)
+	joined, _ := pe.parties.Join(pe.ctx, pe.guest, created.InviteCode)
+	queued, _ := pe.parties.AddTracks(pe.ctx, pe.host, created.InviteCode, []uuid.UUID{pe.tracks[0].ID})
+	if created.Revision < 1 || joined.Revision <= created.Revision || queued.Revision <= joined.Revision {
+		t.Fatalf("revisions %d %d %d", created.Revision, joined.Revision, queued.Revision)
+	}
+	if _, err := pe.parties.AddTracks(pe.ctx, pe.host, created.InviteCode, []uuid.UUID{uuid.New()}); err == nil {
+		t.Fatal("expected error")
+	}
+	current, _ := pe.parties.State(pe.ctx, pe.host, created.InviteCode)
+	if current.Revision != queued.Revision {
+		t.Fatalf("failed mutation must not bump revision: %d vs %d", current.Revision, queued.Revision)
+	}
+}
+
 func TestEveryonePolicyLetsGuestsControl(t *testing.T) {
 	pe := newPartyEnv(t)
 	st := pe.create(t, model.PolicyEveryone)

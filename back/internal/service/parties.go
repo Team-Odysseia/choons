@@ -215,7 +215,7 @@ func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) 
 		pb.Track = &dt
 	}
 	return dto.PartyState{
-		ID: p.ID, InviteCode: p.InviteCode, Name: p.Name, QueuePolicy: p.QueuePolicy, HostUserID: p.HostUserID,
+		ID: p.ID, Revision: p.Revision, InviteCode: p.InviteCode, Name: p.Name, QueuePolicy: p.QueuePolicy, HostUserID: p.HostUserID,
 		Members: dto.Map(members, func(m *model.PartyMember) dto.PartyMember {
 			return dto.PartyMember{UserID: m.UserID, Username: m.User.Username, Host: m.Host, DJ: m.DJ, Connected: m.Connected}
 		}),
@@ -227,6 +227,9 @@ func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) 
 }
 
 func (s *Parties) stage(tx *gorm.DB, o *outbox, p *model.Party) (dto.PartyState, error) {
+	if err := tx.Raw(`UPDATE parties SET revision = revision + 1 WHERE id = ? RETURNING revision`, p.ID).Scan(&p.Revision).Error; err != nil {
+		return dto.PartyState{}, err
+	}
 	st, err := s.assemble(tx, p)
 	if err != nil {
 		return dto.PartyState{}, err
