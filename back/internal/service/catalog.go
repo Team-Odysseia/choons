@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,15 +24,28 @@ type LyricsFinder interface {
 	Find(ctx context.Context, title, artist, album string, durationSeconds int) (*int, error)
 }
 
+const (
+	mostPlayedTTL   = 5 * time.Minute
+	mostPlayedLimit = 100
+)
+
+type ranking struct {
+	mu  sync.Mutex
+	ids []uuid.UUID
+	at  time.Time
+}
+
 type Catalog struct {
-	db     *gorm.DB
-	store  storage.Storage
-	lyrics LyricsFinder
-	async  func(func())
+	db         *gorm.DB
+	store      storage.Storage
+	lyrics     LyricsFinder
+	async      func(func())
+	now        func() time.Time
+	mostPlayed ranking
 }
 
 func NewCatalog(gdb *gorm.DB, store storage.Storage, lyrics LyricsFinder) *Catalog {
-	return &Catalog{db: gdb, store: store, lyrics: lyrics, async: func(f func()) { go f() }}
+	return &Catalog{db: gdb, store: store, lyrics: lyrics, async: func(f func()) { go f() }, now: time.Now}
 }
 
 func (s *Catalog) SetAsync(run func(func())) { s.async = run }
@@ -423,31 +437,40 @@ func (s *Catalog) TrackKey(ctx context.Context, id uuid.UUID) (string, error) {
 }
 
 func (s *Catalog) MostPlayed(ctx context.Context, limit int) ([]dto.Track, error) {
-	limit = min(max(limit, 1), 100)
-	var ranked []struct {
-		TrackID uuid.UUID
-	}
-	err := s.db.WithContext(ctx).Model(&model.StreamEvent{}).
-		Select("track_id").Group("track_id").Order("count(*) DESC").Order("track_id ASC").Limit(limit).
-		Scan(&ranked).Error
+	limit = min(max(limit, 1), mostPlayedLimit)
+	ranked, err := s.rankedTrackIDs(ctx)
 	if err != nil || len(ranked) == 0 {
 		return []dto.Track{}, err
 	}
-	ids := make([]uuid.UUID, len(ranked))
-	for i, r := range ranked {
-		ids[i] = r.TrackID
-	}
-	byID, err := s.tracksByID(ctx, ids)
+	byID, err := s.tracksByID(ctx, ranked)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]dto.Track, 0, len(ids))
-	for _, id := range ids {
-		if t, ok := byID[id]; ok {
+	out := make([]dto.Track, 0, limit)
+	for _, id := range ranked {
+		if t, ok := byID[id]; ok && len(out) < limit {
 			out = append(out, dto.FromTrack(t))
 		}
 	}
 	return out, nil
+}
+
+func (s *Catalog) rankedTrackIDs(ctx context.Context) ([]uuid.UUID, error) {
+	r := &s.mostPlayed
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.ids != nil && s.now().Sub(r.at) < mostPlayedTTL {
+		return r.ids, nil
+	}
+	ids := []uuid.UUID{}
+	err := s.db.WithContext(ctx).Model(&model.StreamEvent{}).
+		Group("track_id").Order("count(*) DESC").Order("track_id ASC").Limit(mostPlayedLimit).
+		Pluck("track_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	r.ids, r.at = ids, s.now()
+	return ids, nil
 }
 
 func (s *Catalog) RecordPlay(ctx context.Context, userID, trackID uuid.UUID) error {

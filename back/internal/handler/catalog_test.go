@@ -64,10 +64,6 @@ func TestCatalogJSONContract(t *testing.T) {
 	bob.get("/music/tracks?size=abc").errorIs(400, "size must be a number")
 	bob.get("/music/artists/"+ids.album).errorIs(404, "Artist not found: "+ids.album)
 
-	bob.get("/music/tracks/most-played").status(200).decode(&list)
-	if len(list) != 0 {
-		t.Fatal("no plays yet")
-	}
 	bob.json(http.MethodPost, "/stream/"+ids.track+"/played", nil).status(http.StatusNoContent)
 	bob.get("/music/tracks/most-played?limit=5").status(200).decode(&list)
 	if len(list) != 1 || list[0]["id"] != ids.track {

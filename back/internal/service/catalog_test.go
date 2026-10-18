@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -478,6 +479,53 @@ func TestMostPlayed(t *testing.T) {
 		t.Fatalf("limit 0 clamps to 1: %d", len(top))
 	}
 	wantAppErr(t, e.catalog.RecordPlay(e.ctx, u.ID, uuid.New()), 404, "")
+}
+
+func TestMostPlayedCachesRanking(t *testing.T) {
+	e := newEnv(t)
+	clock := time.UnixMilli(1_700_000_000_000)
+	e.catalog.now = func() time.Time { return clock }
+	album := e.album(t, e.artist(t, "A"), "x", 1)
+	a, b := e.track(t, album, "a", 1), e.track(t, album, "b", 2)
+	u := e.user(t, "u", model.RoleListener)
+	play := func(tr *model.Track, n int) {
+		for range n {
+			if err := e.catalog.RecordPlay(e.ctx, u.ID, tr.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	top := func(limit int) []uuid.UUID {
+		out, err := e.catalog.MostPlayed(e.ctx, limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ids(out, func(t dto.Track) uuid.UUID { return t.ID })
+	}
+
+	play(a, 2)
+	if got := top(10); !slices.Equal(got, []uuid.UUID{a.ID}) {
+		t.Fatalf("%v", got)
+	}
+	play(b, 5)
+	clock = clock.Add(mostPlayedTTL - time.Second)
+	if got := top(10); !slices.Equal(got, []uuid.UUID{a.ID}) {
+		t.Fatalf("ranking should be cached: %v", got)
+	}
+	e.db.Model(&model.Track{}).Where("id = ?", a.ID).Update("title", "renamed")
+	if out, _ := e.catalog.MostPlayed(e.ctx, 10); out[0].Title != "renamed" {
+		t.Fatal("track rows must load fresh")
+	}
+	clock = clock.Add(2 * time.Second)
+	if got := top(10); !slices.Equal(got, []uuid.UUID{b.ID, a.ID}) {
+		t.Fatalf("ranking should refresh after ttl: %v", got)
+	}
+	if err := e.catalog.DeleteTrack(e.ctx, b.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := top(1); !slices.Equal(got, []uuid.UUID{a.ID}) {
+		t.Fatalf("deleted tracks drop out and limit still fills from ranking: %v", got)
+	}
 }
 
 func TestMostPlayedEmpty(t *testing.T) {
