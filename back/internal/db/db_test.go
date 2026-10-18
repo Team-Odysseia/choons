@@ -49,7 +49,7 @@ func cascadeCount(t *testing.T, gdb *gorm.DB) int64 {
 	return n
 }
 
-var addedColumns = []string{"parties.revision"}
+var addedColumns = []string{"parties.revision", "party_playback_state.queue_item_id"}
 
 func requireDeferredPlaylistPosition(t *testing.T, gdb *gorm.DB) {
 	t.Helper()
@@ -127,11 +127,11 @@ func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 			t.Errorf("column %s: fresh=%+v hibernate=%+v", key, g, w)
 		}
 	}
-	if n := cascadeCount(t, legacy); n != 19 {
-		t.Errorf("legacy cascading FKs = %d, want 19", n)
+	if n := cascadeCount(t, legacy); n != 20 {
+		t.Errorf("legacy cascading FKs = %d, want 20", n)
 	}
-	if n := cascadeCount(t, fresh); n != 19 {
-		t.Errorf("fresh cascading FKs = %d, want 19", n)
+	if n := cascadeCount(t, fresh); n != 20 {
+		t.Errorf("fresh cascading FKs = %d, want 20", n)
 	}
 	requireDeferredPlaylistPosition(t, fresh)
 	requireDeferredPlaylistPosition(t, legacy)
@@ -165,8 +165,8 @@ func TestMigrateProductionSchema(t *testing.T) {
 	if len(pk) != 1 || pk[0] != "id" {
 		t.Fatalf("playlist_tracks pk = %v, want [id]", pk)
 	}
-	if n := cascadeCount(t, gdb); n != 19 {
-		t.Errorf("cascading FKs = %d, want 19", n)
+	if n := cascadeCount(t, gdb); n != 20 {
+		t.Errorf("cascading FKs = %d, want 20", n)
 	}
 	requireDeferredPlaylistPosition(t, gdb)
 	requireIndexes(t, gdb)

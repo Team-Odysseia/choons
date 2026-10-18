@@ -510,3 +510,26 @@ func untimedTrack(t *testing.T, pe *partyEnv, duration int) *model.Track {
 	}
 	return tr
 }
+
+func TestDuplicateTracksInQueueTrackPlayingItem(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyEveryone).InviteCode
+	a, b := pe.tracks[0].ID, pe.tracks[1].ID
+	st, _ := pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{a, b, a})
+	before := st.Playback
+	pe.clock = pe.clock.Add(time.Minute)
+
+	st, err := pe.parties.RemoveItem(pe.ctx, pe.host, code, st.Queue[2].ID)
+	if err != nil || st.Playback.AnchorEpochMs != before.AnchorEpochMs || !slices.Equal(queueTracks(st), []uuid.UUID{a, b}) {
+		t.Fatalf("removing a later duplicate must not restart playback: %+v %v", st.Playback, err)
+	}
+
+	st, _ = pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{a})
+	playing, second, dup := st.Queue[0].ID, st.Queue[1].ID, st.Queue[2].ID
+	pe.parties.Reorder(pe.ctx, pe.host, code, []uuid.UUID{second, dup, playing})
+	st, _ = pe.parties.Next(pe.ctx, pe.host, code)
+	itemIDs := ids(st.Queue, func(q dto.PartyQueueItem) uuid.UUID { return q.ID })
+	if !slices.Equal(itemIDs, []uuid.UUID{second, dup}) || st.Playback.Track.ID != b {
+		t.Fatalf("next must drop the playing item, not an earlier duplicate: %v %+v", itemIDs, st.Playback)
+	}
+}

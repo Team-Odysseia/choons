@@ -168,6 +168,7 @@ type PartyPlaybackState struct {
 	PartyID           uuid.UUID  `gorm:"type:uuid"`
 	TrackID           *uuid.UUID `gorm:"type:uuid"`
 	Track             *Track
+	QueueItemID       *uuid.UUID `gorm:"type:uuid"`
 	Playing           bool
 	AnchorPositionSec float64
 	AnchorEpochMs     int64
