@@ -120,7 +120,7 @@ func (s *Catalog) CreateArtist(ctx context.Context, in ArtistInput) (dto.Artist,
 		if img == nil {
 			return nil
 		}
-		key := fmt.Sprintf("images/artists/%s.%s", artist.ID, img.ext)
+		key := imageKey("artists", artist.ID, img.ext)
 		if err := up.put(ctx, key, img); err != nil {
 			return err
 		}
@@ -149,11 +149,11 @@ func (s *Catalog) UpdateArtist(ctx context.Context, id uuid.UUID, in ArtistInput
 		artist = a
 		artist.Name, artist.Bio = in.Name, in.Bio
 		if img != nil {
-			key := fmt.Sprintf("images/artists/%s.%s", id, img.ext)
+			key := imageKey("artists", id, img.ext)
 			if err := up.put(ctx, key, img); err != nil {
 				return err
 			}
-			if artist.AvatarKey != nil && *artist.AvatarKey != key {
+			if artist.AvatarKey != nil {
 				stale = *artist.AvatarKey
 			}
 			artist.AvatarKey = &key
@@ -272,7 +272,7 @@ func (s *Catalog) CreateAlbum(ctx context.Context, in AlbumInput) (dto.Album, er
 		if img == nil {
 			return nil
 		}
-		key := fmt.Sprintf("images/albums/%s.%s", album.ID, img.ext)
+		key := imageKey("albums", album.ID, img.ext)
 		if err := up.put(ctx, key, img); err != nil {
 			return err
 		}
@@ -305,11 +305,11 @@ func (s *Catalog) UpdateAlbum(ctx context.Context, id uuid.UUID, in AlbumInput) 
 		album = a
 		album.Title, album.ArtistID, album.ReleaseYear, album.Artist = in.Title, in.ArtistID, in.ReleaseYear, nil
 		if img != nil {
-			key := fmt.Sprintf("images/albums/%s.%s", id, img.ext)
+			key := imageKey("albums", id, img.ext)
 			if err := up.put(ctx, key, img); err != nil {
 				return err
 			}
-			if album.CoverKey != nil && *album.CoverKey != key {
+			if album.CoverKey != nil {
 				stale = *album.CoverKey
 			}
 			album.CoverKey = &key
@@ -654,6 +654,10 @@ func (s *Catalog) ImageKey(ctx context.Context, kind string, id uuid.UUID) (*str
 		return a.CoverKey, nil
 	}
 	return nil, apperr.NotFound("Unknown image kind")
+}
+
+func imageKey(kind string, id uuid.UUID, ext string) string {
+	return fmt.Sprintf("images/%s/%s-%s.%s", kind, id, newID(), ext)
 }
 
 func prepareImage(u *Upload) (*prepared, error) {

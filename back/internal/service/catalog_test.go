@@ -28,8 +28,8 @@ func TestCreateArtistWithAndWithoutAvatar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "images/artists/" + withAvatar.ID.String() + ".png"
-	if !e.store.Has(key) || e.store.Objects[key].ContentType != "image/png" {
+	key := e.avatarKey(t, withAvatar.ID)
+	if !imageKeyLike(key, "artists", withAvatar.ID, "png") || !e.store.Has(key) || e.store.Objects[key].ContentType != "image/png" {
 		t.Fatalf("avatar not stored: %v", e.store.Keys())
 	}
 	if withAvatar.AvatarURL == nil || *withAvatar.AvatarURL != "/media/images/artists/"+withAvatar.ID.String() || *withAvatar.Bio != "Warp" {
@@ -82,20 +82,49 @@ func TestCreateArtistStorageFailureRollsBack(t *testing.T) {
 func TestUpdateArtistReplacesAvatarAndDeletesStaleKey(t *testing.T) {
 	e := newEnv(t)
 	a, _ := e.catalog.CreateArtist(e.ctx, ArtistInput{Name: "Old", Avatar: upload("image/png", pngBytes)})
-	oldKey := "images/artists/" + a.ID.String() + ".png"
+	oldKey := e.avatarKey(t, a.ID)
 	bio := "new bio"
 	got, err := e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "New", Bio: &bio, Avatar: upload("image/jpeg", jpgBytes)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	newKey := "images/artists/" + a.ID.String() + ".jpg"
-	if got.Name != "New" || *got.Bio != "new bio" || !e.store.Has(newKey) || e.store.Has(oldKey) {
+	newKey := e.avatarKey(t, a.ID)
+	if got.Name != "New" || *got.Bio != "new bio" || !imageKeyLike(newKey, "artists", a.ID, "jpg") || !e.store.Has(newKey) || e.store.Has(oldKey) {
 		t.Fatalf("%+v keys=%v", got, e.store.Keys())
+	}
+
+	if _, err := e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "New", Avatar: upload("image/jpeg", jpgBytes)}); err != nil {
+		t.Fatal(err)
+	}
+	if sameExt := e.avatarKey(t, a.ID); sameExt == newKey || !e.store.Has(sameExt) || e.store.Has(newKey) {
+		t.Fatalf("same-extension replace must use a fresh key: %s -> %s keys=%v", newKey, sameExt, e.store.Keys())
 	}
 
 	got, err = e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "Newer"})
 	if err != nil || got.AvatarURL == nil || got.Bio != nil {
 		t.Fatalf("update without avatar should keep it and clear bio: %+v %v", got, err)
+	}
+}
+
+func TestFailedImageUpdateKeepsCurrentObject(t *testing.T) {
+	e := newEnv(t)
+	e.artist(t, "Taken")
+	a, _ := e.catalog.CreateArtist(e.ctx, ArtistInput{Name: "Mine", Avatar: upload("image/png", pngBytes)})
+	avatar := e.avatarKey(t, a.ID)
+	if _, err := e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "Taken", Avatar: upload("image/png", pngBytes)}); err == nil {
+		t.Fatal("expected duplicate name error")
+	}
+	if e.avatarKey(t, a.ID) != avatar || !e.store.Has(avatar) || len(e.store.Keys()) != 1 {
+		t.Fatalf("live avatar lost or orphan left: key=%s keys=%v", avatar, e.store.Keys())
+	}
+
+	al, _ := e.catalog.CreateAlbum(e.ctx, AlbumInput{Title: "x", ArtistID: a.ID, ReleaseYear: 1, Cover: upload("image/png", pngBytes)})
+	cover := e.coverKey(t, al.ID)
+	if _, err := e.catalog.UpdateAlbum(e.ctx, al.ID, AlbumInput{Title: "x", ArtistID: uuid.New(), ReleaseYear: 1, Cover: upload("image/png", pngBytes)}); err == nil {
+		t.Fatal("expected unknown artist error")
+	}
+	if e.coverKey(t, al.ID) != cover || !e.store.Has(cover) || len(e.store.Keys()) != 2 {
+		t.Fatalf("live cover lost or orphan left: key=%s keys=%v", cover, e.store.Keys())
 	}
 }
 
@@ -489,7 +518,7 @@ func TestRandomCoverIDsAndImageKey(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 	key, err := e.catalog.ImageKey(e.ctx, "albums", withCover.ID)
-	if err != nil || key == nil || *key != "images/albums/"+withCover.ID.String()+".png" {
+	if err != nil || key == nil || *key != e.coverKey(t, withCover.ID) || !imageKeyLike(*key, "albums", withCover.ID, "png") {
 		t.Fatalf("%v %v", key, err)
 	}
 	key, err = e.catalog.ImageKey(e.ctx, "artists", artist.ID)

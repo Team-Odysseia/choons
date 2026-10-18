@@ -103,7 +103,7 @@ func TestImages(t *testing.T) {
 	ids := s.seedCatalog(admin)
 
 	res := s.anon().get("/media/images/albums/" + ids.album).status(http.StatusFound)
-	if !strings.HasPrefix(res.Header().Get("Location"), "https://r2.test/images/albums/"+ids.album+".png") ||
+	if loc := res.Header().Get("Location"); !strings.HasPrefix(loc, "https://r2.test/images/albums/"+ids.album+"-") || !strings.Contains(loc, ".png") ||
 		res.Header().Get("Cache-Control") != "private, max-age=1800" {
 		t.Fatalf("%v", res.Header())
 	}
