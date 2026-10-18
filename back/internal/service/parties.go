@@ -176,20 +176,10 @@ func (s *Parties) queue(tx *gorm.DB, partyID uuid.UUID) ([]model.PartyQueueItem,
 }
 
 func (s *Parties) normalizeQueue(tx *gorm.DB, partyID uuid.UUID) ([]model.PartyQueueItem, error) {
-	items, err := s.queue(tx, partyID)
-	if err != nil {
+	if err := compactPositions(tx, "party_queue_items", "party_id", partyID, "position, created_at, id"); err != nil {
 		return nil, err
 	}
-	for i := range items {
-		if items[i].Position == i {
-			continue
-		}
-		items[i].Position = i
-		if err := tx.Model(&items[i]).Update("position", i).Error; err != nil {
-			return nil, err
-		}
-	}
-	return items, nil
+	return s.queue(tx, partyID)
 }
 
 func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) {
@@ -590,12 +580,7 @@ func (s *Parties) Reorder(ctx context.Context, user *model.User, code string, it
 			}
 			seen[id] = true
 		}
-		for i, id := range itemIDs {
-			if err := tx.Model(&model.PartyQueueItem{}).Where("id = ?", id).Update("position", i).Error; err != nil {
-				return err
-			}
-		}
-		return nil
+		return setPositions(tx, "party_queue_items", itemIDs)
 	})
 }
 

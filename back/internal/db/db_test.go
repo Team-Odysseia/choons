@@ -51,6 +51,25 @@ func cascadeCount(t *testing.T, gdb *gorm.DB) int64 {
 
 var addedColumns = []string{"parties.revision"}
 
+func requireDeferredPlaylistPosition(t *testing.T, gdb *gorm.DB) {
+	t.Helper()
+	var uniques []struct {
+		Name     string
+		Deferred bool
+	}
+	err := gdb.Raw(`SELECT i.relname AS name, coalesce(c.condeferred, false) AS deferred
+		FROM pg_index x
+		JOIN pg_class i ON i.oid = x.indexrelid
+		LEFT JOIN pg_constraint c ON c.conindid = x.indexrelid
+		WHERE x.indrelid = 'playlist_tracks'::regclass AND x.indisunique AND NOT x.indisprimary`).Scan(&uniques).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uniques) != 1 || !uniques[0].Deferred {
+		t.Fatalf("playlist position uniqueness must be a single deferred constraint: %+v", uniques)
+	}
+}
+
 func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 	fresh := pgtest.NewDB(t)
 
@@ -89,6 +108,8 @@ func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 	if n := cascadeCount(t, fresh); n != 19 {
 		t.Errorf("fresh cascading FKs = %d, want 19", n)
 	}
+	requireDeferredPlaylistPosition(t, fresh)
+	requireDeferredPlaylistPosition(t, legacy)
 }
 
 //go:embed testdata/prod_schema.sql
@@ -120,6 +141,7 @@ func TestMigrateProductionSchema(t *testing.T) {
 	if n := cascadeCount(t, gdb); n != 19 {
 		t.Errorf("cascading FKs = %d, want 19", n)
 	}
+	requireDeferredPlaylistPosition(t, gdb)
 
 	user, artist, album, track, playlist := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	must := func(sql string, args ...any) {

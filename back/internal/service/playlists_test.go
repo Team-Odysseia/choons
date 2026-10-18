@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -150,4 +151,39 @@ func TestPlaylistReorder(t *testing.T) {
 	p, _ = pls.AddTrack(e.ctx, bob, p.ID, a.ID)
 	_, err = pls.Reorder(e.ctx, bob, p.ID, []uuid.UUID{a.ID, b.ID, c.ID, uuid.New()})
 	wantAppErr(t, err, 400, "Reorder list must contain all playlist tracks exactly once")
+}
+
+func TestPlaylistLargeReorderAndCompaction(t *testing.T) {
+	e := newEnv(t)
+	pls := NewPlaylists(e.db)
+	bob := e.user(t, "bob", model.RoleListener)
+	album := e.album(t, e.artist(t, "A"), "x", 1)
+	p, _ := pls.Create(e.ctx, bob, "big")
+	var order []uuid.UUID
+	for i := range 300 {
+		tr := e.track(t, album, fmt.Sprintf("t%03d", i), i)
+		if err := e.db.Omit("Track").Create(&model.PlaylistTrack{PlaylistID: p.ID, TrackID: tr.ID, Position: i}).Error; err != nil {
+			t.Fatal(err)
+		}
+		order = append(order, tr.ID)
+	}
+	slices.Reverse(order)
+	got, err := pls.Reorder(e.ctx, bob, p.ID, order)
+	if err != nil || !slices.Equal(trackIDs(got), order) {
+		t.Fatalf("reverse reorder: %v", err)
+	}
+	got, err = pls.RemoveTrack(e.ctx, bob, p.ID, order[150])
+	if err != nil || len(got.Tracks) != 299 {
+		t.Fatalf("remove: %v %d", err, len(got.Tracks))
+	}
+	var positions []int
+	e.db.Model(&model.PlaylistTrack{}).Where("playlist_id = ?", p.ID).Order("position").Pluck("position", &positions)
+	for i, pos := range positions {
+		if pos != i {
+			t.Fatalf("positions not contiguous at %d: %d", i, pos)
+		}
+	}
+	if want := slices.Delete(slices.Clone(order), 150, 151); !slices.Equal(trackIDs(got), want) {
+		t.Fatal("order changed by removal")
+	}
 }

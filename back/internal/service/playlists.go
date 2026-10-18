@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -108,15 +109,7 @@ func (s *Playlists) RemoveTrack(ctx context.Context, user *model.User, id, track
 		if err := tx.Where("playlist_id = ? AND track_id = ?", id, trackID).Delete(&model.PlaylistTrack{}).Error; err != nil {
 			return err
 		}
-		var entries []model.PlaylistTrack
-		if err := tx.Where("playlist_id = ?", id).Order("position ASC").Find(&entries).Error; err != nil {
-			return err
-		}
-		order := make([]uuid.UUID, len(entries))
-		for i, e := range entries {
-			order[i] = e.ID
-		}
-		return setPositions(tx, "playlist_tracks", order)
+		return compactPositions(tx, "playlist_tracks", "playlist_id", id, "position, id")
 	})
 }
 
@@ -189,15 +182,17 @@ func setPositions(tx *gorm.DB, table string, orderedIDs []uuid.UUID) error {
 	if len(orderedIDs) == 0 {
 		return nil
 	}
+	ids := make([]string, len(orderedIDs))
 	for i, id := range orderedIDs {
-		if err := tx.Table(table).Where("id = ?", id).Update("position", -(i + 1)).Error; err != nil {
-			return err
-		}
+		ids[i] = id.String()
 	}
-	for i, id := range orderedIDs {
-		if err := tx.Table(table).Where("id = ?", id).Update("position", i).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	return tx.Exec(`UPDATE `+table+` AS t SET position = v.ord - 1
+		FROM unnest(?::uuid[]) WITH ORDINALITY AS v(id, ord)
+		WHERE t.id = v.id AND t.position <> v.ord - 1`, "{"+strings.Join(ids, ",")+"}").Error
+}
+
+func compactPositions(tx *gorm.DB, table, scope string, scopeID uuid.UUID, order string) error {
+	return tx.Exec(`UPDATE `+table+` AS t SET position = r.pos
+		FROM (SELECT id, row_number() OVER (ORDER BY `+order+`) - 1 AS pos FROM `+table+` WHERE `+scope+` = ?) AS r
+		WHERE t.id = r.id AND t.position <> r.pos`, scopeID).Error
 }
