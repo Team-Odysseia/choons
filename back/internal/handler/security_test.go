@@ -86,3 +86,30 @@ func TestStreamRateLimitCoversPlayed(t *testing.T) {
 	admin.get("/stream/"+ids.track).errorIs(http.StatusTooManyRequests, "Too many requests")
 	admin.get("/music/tracks/" + ids.track).status(http.StatusOK)
 }
+
+func TestCrossOriginWritesRejected(t *testing.T) {
+	s := newServer(t)
+	listener := s.login("bob", model.RoleListener)
+	send := func(method, path string, headers map[string]string) *response {
+		req := httptest.NewRequest(method, path, strings.NewReader(`{"name":"pwned"}`))
+		req.Header.Set("Content-Type", "text/plain")
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		return listener.do(req)
+	}
+
+	send(http.MethodPost, "/playlists", map[string]string{"Origin": "https://evil.example"}).errorIs(http.StatusForbidden, "Forbidden")
+	send(http.MethodPost, "/playlists", map[string]string{"Sec-Fetch-Site": "cross-site"}).errorIs(http.StatusForbidden, "Forbidden")
+	if mine := listener.get("/playlists"); mine.Body.String() != "[]" {
+		t.Fatalf("cross-site write persisted: %s", mine.Body.String())
+	}
+
+	send(http.MethodPost, "/playlists", map[string]string{"Origin": testOrigin, "Sec-Fetch-Site": "cross-site"}).status(http.StatusCreated)
+	send(http.MethodPost, "/playlists", nil).status(http.StatusCreated)
+
+	req := httptest.NewRequest(http.MethodGet, "/playlists", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	listener.do(req).status(http.StatusOK)
+}

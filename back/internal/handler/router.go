@@ -23,6 +23,11 @@ func (h *Handler) Router(cfg RouterConfig) (*gin.Engine, error) {
 	}
 	r.Use(gin.Recovery())
 	r.Use(httpx.CORS(cfg.CORSOrigins))
+	guard, err := httpx.CrossOriginGuard(cfg.CORSOrigins)
+	if err != nil {
+		return nil, err
+	}
+	r.Use(guard)
 	r.Use(auth.Authenticate(h.Tokens, h.Cookie, h.Users.Get))
 	r.NoRoute(notFound)
 

@@ -46,3 +46,19 @@ func CORS(origins []string) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func CrossOriginGuard(origins []string) (gin.HandlerFunc, error) {
+	cop := http.NewCrossOriginProtection()
+	for _, o := range origins {
+		if err := cop.AddTrustedOrigin(o); err != nil {
+			return nil, err
+		}
+	}
+	return func(c *gin.Context) {
+		if err := cop.Check(c.Request); err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, ErrorBody{Error: "Forbidden"})
+			return
+		}
+		c.Next()
+	}, nil
+}
