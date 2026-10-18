@@ -243,15 +243,15 @@ func (s *Catalog) DeleteArtistAvatar(ctx context.Context, id uuid.UUID) error {
 // Albums
 
 func (s *Catalog) ListAlbums(ctx context.Context, artistID *uuid.UUID, query string, p *Page) ([]dto.Album, error) {
-	q := s.db.WithContext(ctx).Preload("Artist").Joins("JOIN artists ON artists.id = albums.artist_id")
+	q := s.db.WithContext(ctx).Joins("Artist")
 	if artistID != nil {
 		q = q.Where("albums.artist_id = ?", *artistID).Order("albums.release_year DESC").Order("albums.id ASC")
 	} else {
-		q = q.Order("artists.name ASC").Order("albums.title ASC").Order("albums.id ASC")
+		q = q.Order(`"Artist".name ASC`).Order("albums.title ASC").Order("albums.id ASC")
 	}
 	if strings.TrimSpace(query) != "" {
 		pat := likePattern(query)
-		q = q.Where("(lower(albums.title) LIKE ? OR lower(artists.name) LIKE ?)", pat, pat)
+		q = q.Where(`(lower(albums.title) LIKE ? OR lower("Artist".name) LIKE ?)`, pat, pat)
 	}
 	if p != nil {
 		limit, offset := p.limitOffset()
@@ -479,10 +479,11 @@ func (s *Catalog) rankedTrackIDs(ctx context.Context) ([]uuid.UUID, error) {
 }
 
 func (s *Catalog) RecordPlay(ctx context.Context, userID, trackID uuid.UUID) error {
-	if _, err := first[model.Track](s.db.WithContext(ctx).Select("id"), "Track", trackID); err != nil {
-		return err
+	err := s.db.WithContext(ctx).Create(&model.StreamEvent{UserID: userID, TrackID: trackID}).Error
+	if errors.Is(err, gorm.ErrForeignKeyViolated) {
+		return notFound("Track", trackID)
 	}
-	return s.db.WithContext(ctx).Create(&model.StreamEvent{UserID: userID, TrackID: trackID}).Error
+	return err
 }
 
 type TrackInput struct {
@@ -591,15 +592,13 @@ type TrackUpdate struct {
 }
 
 func (s *Catalog) UpdateTrack(ctx context.Context, id uuid.UUID, title string, trackNumber int) (dto.Track, error) {
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if _, err := first[model.Track](tx, "Track", id); err != nil {
-			return err
-		}
-		return tx.Model(&model.Track{}).Where("id = ?", id).
-			Updates(map[string]any{"title": title, "track_number": trackNumber}).Error
-	})
-	if err != nil {
-		return dto.Track{}, err
+	res := s.db.WithContext(ctx).Model(&model.Track{}).Where("id = ?", id).
+		Updates(map[string]any{"title": title, "track_number": trackNumber})
+	if res.Error != nil {
+		return dto.Track{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return dto.Track{}, notFound("Track", id)
 	}
 	return s.GetTrack(ctx, id)
 }
@@ -730,13 +729,13 @@ func (s *Catalog) DeleteTrack(ctx context.Context, id uuid.UUID) error {
 func (s *Catalog) ImageKey(ctx context.Context, kind string, id uuid.UUID) (*string, error) {
 	switch kind {
 	case "artists":
-		a, err := first[model.Artist](s.db.WithContext(ctx), "Artist", id)
+		a, err := first[model.Artist](s.db.WithContext(ctx).Select("id", "avatar_key"), "Artist", id)
 		if err != nil {
 			return nil, err
 		}
 		return a.AvatarKey, nil
 	case "albums":
-		a, err := first[model.Album](s.db.WithContext(ctx), "Album", id)
+		a, err := first[model.Album](s.db.WithContext(ctx).Select("id", "cover_key"), "Album", id)
 		if err != nil {
 			return nil, err
 		}
