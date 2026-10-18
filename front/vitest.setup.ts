@@ -38,15 +38,23 @@ class AudioMock {
     this._emit('pause')
   })
 
-  addEventListener(event: string, fn: () => void) {
+  addEventListener(event: string, fn: () => void, options?: { once?: boolean }) {
     if (!this._listeners[event]) this._listeners[event] = []
-    this._listeners[event].push(fn)
+    const listener = options?.once
+      ? () => {
+          this.removeEventListener(event, listener)
+          fn()
+        }
+      : fn
+    this._listeners[event].push(listener)
   }
 
-  removeEventListener() {}
+  removeEventListener(event: string, fn: () => void) {
+    this._listeners[event] = (this._listeners[event] ?? []).filter((l) => l !== fn)
+  }
 
   _emit(event: string) {
-    ;(this._listeners[event] ?? []).forEach((fn) => fn())
+    ;[...(this._listeners[event] ?? [])].forEach((fn) => fn())
   }
 }
 

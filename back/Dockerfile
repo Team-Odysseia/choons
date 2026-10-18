@@ -1,27 +1,15 @@
-# syntax=docker/dockerfile:1.7
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -tags nomsgpack -trimpath -ldflags="-s -w" -o /out/choons ./cmd/choons
 
-FROM eclipse-temurin:25-jdk AS build
-WORKDIR /app
-
-COPY gradle gradle
-COPY gradlew .
-COPY build.gradle settings.gradle ./
-
-RUN chmod +x ./gradlew
-RUN ./gradlew --no-daemon -q dependencies
-
-COPY src src
-RUN ./gradlew --no-daemon bootJar -x test
-
-FROM eclipse-temurin:25-jre AS runtime
-WORKDIR /app
-
-RUN groupadd --system choons && useradd --system --gid choons --create-home --home-dir /home/choons choons
-
-COPY --from=build --chown=choons:choons /app/build/libs/choons-*.jar /app/app.jar
-
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:InitialRAMPercentage=10.0 -XX:MaxRAMPercentage=60.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:os+container=info -Xlog:gc*:stdout:time,level,tags -Djava.security.egd=file:/dev/./urandom"
-
-USER choons
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/choons /choons
+ENV GOMEMLIMIT=96MiB GIN_MODE=release
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+USER nonroot:nonroot
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["/choons", "health"]
+ENTRYPOINT ["/choons"]

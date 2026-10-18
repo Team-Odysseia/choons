@@ -13,6 +13,30 @@ export function useAudioEngine(audioElement?: HTMLAudioElement) {
   const duration = ref(0)
   const isPlaying = ref(false)
 
+  let requestedSrc = ''
+  let recovering = false
+
+  function onError() {
+    if (!requestedSrc || recovering) return
+    recovering = true
+    const resumeAt = audio.currentTime
+    const resume = !audio.paused || isPlaying.value
+    audio.addEventListener(
+      'loadedmetadata',
+      () => {
+        audio.currentTime = resumeAt
+        if (resume) void play()
+      },
+      { once: true },
+    )
+    audio.src = requestedSrc
+    audio.load()
+  }
+
+  function onPlaying() {
+    recovering = false
+  }
+
   function updateCurrentTime() {
     currentTime.value = audio.currentTime
   }
@@ -33,12 +57,17 @@ export function useAudioEngine(audioElement?: HTMLAudioElement) {
   audio.addEventListener('durationchange', updateDuration)
   audio.addEventListener('play', onPlay)
   audio.addEventListener('pause', onPause)
+  audio.addEventListener('error', onError)
+  audio.addEventListener('playing', onPlaying)
 
   function dispose() {
     audio.removeEventListener('timeupdate', updateCurrentTime)
     audio.removeEventListener('durationchange', updateDuration)
     audio.removeEventListener('play', onPlay)
     audio.removeEventListener('pause', onPause)
+    audio.removeEventListener('error', onError)
+    audio.removeEventListener('playing', onPlaying)
+    requestedSrc = ''
     audio.pause()
     audio.src = ''
   }
@@ -64,10 +93,13 @@ export function useAudioEngine(audioElement?: HTMLAudioElement) {
   }
 
   function setSrc(src: string) {
+    requestedSrc = src
+    recovering = false
     audio.src = src
   }
 
   function stop() {
+    requestedSrc = ''
     audio.pause()
     audio.src = ''
   }
