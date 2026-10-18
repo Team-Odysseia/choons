@@ -112,20 +112,16 @@ func (s *Catalog) CreateArtist(ctx context.Context, in ArtistInput) (dto.Artist,
 		return dto.Artist{}, err
 	}
 	defer img.close()
-	artist := model.Artist{Name: in.Name, Bio: in.Bio}
-	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
-		if err := tx.Create(&artist).Error; err != nil {
-			return err
-		}
+	artist := model.Artist{Base: model.Base{ID: newID()}, Name: in.Name, Bio: in.Bio}
+	err = withUploads(ctx, s.db, s.store, func(up *uploads) error {
 		if img == nil {
 			return nil
 		}
 		key := imageKey("artists", artist.ID, img.ext)
-		if err := up.put(ctx, key, img); err != nil {
-			return err
-		}
 		artist.AvatarKey = &key
-		return tx.Model(&artist).Update("avatar_key", key).Error
+		return up.put(ctx, key, img)
+	}, func(tx *gorm.DB) error {
+		return tx.Create(&artist).Error
 	})
 	if err != nil {
 		return dto.Artist{}, err
@@ -139,24 +135,29 @@ func (s *Catalog) UpdateArtist(ctx context.Context, id uuid.UUID, in ArtistInput
 		return dto.Artist{}, err
 	}
 	defer img.close()
+	if _, err := first[model.Artist](s.db.WithContext(ctx).Select("id"), "Artist", id); err != nil {
+		return dto.Artist{}, err
+	}
 	var artist *model.Artist
-	var stale string
-	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
-		a, err := first[model.Artist](tx, "Artist", id)
+	var newKey, stale string
+	err = withUploads(ctx, s.db, s.store, func(up *uploads) error {
+		if img == nil {
+			return nil
+		}
+		newKey = imageKey("artists", id, img.ext)
+		return up.put(ctx, newKey, img)
+	}, func(tx *gorm.DB) error {
+		a, err := first[model.Artist](tx.Clauses(lockForUpdate()), "Artist", id)
 		if err != nil {
 			return err
 		}
 		artist = a
 		artist.Name, artist.Bio = in.Name, in.Bio
-		if img != nil {
-			key := imageKey("artists", id, img.ext)
-			if err := up.put(ctx, key, img); err != nil {
-				return err
-			}
+		if newKey != "" {
 			if artist.AvatarKey != nil {
 				stale = *artist.AvatarKey
 			}
-			artist.AvatarKey = &key
+			artist.AvatarKey = &newKey
 		}
 		return tx.Model(artist).Select("name", "bio", "avatar_key").Updates(artist).Error
 	})
@@ -259,29 +260,25 @@ func (s *Catalog) CreateAlbum(ctx context.Context, in AlbumInput) (dto.Album, er
 		return dto.Album{}, err
 	}
 	defer img.close()
-	album := model.Album{Title: in.Title, ArtistID: in.ArtistID, ReleaseYear: in.ReleaseYear}
-	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
-		artist, err := first[model.Artist](tx, "Artist", in.ArtistID)
-		if err != nil {
-			return err
-		}
-		if err := tx.Omit("Artist").Create(&album).Error; err != nil {
-			return err
-		}
-		album.Artist = artist
+	artist, err := first[model.Artist](s.db.WithContext(ctx), "Artist", in.ArtistID)
+	if err != nil {
+		return dto.Album{}, err
+	}
+	album := model.Album{Base: model.Base{ID: newID()}, Title: in.Title, ArtistID: in.ArtistID, ReleaseYear: in.ReleaseYear}
+	err = withUploads(ctx, s.db, s.store, func(up *uploads) error {
 		if img == nil {
 			return nil
 		}
 		key := imageKey("albums", album.ID, img.ext)
-		if err := up.put(ctx, key, img); err != nil {
-			return err
-		}
 		album.CoverKey = &key
-		return tx.Model(&album).Update("cover_key", key).Error
+		return up.put(ctx, key, img)
+	}, func(tx *gorm.DB) error {
+		return tx.Omit("Artist").Create(&album).Error
 	})
 	if err != nil {
 		return dto.Album{}, err
 	}
+	album.Artist = artist
 	return dto.FromAlbum(&album), nil
 }
 
@@ -291,39 +288,41 @@ func (s *Catalog) UpdateAlbum(ctx context.Context, id uuid.UUID, in AlbumInput) 
 		return dto.Album{}, err
 	}
 	defer img.close()
+	if _, err := first[model.Album](s.db.WithContext(ctx).Select("id"), "Album", id); err != nil {
+		return dto.Album{}, err
+	}
+	artist, err := first[model.Artist](s.db.WithContext(ctx), "Artist", in.ArtistID)
+	if err != nil {
+		return dto.Album{}, err
+	}
 	var album *model.Album
-	var stale string
-	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
-		a, err := first[model.Album](tx, "Album", id)
-		if err != nil {
-			return err
+	var newKey, stale string
+	err = withUploads(ctx, s.db, s.store, func(up *uploads) error {
+		if img == nil {
+			return nil
 		}
-		artist, err := first[model.Artist](tx, "Artist", in.ArtistID)
+		newKey = imageKey("albums", id, img.ext)
+		return up.put(ctx, newKey, img)
+	}, func(tx *gorm.DB) error {
+		a, err := first[model.Album](tx.Clauses(lockForUpdate()), "Album", id)
 		if err != nil {
 			return err
 		}
 		album = a
-		album.Title, album.ArtistID, album.ReleaseYear, album.Artist = in.Title, in.ArtistID, in.ReleaseYear, nil
-		if img != nil {
-			key := imageKey("albums", id, img.ext)
-			if err := up.put(ctx, key, img); err != nil {
-				return err
-			}
+		album.Title, album.ArtistID, album.ReleaseYear = in.Title, in.ArtistID, in.ReleaseYear
+		if newKey != "" {
 			if album.CoverKey != nil {
 				stale = *album.CoverKey
 			}
-			album.CoverKey = &key
+			album.CoverKey = &newKey
 		}
-		if err := tx.Model(album).Select("title", "artist_id", "release_year", "cover_key").Updates(album).Error; err != nil {
-			return err
-		}
-		album.Artist = artist
-		return nil
+		return tx.Model(album).Select("title", "artist_id", "release_year", "cover_key").Updates(album).Error
 	})
 	if err != nil {
 		return dto.Album{}, err
 	}
 	deleteObjects(ctx, s.store, []string{stale})
+	album.Artist = artist
 	return dto.FromAlbum(album), nil
 }
 
@@ -496,45 +495,50 @@ func (s *Catalog) UploadTracks(ctx context.Context, inputs []TrackInput) ([]dto.
 		}
 		files[i] = p
 	}
-	created := make([]model.Track, 0, len(inputs))
-	err := withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
-		for i, in := range inputs {
-			album, err := first[model.Album](tx.Preload("Artist"), "Album", in.AlbumID)
+	albums := map[uuid.UUID]*model.Album{}
+	artists := map[uuid.UUID]*model.Artist{}
+	tracks := make([]model.Track, len(inputs))
+	for i, in := range inputs {
+		if albums[in.AlbumID] == nil {
+			album, err := first[model.Album](s.db.WithContext(ctx).Preload("Artist"), "Album", in.AlbumID)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			artist, err := first[model.Artist](tx, "Artist", in.ArtistID)
+			albums[in.AlbumID] = album
+		}
+		if artists[in.ArtistID] == nil {
+			artist, err := first[model.Artist](s.db.WithContext(ctx), "Artist", in.ArtistID)
 			if err != nil {
+				return nil, err
+			}
+			artists[in.ArtistID] = artist
+		}
+		id := newID()
+		tracks[i] = model.Track{
+			Base: model.Base{ID: id}, Title: in.Title, AlbumID: in.AlbumID, ArtistID: in.ArtistID,
+			TrackNumber: in.TrackNumber, DurationSeconds: in.DurationSeconds, ContentType: in.Audio.ContentType,
+			R2Key: fmt.Sprintf("audio/%s/%s/%s.%s", in.ArtistID, in.AlbumID, id, files[i].ext),
+		}
+	}
+	err := withUploads(ctx, s.db, s.store, func(up *uploads) error {
+		for i := range tracks {
+			if err := up.put(ctx, tracks[i].R2Key, files[i]); err != nil {
 				return err
 			}
-			track := model.Track{
-				Title: in.Title, AlbumID: in.AlbumID, ArtistID: in.ArtistID,
-				TrackNumber: in.TrackNumber, DurationSeconds: in.DurationSeconds,
-				R2Key: model.PendingKey, ContentType: in.Audio.ContentType,
-			}
-			if err := tx.Omit("Album", "Artist").Create(&track).Error; err != nil {
-				return err
-			}
-			key := fmt.Sprintf("audio/%s/%s/%s.%s", in.ArtistID, in.AlbumID, track.ID, files[i].ext)
-			if err := up.put(ctx, key, files[i]); err != nil {
-				return err
-			}
-			if err := tx.Model(&track).Update("r2_key", key).Error; err != nil {
-				return err
-			}
-			track.R2Key, track.Album, track.Artist = key, album, artist
-			created = append(created, track)
 		}
 		return nil
+	}, func(tx *gorm.DB) error {
+		return tx.Omit("Album", "Artist").Create(&tracks).Error
 	})
 	if err != nil {
 		return nil, err
 	}
-	for i := range created {
-		t := created[i]
+	for i := range tracks {
+		t := &tracks[i]
+		t.Album, t.Artist = albums[t.AlbumID], artists[t.ArtistID]
 		s.async(func() { s.matchLyrics(t.ID, t.Title, t.Artist.Name, t.Album.Title, t.DurationSeconds) })
 	}
-	return dto.Map(created, dto.FromTrack), nil
+	return dto.Map(tracks, dto.FromTrack), nil
 }
 
 func (s *Catalog) matchLyrics(trackID uuid.UUID, title, artist, album string, duration int) {

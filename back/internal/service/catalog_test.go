@@ -365,8 +365,8 @@ func TestUploadBatchIsAtomic(t *testing.T) {
 	if e.count(t, "tracks") != 0 {
 		t.Fatal("first track persisted after batch failure")
 	}
-	if len(e.store.Keys()) != 0 || len(e.store.Deleted) != 1 {
-		t.Fatalf("uploaded object not cleaned up: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
+	if len(e.store.Keys()) != 0 || len(e.store.Deleted) != 0 {
+		t.Fatalf("unknown album must be rejected before uploading: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
 	}
 	if len(e.lyrics.calls) != 0 {
 		t.Fatal("lyrics must not run for rolled back uploads")
@@ -376,6 +376,44 @@ func TestUploadBatchIsAtomic(t *testing.T) {
 	out, err := e.catalog.UploadTracks(e.ctx, inputs)
 	if err != nil || len(out) != 2 || out[0].Title != "one" || out[1].Title != "two" {
 		t.Fatalf("%v %v", out, err)
+	}
+}
+
+func TestFailedWriteAfterUploadRemovesObjects(t *testing.T) {
+	e := newEnv(t)
+	e.artist(t, "Dup")
+	_, err := e.catalog.CreateArtist(e.ctx, ArtistInput{Name: "Dup", Avatar: upload("image/png", pngBytes)})
+	if !errors.Is(err, gorm.ErrDuplicatedKey) {
+		t.Fatalf("want duplicate key, got %v", err)
+	}
+	if len(e.store.Keys()) != 0 {
+		t.Fatalf("avatar of rejected artist left behind: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
+	}
+
+	artist := e.artist(t, "A")
+	album := e.album(t, artist, "x", 1)
+	failTrackInserts(t, e.db)
+	_, err = e.catalog.UploadTracks(e.ctx, []TrackInput{
+		{Title: "one", AlbumID: album.ID, ArtistID: artist.ID, TrackNumber: 1, Audio: upload("audio/mpeg", mp3Bytes)},
+		{Title: "two", AlbumID: album.ID, ArtistID: artist.ID, TrackNumber: 2, Audio: upload("audio/mpeg", mp3Bytes)},
+	})
+	if err == nil {
+		t.Fatal("expected insert failure")
+	}
+	if e.count(t, "tracks") != 0 || len(e.store.Keys()) != 0 {
+		t.Fatalf("uploaded audio not cleaned up: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
+	}
+}
+
+func failTrackInserts(t *testing.T, gdb *gorm.DB) {
+	t.Helper()
+	err := gdb.Callback().Create().Before("gorm:create").Register("test:fail_tracks", func(tx *gorm.DB) {
+		if tx.Statement.Table == "tracks" {
+			_ = tx.AddError(errors.New("insert failed"))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
