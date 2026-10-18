@@ -2,18 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { usePlayerStore } from '../player'
 import { audioMock } from '../../../vitest.setup'
+import { emitter } from '@/lib/emitter'
 import type { TrackResponse } from '@/api/types'
 
 const { recordStreamMock } = vi.hoisted(() => ({
   recordStreamMock: vi.fn().mockResolvedValue(undefined),
-}))
-
-const { partyStoreMock } = vi.hoisted(() => ({
-  partyStoreMock: {
-    inParty: false,
-    canControl: false,
-    next: vi.fn().mockResolvedValue(undefined),
-  },
 }))
 
 vi.mock('@/api/tracks', () => ({
@@ -21,19 +14,17 @@ vi.mock('@/api/tracks', () => ({
   recordStream: recordStreamMock,
 }))
 
-vi.mock('@/stores/party', () => ({
-  usePartyStore: () => partyStoreMock,
-}))
-
 function makeTrack(n: number): TrackResponse {
   return {
     id: `track-${n}`,
     title: `Track ${n}`,
-    album: { id: 'album-1', title: 'Album', artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '' }, releaseYear: 2024, createdAt: '' },
-    artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '' },
+    album: { id: 'album-1', title: 'Album', artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '', avatarUrl: null }, releaseYear: 2024, createdAt: '', coverUrl: null },
+    artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '', avatarUrl: null },
     trackNumber: n,
     durationSeconds: 180,
     createdAt: '',
+    hifi: false,
+    lrclibId: null,
   }
 }
 
@@ -45,10 +36,7 @@ beforeEach(() => {
   localStorage.clear()
   setActivePinia(createPinia())
   recordStreamMock.mockClear()
-  partyStoreMock.inParty = false
-  partyStoreMock.canControl = false
-  partyStoreMock.next.mockClear()
-  partyStoreMock.next.mockResolvedValue(undefined)
+  emitter.all.clear()
 })
 
 // ─── playTrack ────────────────────────────────────────────────────────────────
@@ -373,26 +361,25 @@ describe('evento ended', () => {
 
   it('em party mode, evita next duplicado enquanto request anterior está em andamento', async () => {
     let resolveNext: (() => void) | null = null
-    partyStoreMock.inParty = true
-    partyStoreMock.canControl = true
-    partyStoreMock.next.mockImplementation(
+    const nextMock = vi.fn(
       () =>
-        new Promise<void>((resolve) => {
-          resolveNext = resolve
+        new Promise<boolean>((resolve) => {
+          resolveNext = () => resolve(true)
         }),
     )
 
     const store = usePlayerStore()
+    emitter.emit('party:joined', { next: nextMock })
     store.playQueue([t1, t2], 0)
 
     audioMock._emit('ended')
     audioMock._emit('ended')
-    expect(partyStoreMock.next).toHaveBeenCalledTimes(1)
+    expect(nextMock).toHaveBeenCalledTimes(1)
 
-    resolveNext?.()
+    ;(resolveNext as unknown as (() => void))?.()
     await Promise.resolve()
     audioMock._emit('ended')
-    expect(partyStoreMock.next).toHaveBeenCalledTimes(2)
+    expect(nextMock).toHaveBeenCalledTimes(2)
   })
 })
 

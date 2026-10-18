@@ -52,6 +52,19 @@ const router = createRouter({
       ],
     },
     {
+      path: '/favorites',
+      component: () => import('@/components/layout/AppLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'favorites',
+          component: () => import('@/views/FavoritesView.vue'),
+          meta: { shell: 'wide' },
+        },
+      ],
+    },
+    {
       path: '/playlists',
       component: () => import('@/components/layout/AppLayout.vue'),
       meta: { requiresAuth: true },

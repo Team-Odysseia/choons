@@ -28,5 +28,5 @@ export const setPlaylistVisibility = (playlistId: string, isPublic: boolean) =>
     .put<PlaylistResponse>(`/playlists/${playlistId}/visibility`, { isPublic })
     .then((r) => r.data)
 
-export const getPublicPlaylists = () =>
-  client.get<PlaylistSummaryResponse[]>('/playlists/public').then((r) => r.data)
+export const getPublicPlaylists = (signal?: AbortSignal) =>
+  client.get<PlaylistSummaryResponse[]>('/playlists/public', { signal }).then((r) => r.data)

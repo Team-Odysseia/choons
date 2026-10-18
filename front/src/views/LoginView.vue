@@ -49,6 +49,7 @@ async function submit() {
     toast.error(
       e.response?.status === 401 ? 'Invalid username or password' : 'Login failed. Please try again.',
     )
+    console.log('Login error:', e)
   }
 }
 </script>

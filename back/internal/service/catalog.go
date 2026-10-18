@@ -1,0 +1,668 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"math/rand/v2"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
+	"github.com/Team-Odysseia/choons/back/internal/apperr"
+	"github.com/Team-Odysseia/choons/back/internal/dto"
+	"github.com/Team-Odysseia/choons/back/internal/model"
+	"github.com/Team-Odysseia/choons/back/internal/storage"
+)
+
+type LyricsFinder interface {
+	Find(ctx context.Context, title, artist, album string, durationSeconds int) (*int, error)
+}
+
+type Catalog struct {
+	db     *gorm.DB
+	store  storage.Storage
+	lyrics LyricsFinder
+	async  func(func())
+}
+
+func NewCatalog(gdb *gorm.DB, store storage.Storage, lyrics LyricsFinder) *Catalog {
+	return &Catalog{db: gdb, store: store, lyrics: lyrics, async: func(f func()) { go f() }}
+}
+
+func (s *Catalog) SetAsync(run func(func())) { s.async = run }
+
+type Page struct {
+	Page int
+	Size int
+}
+
+const maxPageSize = 200
+
+func (p Page) limitOffset() (int, int) {
+	size := min(max(p.Size, 1), maxPageSize)
+	page := min(max(p.Page, 0), 1_000_000)
+	return size, page * size
+}
+
+func likePattern(q string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return "%" + r.Replace(strings.ToLower(strings.TrimSpace(q))) + "%"
+}
+
+func notFound(kind string, id uuid.UUID) error {
+	return apperr.NotFound("%s not found: %s", kind, id)
+}
+
+func first[T any](tx *gorm.DB, kind string, id uuid.UUID) (*T, error) {
+	var out T
+	err := tx.First(&out, "id = ?", id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, notFound(kind, id)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func tracksQuery(tx *gorm.DB) *gorm.DB {
+	return tx.Preload("Album.Artist").Preload("Artist")
+}
+
+// Artists
+
+func (s *Catalog) ListArtists(ctx context.Context, query string, p *Page) ([]dto.Artist, error) {
+	q := s.db.WithContext(ctx).Order("name ASC").Order("id ASC")
+	if strings.TrimSpace(query) != "" {
+		q = q.Where("lower(name) LIKE ?", likePattern(query))
+	}
+	if p != nil {
+		limit, offset := p.limitOffset()
+		q = q.Limit(limit).Offset(offset)
+	}
+	var artists []model.Artist
+	if err := q.Find(&artists).Error; err != nil {
+		return nil, err
+	}
+	return dto.Map(artists, dto.FromArtist), nil
+}
+
+func (s *Catalog) GetArtist(ctx context.Context, id uuid.UUID) (dto.Artist, error) {
+	a, err := first[model.Artist](s.db.WithContext(ctx), "Artist", id)
+	if err != nil {
+		return dto.Artist{}, err
+	}
+	return dto.FromArtist(a), nil
+}
+
+type ArtistInput struct {
+	Name   string
+	Bio    *string
+	Avatar *Upload
+}
+
+func (s *Catalog) CreateArtist(ctx context.Context, in ArtistInput) (dto.Artist, error) {
+	img, err := prepareImage(in.Avatar)
+	if err != nil {
+		return dto.Artist{}, err
+	}
+	defer img.close()
+	artist := model.Artist{Name: in.Name, Bio: in.Bio}
+	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
+		if err := tx.Create(&artist).Error; err != nil {
+			return err
+		}
+		if img == nil {
+			return nil
+		}
+		key := fmt.Sprintf("images/artists/%s.%s", artist.ID, img.ext)
+		if err := up.put(ctx, key, img); err != nil {
+			return err
+		}
+		artist.AvatarKey = &key
+		return tx.Model(&artist).Update("avatar_key", key).Error
+	})
+	if err != nil {
+		return dto.Artist{}, err
+	}
+	return dto.FromArtist(&artist), nil
+}
+
+func (s *Catalog) UpdateArtist(ctx context.Context, id uuid.UUID, in ArtistInput) (dto.Artist, error) {
+	img, err := prepareImage(in.Avatar)
+	if err != nil {
+		return dto.Artist{}, err
+	}
+	defer img.close()
+	var artist *model.Artist
+	var stale string
+	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
+		a, err := first[model.Artist](tx, "Artist", id)
+		if err != nil {
+			return err
+		}
+		artist = a
+		artist.Name, artist.Bio = in.Name, in.Bio
+		if img != nil {
+			key := fmt.Sprintf("images/artists/%s.%s", id, img.ext)
+			if err := up.put(ctx, key, img); err != nil {
+				return err
+			}
+			if artist.AvatarKey != nil && *artist.AvatarKey != key {
+				stale = *artist.AvatarKey
+			}
+			artist.AvatarKey = &key
+		}
+		return tx.Model(artist).Select("name", "bio", "avatar_key").Updates(artist).Error
+	})
+	if err != nil {
+		return dto.Artist{}, err
+	}
+	deleteObjects(ctx, s.store, []string{stale})
+	return dto.FromArtist(artist), nil
+}
+
+func (s *Catalog) DeleteArtist(ctx context.Context, id uuid.UUID) error {
+	var keys []string
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		artist, err := first[model.Artist](tx, "Artist", id)
+		if err != nil {
+			return err
+		}
+		if artist.AvatarKey != nil {
+			keys = append(keys, *artist.AvatarKey)
+		}
+		var covers []string
+		if err := tx.Model(&model.Album{}).Where("artist_id = ? AND cover_key IS NOT NULL", id).Pluck("cover_key", &covers).Error; err != nil {
+			return err
+		}
+		var audio []string
+		if err := tx.Model(&model.Track{}).
+			Where("(artist_id = ? OR album_id IN (SELECT id FROM albums WHERE artist_id = ?)) AND r2_key <> ?", id, id, model.PendingKey).
+			Pluck("r2_key", &audio).Error; err != nil {
+			return err
+		}
+		keys = append(append(keys, covers...), audio...)
+		return tx.Delete(&model.Artist{}, "id = ?", id).Error
+	})
+	if err != nil {
+		return err
+	}
+	deleteObjects(ctx, s.store, keys)
+	return nil
+}
+
+func (s *Catalog) DeleteArtistAvatar(ctx context.Context, id uuid.UUID) error {
+	var key string
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		a, err := first[model.Artist](tx, "Artist", id)
+		if err != nil || a.AvatarKey == nil {
+			return err
+		}
+		key = *a.AvatarKey
+		return tx.Model(a).Update("avatar_key", nil).Error
+	})
+	if err != nil {
+		return err
+	}
+	deleteObjects(ctx, s.store, []string{key})
+	return nil
+}
+
+// Albums
+
+func (s *Catalog) ListAlbums(ctx context.Context, artistID *uuid.UUID, query string, p *Page) ([]dto.Album, error) {
+	q := s.db.WithContext(ctx).Preload("Artist").Joins("JOIN artists ON artists.id = albums.artist_id")
+	if artistID != nil {
+		q = q.Where("albums.artist_id = ?", *artistID).Order("albums.release_year DESC").Order("albums.id ASC")
+	} else {
+		q = q.Order("artists.name ASC").Order("albums.title ASC").Order("albums.id ASC")
+	}
+	if strings.TrimSpace(query) != "" {
+		pat := likePattern(query)
+		q = q.Where("(lower(albums.title) LIKE ? OR lower(artists.name) LIKE ?)", pat, pat)
+	}
+	if p != nil {
+		limit, offset := p.limitOffset()
+		q = q.Limit(limit).Offset(offset)
+	}
+	var albums []model.Album
+	if err := q.Find(&albums).Error; err != nil {
+		return nil, err
+	}
+	return dto.Map(albums, dto.FromAlbum), nil
+}
+
+func (s *Catalog) GetAlbum(ctx context.Context, id uuid.UUID) (dto.Album, error) {
+	a, err := first[model.Album](s.db.WithContext(ctx).Preload("Artist"), "Album", id)
+	if err != nil {
+		return dto.Album{}, err
+	}
+	return dto.FromAlbum(a), nil
+}
+
+type AlbumInput struct {
+	Title       string
+	ArtistID    uuid.UUID
+	ReleaseYear int
+	Cover       *Upload
+}
+
+func (s *Catalog) CreateAlbum(ctx context.Context, in AlbumInput) (dto.Album, error) {
+	img, err := prepareImage(in.Cover)
+	if err != nil {
+		return dto.Album{}, err
+	}
+	defer img.close()
+	album := model.Album{Title: in.Title, ArtistID: in.ArtistID, ReleaseYear: in.ReleaseYear}
+	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
+		artist, err := first[model.Artist](tx, "Artist", in.ArtistID)
+		if err != nil {
+			return err
+		}
+		if err := tx.Omit("Artist").Create(&album).Error; err != nil {
+			return err
+		}
+		album.Artist = artist
+		if img == nil {
+			return nil
+		}
+		key := fmt.Sprintf("images/albums/%s.%s", album.ID, img.ext)
+		if err := up.put(ctx, key, img); err != nil {
+			return err
+		}
+		album.CoverKey = &key
+		return tx.Model(&album).Update("cover_key", key).Error
+	})
+	if err != nil {
+		return dto.Album{}, err
+	}
+	return dto.FromAlbum(&album), nil
+}
+
+func (s *Catalog) UpdateAlbum(ctx context.Context, id uuid.UUID, in AlbumInput) (dto.Album, error) {
+	img, err := prepareImage(in.Cover)
+	if err != nil {
+		return dto.Album{}, err
+	}
+	defer img.close()
+	var album *model.Album
+	var stale string
+	err = withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
+		a, err := first[model.Album](tx, "Album", id)
+		if err != nil {
+			return err
+		}
+		artist, err := first[model.Artist](tx, "Artist", in.ArtistID)
+		if err != nil {
+			return err
+		}
+		album = a
+		album.Title, album.ArtistID, album.ReleaseYear, album.Artist = in.Title, in.ArtistID, in.ReleaseYear, nil
+		if img != nil {
+			key := fmt.Sprintf("images/albums/%s.%s", id, img.ext)
+			if err := up.put(ctx, key, img); err != nil {
+				return err
+			}
+			if album.CoverKey != nil && *album.CoverKey != key {
+				stale = *album.CoverKey
+			}
+			album.CoverKey = &key
+		}
+		if err := tx.Model(album).Select("title", "artist_id", "release_year", "cover_key").Updates(album).Error; err != nil {
+			return err
+		}
+		album.Artist = artist
+		return nil
+	})
+	if err != nil {
+		return dto.Album{}, err
+	}
+	deleteObjects(ctx, s.store, []string{stale})
+	return dto.FromAlbum(album), nil
+}
+
+func (s *Catalog) DeleteAlbum(ctx context.Context, id uuid.UUID) error {
+	var keys []string
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		album, err := first[model.Album](tx, "Album", id)
+		if err != nil {
+			return err
+		}
+		if album.CoverKey != nil {
+			keys = append(keys, *album.CoverKey)
+		}
+		var audio []string
+		if err := tx.Model(&model.Track{}).Where("album_id = ? AND r2_key <> ?", id, model.PendingKey).Pluck("r2_key", &audio).Error; err != nil {
+			return err
+		}
+		keys = append(keys, audio...)
+		return tx.Delete(&model.Album{}, "id = ?", id).Error
+	})
+	if err != nil {
+		return err
+	}
+	deleteObjects(ctx, s.store, keys)
+	return nil
+}
+
+func (s *Catalog) DeleteAlbumCover(ctx context.Context, id uuid.UUID) error {
+	var key string
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		a, err := first[model.Album](tx, "Album", id)
+		if err != nil || a.CoverKey == nil {
+			return err
+		}
+		key = *a.CoverKey
+		return tx.Model(a).Update("cover_key", nil).Error
+	})
+	if err != nil {
+		return err
+	}
+	deleteObjects(ctx, s.store, []string{key})
+	return nil
+}
+
+func (s *Catalog) RandomCoverIDs(ctx context.Context, n int) ([]string, error) {
+	var ids []uuid.UUID
+	if err := s.db.WithContext(ctx).Model(&model.Album{}).Where("cover_key IS NOT NULL").Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	rand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
+	out := make([]string, 0, min(n, len(ids)))
+	for _, id := range ids[:min(n, len(ids))] {
+		out = append(out, id.String())
+	}
+	return out, nil
+}
+
+// Tracks
+
+func (s *Catalog) ListTracks(ctx context.Context, albumID *uuid.UUID, query string, p *Page) ([]dto.Track, error) {
+	q := tracksQuery(s.db.WithContext(ctx))
+	if albumID != nil {
+		q = q.Where("tracks.album_id = ?", *albumID).Order("tracks.track_number ASC").Order("tracks.id ASC")
+	} else {
+		q = q.Order("tracks.created_at ASC").Order("tracks.id ASC")
+	}
+	if strings.TrimSpace(query) != "" {
+		pat := likePattern(query)
+		q = q.Where(`(lower(tracks.title) LIKE ?
+			OR EXISTS (SELECT 1 FROM artists ar WHERE ar.id = tracks.artist_id AND lower(ar.name) LIKE ?)
+			OR EXISTS (SELECT 1 FROM albums al WHERE al.id = tracks.album_id AND lower(al.title) LIKE ?))`, pat, pat, pat)
+	}
+	if p != nil {
+		limit, offset := p.limitOffset()
+		q = q.Limit(limit).Offset(offset)
+	}
+	var tracks []model.Track
+	if err := q.Find(&tracks).Error; err != nil {
+		return nil, err
+	}
+	return dto.Map(tracks, dto.FromTrack), nil
+}
+
+func (s *Catalog) GetTrack(ctx context.Context, id uuid.UUID) (dto.Track, error) {
+	t, err := first[model.Track](tracksQuery(s.db.WithContext(ctx)), "Track", id)
+	if err != nil {
+		return dto.Track{}, err
+	}
+	return dto.FromTrack(t), nil
+}
+
+func (s *Catalog) TrackKey(ctx context.Context, id uuid.UUID) (string, error) {
+	t, err := first[model.Track](s.db.WithContext(ctx).Select("id", "r2_key"), "Track", id)
+	if err != nil {
+		return "", err
+	}
+	return t.R2Key, nil
+}
+
+func (s *Catalog) MostPlayed(ctx context.Context, limit int) ([]dto.Track, error) {
+	limit = min(max(limit, 1), 100)
+	var ranked []struct {
+		TrackID uuid.UUID
+	}
+	err := s.db.WithContext(ctx).Model(&model.StreamEvent{}).
+		Select("track_id").Group("track_id").Order("count(*) DESC").Order("track_id ASC").Limit(limit).
+		Scan(&ranked).Error
+	if err != nil || len(ranked) == 0 {
+		return []dto.Track{}, err
+	}
+	ids := make([]uuid.UUID, len(ranked))
+	for i, r := range ranked {
+		ids[i] = r.TrackID
+	}
+	var tracks []model.Track
+	if err := tracksQuery(s.db.WithContext(ctx)).Where("id IN ?", ids).Find(&tracks).Error; err != nil {
+		return nil, err
+	}
+	byID := make(map[uuid.UUID]*model.Track, len(tracks))
+	for i := range tracks {
+		byID[tracks[i].ID] = &tracks[i]
+	}
+	out := make([]dto.Track, 0, len(ids))
+	for _, id := range ids {
+		if t, ok := byID[id]; ok {
+			out = append(out, dto.FromTrack(t))
+		}
+	}
+	return out, nil
+}
+
+func (s *Catalog) RecordPlay(ctx context.Context, userID, trackID uuid.UUID) error {
+	if _, err := first[model.Track](s.db.WithContext(ctx).Select("id"), "Track", trackID); err != nil {
+		return err
+	}
+	return s.db.WithContext(ctx).Create(&model.StreamEvent{UserID: userID, TrackID: trackID}).Error
+}
+
+type TrackInput struct {
+	Title           string
+	AlbumID         uuid.UUID
+	ArtistID        uuid.UUID
+	TrackNumber     int
+	DurationSeconds int
+	Audio           *Upload
+}
+
+func (s *Catalog) UploadTrack(ctx context.Context, in TrackInput) (dto.Track, error) {
+	out, err := s.UploadTracks(ctx, []TrackInput{in})
+	if err != nil {
+		return dto.Track{}, err
+	}
+	return out[0], nil
+}
+
+func (s *Catalog) UploadTracks(ctx context.Context, inputs []TrackInput) ([]dto.Track, error) {
+	files := make([]*prepared, len(inputs))
+	defer func() {
+		for _, f := range files {
+			f.close()
+		}
+	}()
+	for i := range inputs {
+		if inputs[i].Audio == nil {
+			return nil, apperr.BadRequest("audioFile is required")
+		}
+		p, err := prepare(inputs[i].Audio, storage.AudioExt)
+		if err != nil {
+			return nil, err
+		}
+		files[i] = p
+	}
+	created := make([]model.Track, 0, len(inputs))
+	err := withUploads(ctx, s.db, s.store, func(tx *gorm.DB, up *uploads) error {
+		for i, in := range inputs {
+			album, err := first[model.Album](tx.Preload("Artist"), "Album", in.AlbumID)
+			if err != nil {
+				return err
+			}
+			artist, err := first[model.Artist](tx, "Artist", in.ArtistID)
+			if err != nil {
+				return err
+			}
+			track := model.Track{
+				Title: in.Title, AlbumID: in.AlbumID, ArtistID: in.ArtistID,
+				TrackNumber: in.TrackNumber, DurationSeconds: in.DurationSeconds,
+				R2Key: model.PendingKey, ContentType: in.Audio.ContentType,
+			}
+			if err := tx.Omit("Album", "Artist").Create(&track).Error; err != nil {
+				return err
+			}
+			key := fmt.Sprintf("audio/%s/%s/%s.%s", in.ArtistID, in.AlbumID, track.ID, files[i].ext)
+			if err := up.put(ctx, key, files[i]); err != nil {
+				return err
+			}
+			if err := tx.Model(&track).Update("r2_key", key).Error; err != nil {
+				return err
+			}
+			track.R2Key, track.Album, track.Artist = key, album, artist
+			created = append(created, track)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	for i := range created {
+		t := created[i]
+		s.async(func() { s.matchLyrics(t.ID, t.Title, t.Artist.Name, t.Album.Title, t.DurationSeconds) })
+	}
+	return dto.Map(created, dto.FromTrack), nil
+}
+
+func (s *Catalog) matchLyrics(trackID uuid.UUID, title, artist, album string, duration int) {
+	if s.lyrics == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	id, err := s.lyrics.Find(ctx, title, artist, album, duration)
+	if err != nil {
+		slog.Warn("lyrics lookup failed", "title", title, "err", err)
+		return
+	}
+	if id == nil {
+		return
+	}
+	if err := s.db.WithContext(ctx).Model(&model.Track{}).Where("id = ?", trackID).Update("lrclib_id", *id).Error; err != nil {
+		slog.Warn("lyrics save failed", "track", trackID, "err", err)
+	}
+}
+
+type TrackUpdate struct {
+	ID          *uuid.UUID `json:"id" binding:"required"`
+	Title       string     `json:"title" binding:"notblank"`
+	TrackNumber int        `json:"trackNumber" binding:"gte=0"`
+}
+
+func (s *Catalog) UpdateTrack(ctx context.Context, id uuid.UUID, title string, trackNumber int) (dto.Track, error) {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := first[model.Track](tx, "Track", id); err != nil {
+			return err
+		}
+		return tx.Model(&model.Track{}).Where("id = ?", id).
+			Updates(map[string]any{"title": title, "track_number": trackNumber}).Error
+	})
+	if err != nil {
+		return dto.Track{}, err
+	}
+	return s.GetTrack(ctx, id)
+}
+
+func (s *Catalog) UpdateAlbumTracks(ctx context.Context, albumID uuid.UUID, updates []TrackUpdate) ([]dto.Track, error) {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, u := range updates {
+			t, err := first[model.Track](tx, "Track", *u.ID)
+			if err != nil {
+				return err
+			}
+			if t.AlbumID != albumID {
+				return apperr.BadRequest("Track %s does not belong to album %s", *u.ID, albumID)
+			}
+			if err := tx.Model(t).Updates(map[string]any{"title": u.Title, "track_number": u.TrackNumber}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.Track, 0, len(updates))
+	for _, u := range updates {
+		t, err := s.GetTrack(ctx, *u.ID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+func (s *Catalog) UpdateLrclibID(ctx context.Context, id uuid.UUID, lrclibID *int) (dto.Track, error) {
+	res := s.db.WithContext(ctx).Model(&model.Track{}).Where("id = ?", id).Update("lrclib_id", lrclibID)
+	if res.Error != nil {
+		return dto.Track{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return dto.Track{}, notFound("Track", id)
+	}
+	return s.GetTrack(ctx, id)
+}
+
+func (s *Catalog) DeleteTrack(ctx context.Context, id uuid.UUID) error {
+	var key string
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		t, err := first[model.Track](tx, "Track", id)
+		if err != nil {
+			return err
+		}
+		if t.R2Key != model.PendingKey {
+			key = t.R2Key
+		}
+		return tx.Delete(&model.Track{}, "id = ?", id).Error
+	})
+	if err != nil {
+		return err
+	}
+	deleteObjects(ctx, s.store, []string{key})
+	return nil
+}
+
+// Images
+
+func (s *Catalog) ImageKey(ctx context.Context, kind string, id uuid.UUID) (*string, error) {
+	switch kind {
+	case "artists":
+		a, err := first[model.Artist](s.db.WithContext(ctx), "Artist", id)
+		if err != nil {
+			return nil, err
+		}
+		return a.AvatarKey, nil
+	case "albums":
+		a, err := first[model.Album](s.db.WithContext(ctx), "Album", id)
+		if err != nil {
+			return nil, err
+		}
+		return a.CoverKey, nil
+	}
+	return nil, apperr.NotFound("Unknown image kind")
+}
+
+func prepareImage(u *Upload) (*prepared, error) {
+	if u == nil || u.Size == 0 {
+		return nil, nil
+	}
+	return prepare(u, storage.ImageExt)
+}
+
+func lockForUpdate() clause.Locking {
+	return clause.Locking{Strength: "UPDATE"}
+}

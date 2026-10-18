@@ -1,8 +1,8 @@
 import client from './client'
-import type { AuthResponse, ListenerRequestBanResponse, UserResponse } from './types'
+import type { ListenerRequestBanResponse, UserResponse } from './types'
 
 export const login = (username: string, password: string) =>
-  client.post<AuthResponse>('/auth/login', { username, password }).then((r) => r.data)
+  client.post('/auth/login', { username, password })
 
 export const logout = () => client.post('/auth/logout')
 

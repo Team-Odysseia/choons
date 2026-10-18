@@ -23,6 +23,7 @@ function isNew(createdAt: string) {
       <img
         v-if="artist.avatarUrl"
         :src="artistImageUrl(artist.id)"
+        :alt="artist.name + ' avatar'"
         class="size-[100px] md:size-[120px] rounded-full object-cover shrink-0"
       />
       <div
@@ -54,6 +55,7 @@ function isNew(createdAt: string) {
           <img
             v-if="album.coverUrl"
             :src="albumImageUrl(album.id)"
+            :alt="album.title + ' cover'"
             class="w-full aspect-square rounded object-cover"
           />
           <div

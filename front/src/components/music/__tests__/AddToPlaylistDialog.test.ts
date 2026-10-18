@@ -24,11 +24,11 @@ vi.mock('@/api/playlists', () => ({
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const artist = { id: 'a-1', name: 'Test Artist', bio: null, createdAt: '2024-01-01T00:00:00Z' }
-const album = { id: 'al-1', title: 'Test Album', artist, releaseYear: 2024, createdAt: '2024-01-01T00:00:00Z' }
+const artist = { id: 'a-1', name: 'Test Artist', bio: null, createdAt: '2024-01-01T00:00:00Z', avatarUrl: null }
+const album = { id: 'al-1', title: 'Test Album', artist, releaseYear: 2024, createdAt: '2024-01-01T00:00:00Z', coverUrl: null }
 
 function makeTrack(id: string, title: string) {
-  return { id, title, album, artist, trackNumber: 1, durationSeconds: 180, createdAt: '2024-01-01T00:00:00Z' }
+  return { id, title, album, artist, trackNumber: 1, durationSeconds: 180, createdAt: '2024-01-01T00:00:00Z', hifi: false, lrclibId: null }
 }
 
 const track1 = makeTrack('t-1', 'Song One')

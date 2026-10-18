@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
+import { useFavoritesStore } from '@/stores/favorites'
 import { useArtistsQuery, useRecentAlbumsQuery, useMostPlayedQuery } from '@/composables/queries'
 import { albumImageUrl } from '@/api/albums'
 import { artistImageUrl } from '@/api/artists'
@@ -10,11 +11,16 @@ import { Input } from '@/components/ui/input'
 
 const router = useRouter()
 const playlists = usePlaylistsStore()
+const favorites = useFavoritesStore()
 
 const globalSearch = ref('')
 const { data: artists, isPending: artistsLoading } = useArtistsQuery()
 const { data: recentAlbums } = useRecentAlbumsQuery()
 const { data: mostPlayed } = useMostPlayedQuery()
+
+watch(mostPlayed, (tracks) => {
+  if (tracks?.length) void favorites.fetchStatus(tracks.map((t) => t.id))
+})
 
 const swiperRef = ref<HTMLElement | null>(null)
 const communityRef = ref<HTMLElement | null>(null)
@@ -121,6 +127,7 @@ function goToSearch() {
             <img
               v-if="album.coverUrl"
               :src="albumImageUrl(album.id)"
+              :alt="album.title + ' cover'"
               class="w-full aspect-square rounded object-cover"
             />
             <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[36px]">
@@ -203,6 +210,7 @@ function goToSearch() {
           <img
             v-if="artist.avatarUrl"
             :src="artistImageUrl(artist.id)"
+            :alt="artist.name + ' avatar'"
             class="w-full aspect-square rounded-full object-cover mb-3"
           />
           <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[40px] font-extrabold text-muted-foreground mb-3">

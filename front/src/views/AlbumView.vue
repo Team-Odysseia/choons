@@ -6,6 +6,7 @@ import { useAlbumQuery, useAlbumTracksQuery } from '@/composables/queries'
 import { usePlayerStore } from '@/stores/player'
 import { usePartyStore } from '@/stores/party'
 import { usePlaylistsStore } from '@/stores/playlists'
+import { useFavoritesStore } from '@/stores/favorites'
 import TrackRow from '@/components/music/TrackRow.vue'
 import AddToPlaylistDialog from '@/components/music/AddToPlaylistDialog.vue'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ const router = useRouter()
 const player = usePlayerStore()
 const party = usePartyStore()
 const playlists = usePlaylistsStore()
+const favorites = useFavoritesStore()
 
 const id = computed(() => route.params.id as string)
 const { data: album, isPending } = useAlbumQuery(id)
@@ -64,6 +66,7 @@ async function focusTrackFromRoute() {
 
 watch([trackList, () => route.query.track], () => {
   void focusTrackFromRoute()
+  if (trackList.value.length) void favorites.fetchStatus(trackList.value.map((t) => t.id))
 }, { immediate: true })
 
 onBeforeUnmount(() => {
@@ -77,6 +80,7 @@ onBeforeUnmount(() => {
       <img
         v-if="album.coverUrl"
         :src="albumImageUrl(album.id)"
+        :alt="album.title + ' cover'"
         class="size-[120px] md:size-[160px] rounded-lg object-cover shrink-0"
       />
       <div
@@ -110,7 +114,7 @@ onBeforeUnmount(() => {
       </Button>
       <Button
         variant="outline"
-        :disabled="trackList.length === 0 || (party.inParty && !party.canControl)"
+        :disabled="trackList.length === 0"
         @click="addAllToQueue"
       >
         <ListPlus :size="16" />

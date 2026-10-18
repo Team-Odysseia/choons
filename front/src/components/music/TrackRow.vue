@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { usePlayerStore } from '@/stores/player'
 import { usePartyStore } from '@/stores/party'
 import type { TrackResponse } from '@/api/types'
-import { Play, Plus, ListPlus } from 'lucide-vue-next'
+import { Play, Plus, ListPlus, Heart } from 'lucide-vue-next'
 import AddToPlaylistDialog from './AddToPlaylistDialog.vue'
+import { useFavoritesStore } from '@/stores/favorites'
 
 const props = defineProps<{
   track: TrackResponse
@@ -18,6 +19,7 @@ const props = defineProps<{
 
 const player = usePlayerStore()
 const party = usePartyStore()
+const favorites = useFavoritesStore()
 const router = useRouter()
 const dialogOpen = ref(false)
 
@@ -44,7 +46,7 @@ function formatDuration(secs: number) {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-const isActive = () => player.currentTrack?.id === props.track.id
+const isActive = computed(() => player.currentTrack?.id === props.track.id)
 </script>
 
 <template>
@@ -57,7 +59,7 @@ const isActive = () => player.currentTrack?.id === props.track.id
       class="flex flex-col gap-0.5 min-w-0 cursor-pointer"
       @click.stop="play"
     >
-      <span class="text-sm font-medium truncate" :class="isActive() ? 'text-primary' : 'text-foreground'">{{ track.title }}</span>
+      <span class="text-sm font-medium truncate" :class="isActive ? 'text-primary' : 'text-foreground'">{{ track.title }}</span>
       <span class="text-xs text-muted-foreground truncate">{{ track.artist.name }}</span>
     </div>
 
@@ -83,9 +85,17 @@ const isActive = () => player.currentTrack?.id === props.track.id
       </button>
 
       <button
+        class="size-8 rounded-full flex items-center justify-center transition-colors"
+        :class="favorites.isFavorited(track.id) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
+        :title="favorites.isFavorited(track.id) ? 'Remove from favorites' : 'Add to favorites'"
+        @click.stop="favorites.toggle(track.id)"
+      >
+        <Heart :size="16" :fill="favorites.isFavorited(track.id) ? 'currentColor' : 'none'" />
+      </button>
+
+      <button
         v-if="showAddToQueue"
         class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-        :disabled="party.inParty && !party.canControl"
         :title="party.inParty ? 'Add to party queue' : 'Add to queue'"
         @click.stop="addToQueue"
       >

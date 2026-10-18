@@ -18,14 +18,17 @@ const mockTrack: TrackResponse = {
   album: {
     id: 'album-1',
     title: 'Test Album',
-    artist: { id: 'art-1', name: 'Test Artist', bio: '', createdAt: '' },
+    artist: { id: 'art-1', name: 'Test Artist', bio: '', createdAt: '', avatarUrl: null },
     releaseYear: 2024,
     createdAt: '',
+    coverUrl: null,
   },
-  artist: { id: 'art-1', name: 'Test Artist', bio: '', createdAt: '' },
+  artist: { id: 'art-1', name: 'Test Artist', bio: '', createdAt: '', avatarUrl: null },
   trackNumber: 1,
   durationSeconds: 240,
   createdAt: '',
+  hifi: false,
+  lrclibId: null,
 }
 
 function mountPlayer() {
@@ -139,6 +142,22 @@ describe('controles de reprodução', () => {
   })
 })
 
+// ─── Acessibilidade ───────────────────────────────────────────────────────────
+
+describe('accessibility', () => {
+  it('progress range has aria-label', () => {
+    const { wrapper } = mountPlayer()
+    const progressInput = wrapper.find('[data-testid="progress-range"]')
+    expect(progressInput.attributes('aria-label')).toBeDefined()
+  })
+
+  it('volume range has aria-label', () => {
+    const { wrapper } = mountPlayer()
+    const volumeInput = wrapper.find('[data-testid="volume-range"]')
+    expect(volumeInput.attributes('aria-label')).toBeDefined()
+  })
+})
+
 // ─── Barra de progresso ───────────────────────────────────────────────────────
 
 describe('barra de progresso', () => {
@@ -149,7 +168,7 @@ describe('barra de progresso', () => {
 
     // input[type=range] da barra de progresso (primeiro range input)
     const progressInput = wrapper.find('[data-testid="progress-range"]')
-    expect(Number(progressInput.element.value)).toBeCloseTo(25) // 60/240 * 100
+    expect(Number((progressInput.element as HTMLInputElement).value)).toBeCloseTo(25) // 60/240 * 100
   })
 
   it('input dispara seek com tempo correto', async () => {

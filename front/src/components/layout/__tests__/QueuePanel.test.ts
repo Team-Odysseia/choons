@@ -53,8 +53,8 @@ describe('QueuePanel', () => {
 
     const wrapper = mount(QueuePanel)
     const rows = wrapper.findAll('.flex.items-center.gap-2')
-    expect(rows[1].classes()).toContain('bg-muted')
-    expect(rows[0].classes()).not.toContain('bg-muted')
+    expect(rows[1]!.classes()).toContain('bg-muted')
+    expect(rows[0]!.classes()).not.toContain('bg-muted')
   })
 
   it('calls removeFromQueue when remove button is clicked', async () => {
@@ -64,7 +64,7 @@ describe('QueuePanel', () => {
     const removeSpy = vi.spyOn(player, 'removeFromQueue')
 
     const wrapper = mount(QueuePanel)
-    await wrapper.findAll('button[title="Remove"]')[0].trigger('click')
+    await wrapper.findAll('button[title="Remove"]')[0]!.trigger('click')
     expect(removeSpy).toHaveBeenCalledWith(0)
   })
 
@@ -75,7 +75,8 @@ describe('QueuePanel', () => {
     const clearSpy = vi.spyOn(player, 'clearQueue')
 
     const wrapper = mount(QueuePanel)
-    await wrapper.find('button', { text: 'Clear' } as any).trigger('click')
+    const clearBtn = wrapper.findAll('button').find((b) => b.text().includes('Clear'))
+    await clearBtn!.trigger('click')
     expect(clearSpy).toHaveBeenCalled()
   })
 })

@@ -4,9 +4,9 @@ import type { ArtistResponse } from './types'
 export const getArtists = () =>
   client.get<ArtistResponse[]>('/music/artists').then((r) => r.data)
 
-export const searchArtists = (query: string, page = 0, size = 100) =>
+export const searchArtists = (query: string, page = 0, size = 100, signal?: AbortSignal) =>
   client
-    .get<ArtistResponse[]>('/music/artists', { params: { query, page, size } })
+    .get<ArtistResponse[]>('/music/artists', { params: { query, page, size }, signal })
     .then((r) => r.data)
 
 export const getArtist = (id: string) =>

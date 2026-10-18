@@ -21,11 +21,12 @@ function makeTrack(id: string): TrackResponse {
     album: {
       id: 'album-1',
       title: 'Album',
-      artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '' },
+      artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '', avatarUrl: null },
       releaseYear: 2024,
       createdAt: '',
+      coverUrl: null,
     },
-    artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '' },
+    artist: { id: 'art-1', name: 'Artist', bio: '', createdAt: '', avatarUrl: null },
     trackNumber: 1,
     durationSeconds: 180,
     createdAt: '',
@@ -47,28 +48,28 @@ describe('parseLrc', () => {
     const lrc = '[00:01.00] First\n[00:02.00]   \n[00:03.00] Third'
     const lines = parseLrc(lrc)
     expect(lines).toHaveLength(2)
-    expect(lines[0].text).toBe('First')
-    expect(lines[1].text).toBe('Third')
+    expect(lines[0]!.text).toBe('First')
+    expect(lines[1]!.text).toBe('Third')
   })
 
   it('skips lines without a timestamp', () => {
     const lrc = '[ti:Song Title]\n[00:01.00] Lyric'
     const lines = parseLrc(lrc)
     expect(lines).toHaveLength(1)
-    expect(lines[0].text).toBe('Lyric')
+    expect(lines[0]!.text).toBe('Lyric')
   })
 
   it('sorts lines by timestamp', () => {
     const lrc = '[00:10.00] Late\n[00:01.00] Early'
     const lines = parseLrc(lrc)
-    expect(lines[0].text).toBe('Early')
-    expect(lines[1].text).toBe('Late')
+    expect(lines[0]!.text).toBe('Early')
+    expect(lines[1]!.text).toBe('Late')
   })
 
   it('converts minutes and seconds to milliseconds correctly', () => {
     const lrc = '[01:30.25] One and a half'
     const lines = parseLrc(lrc)
-    expect(lines[0].timeMs).toBe((60 + 30.25) * 1000)
+    expect(lines[0]!.timeMs).toBe((60 + 30.25) * 1000)
   })
 
   it('returns empty array for empty input', () => {

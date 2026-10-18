@@ -8,7 +8,7 @@ export const getTracks = (albumId?: string) =>
 
 export const searchTracks = (
   query: string,
-  opts?: { albumId?: string; page?: number; size?: number },
+  opts?: { albumId?: string; page?: number; size?: number; signal?: AbortSignal },
 ) =>
   client
     .get<TrackResponse[]>('/music/tracks', {
@@ -18,6 +18,7 @@ export const searchTracks = (
         page: opts?.page ?? 0,
         size: opts?.size ?? 100,
       },
+      signal: opts?.signal,
     })
     .then((r) => r.data)
 

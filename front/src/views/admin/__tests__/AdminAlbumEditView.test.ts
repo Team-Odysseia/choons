@@ -276,7 +276,7 @@ describe('track deletion', () => {
       .filter((b) => b.attributes('class')?.includes('text-dimmed') && !b.text().includes('Back'))
 
     expect(deleteButtons.length).toBeGreaterThan(0)
-    await deleteButtons[0].trigger('click')
+    await deleteButtons[0]!.trigger('click')
     await flushPromises()
 
     expect(mockDeleteTrack).toHaveBeenCalledWith('t-1')
@@ -292,7 +292,7 @@ describe('track deletion', () => {
       .findAll('button[type="button"]')
       .filter((b) => b.attributes('class')?.includes('text-dimmed') && !b.text().includes('Back'))
 
-    await deleteButtons[0].trigger('click')
+    await deleteButtons[0]!.trigger('click')
     await flushPromises()
 
     expect(mockToastError).toHaveBeenCalledWith('Failed to delete track')

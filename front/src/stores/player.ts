@@ -1,136 +1,120 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
 import { streamUrl, recordStream } from '@/api/tracks'
-import { usePartyStore } from './party'
+import { emitter } from '@/lib/emitter'
+import { useAudioEngine } from '@/composables/useAudioEngine'
+import { useQueue } from '@/composables/useQueue'
+import { useMediaSession } from '@/composables/useMediaSession'
 import type { TrackResponse } from '@/api/types'
 
 export type LoopMode = 'none' | 'queue' | 'track'
 
-function shuffleArray<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    const current = a[i]
-    const target = a[j]
-    if (current === undefined || target === undefined) continue
-    a[i] = target
-    a[j] = current
-  }
-  return a
-}
-
 export const usePlayerStore = defineStore('player', () => {
-  const audio = new Audio()
-  audio.preload = 'metadata'
-
-  const currentTrack = ref<TrackResponse | null>(null)
-  const queue = ref<TrackResponse[]>([])
-  const originalQueue = ref<TrackResponse[]>([])
-  const currentIndex = ref(-1)
-  const isPlaying = ref(false)
-  const currentTime = ref(0)
-  const duration = ref(0)
+  const audioEngine = useAudioEngine()
+  const queueManager = useQueue()
   const volume = useLocalStorage('volume', 1)
-  const loopMode = ref<LoopMode>('none')
-  const isShuffled = ref(false)
   const streamRecorded = ref(false)
   const partyAdvanceInFlight = ref(false)
-  audio.volume = volume.value
+  const partyInParty = ref(false)
+  const partyCanControl = ref(false)
+  const partyNextFn = ref<(() => Promise<boolean>) | null>(null)
+
+  audioEngine.setVolume(volume.value)
 
   // ─── Media Session ──────────────────────────────────────────────────────────
 
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.setActionHandler('play', () => audio.play().catch(() => { isPlaying.value = false }))
-    navigator.mediaSession.setActionHandler('pause', () => audio.pause())
-    navigator.mediaSession.setActionHandler('previoustrack', () => playPrev())
-    navigator.mediaSession.setActionHandler('nexttrack', () => playNext())
-  }
+  useMediaSession(
+    queueManager.currentTrack,
+    {
+      onPlay: () => audioEngine.play().catch(() => {}),
+      onPause: () => audioEngine.pause(),
+      onPreviousTrack: () => playPrev(),
+      onNextTrack: () => playNext(),
+    },
+  )
 
-  watch(currentTrack, (track) => {
-    if (!('mediaSession' in navigator)) return
-    if (track) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.title,
-        artist: track.artist.name,
-        album: track.album.title,
-      })
-    } else {
-      navigator.mediaSession.metadata = null
-    }
+  // ─── Event bus listeners ────────────────────────────────────────────────────
+
+  emitter.on('party:stateChanged', (party) => {
+    if (!party) return
+
+    const queueTracks = party.queue.map((item) => item.track)
+    const playbackTrack = party.playback.track
+    const now = Date.now()
+    const elapsedSec = Math.max(0, (now - party.playback.anchorEpochMs) / 1000)
+    const position = party.playback.playing
+      ? party.playback.anchorPositionSec + elapsedSec
+      : party.playback.anchorPositionSec
+
+    syncExternalState(playbackTrack, queueTracks, party.playback.playing, position)
+  })
+
+  emitter.on('party:joined', ({ next }) => {
+    partyInParty.value = true
+    partyNextFn.value = next
+  })
+
+  emitter.on('party:left', () => {
+    partyInParty.value = false
+    partyCanControl.value = false
+    partyNextFn.value = null
+  })
+
+  emitter.on('auth:logout', () => {
+    stop()
   })
 
   // ─── Audio events ────────────────────────────────────────────────────────────
 
-  audio.addEventListener('timeupdate', () => {
-    currentTime.value = audio.currentTime
-    if (!streamRecorded.value && currentTrack.value && duration.value > 0) {
-      const threshold = Math.min(30, duration.value * 0.5)
-      if (audio.currentTime >= threshold) {
-        streamRecorded.value = true
-        recordStream(currentTrack.value.id).catch(() => {})
-      }
-    }
-  })
-  audio.addEventListener('durationchange', () => {
-    duration.value = audio.duration || 0
-  })
-  audio.addEventListener('ended', () => {
-    if (loopMode.value === 'track') {
-      audio.currentTime = 0
-      audio.play().catch(() => { isPlaying.value = false })
+  audioEngine.onEnded(() => {
+    if (queueManager.loopMode.value === 'track') {
+      audioEngine.seek(0)
+      audioEngine.play().catch(() => {})
     } else {
-      const party = usePartyStore()
-      if (party.inParty && party.canControl) {
+      if (partyInParty.value && partyNextFn.value) {
         if (partyAdvanceInFlight.value) return
         partyAdvanceInFlight.value = true
-        void party.next().finally(() => {
+        void partyNextFn.value().then((handled) => {
           partyAdvanceInFlight.value = false
+          if (!handled) playNext()
         })
         return
       }
       playNext()
     }
   })
-  audio.addEventListener('play', () => {
-    isPlaying.value = true
-  })
-  audio.addEventListener('pause', () => {
-    isPlaying.value = false
+
+  audioEngine.audio.addEventListener('timeupdate', () => {
+    const time = audioEngine.getCurrentTime()
+    if (!streamRecorded.value && queueManager.currentTrack.value && audioEngine.duration.value > 0) {
+      const threshold = Math.min(30, audioEngine.duration.value * 0.5)
+      if (time >= threshold) {
+        streamRecorded.value = true
+        recordStream(queueManager.currentTrack.value.id).catch(() => {})
+      }
+    }
   })
 
-  const hasNext = computed(() =>
-    loopMode.value === 'queue'
-      ? queue.value.length > 1
-      : currentIndex.value < queue.value.length - 1,
-  )
-  const hasPrev = computed(() =>
-    loopMode.value === 'queue'
-      ? queue.value.length > 1
-      : currentIndex.value > 0,
-  )
+  // ─── Public API ─────────────────────────────────────────────────────────────
+
+  const currentTrack = queueManager.currentTrack
+  const queue = queueManager.queue
+  const currentIndex = queueManager.currentIndex
+  const isPlaying = audioEngine.isPlaying
+  const currentTime = audioEngine.currentTime
+  const duration = audioEngine.duration
+  const loopMode = queueManager.loopMode
+  const isShuffled = queueManager.isShuffled
+  const hasNext = queueManager.hasNext
+  const hasPrev = queueManager.hasPrev
 
   function playTrack(track: TrackResponse, trackQueue?: TrackResponse[], index?: number) {
-    if (!currentTrack.value || currentTrack.value.id !== track.id) {
-      currentTrack.value = track
-    }
-    if (trackQueue) {
-      originalQueue.value = trackQueue
-      if (isShuffled.value) {
-        const shuffled = shuffleArray(trackQueue.filter((t) => t.id !== track.id))
-        queue.value = [track, ...shuffled]
-        currentIndex.value = 0
-      } else {
-        queue.value = trackQueue
-        currentIndex.value = index ?? 0
-      }
-    } else {
-      currentIndex.value = index ?? 0
-    }
+    queueManager.playTrack(track, trackQueue, index)
     streamRecorded.value = false
-    audio.src = streamUrl(track.id)
-    audio.play().catch(() => {
-      isPlaying.value = false
+    audioEngine.setSrc(streamUrl(track.id))
+    audioEngine.play().catch(() => {
+      audioEngine.isPlaying.value = false
     })
   }
 
@@ -142,7 +126,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   function playQueueShuffled(tracks: TrackResponse[]) {
     if (tracks.length === 0) return
-    isShuffled.value = true
+    queueManager.isShuffled.value = true
     const startIndex = Math.floor(Math.random() * tracks.length)
     const track = tracks[startIndex]
     if (!track) return
@@ -150,121 +134,83 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function playNext() {
-    if (loopMode.value === 'queue' && currentIndex.value === queue.value.length - 1) {
-      const track = queue.value[0]
-      if (track) playTrack(track, undefined, 0)
-    } else if (currentIndex.value < queue.value.length - 1) {
-      const next = currentIndex.value + 1
-      const track = queue.value[next]
-      if (track) playTrack(track, undefined, next)
+    queueManager.playNext()
+    const track = queueManager.currentTrack.value
+    if (track) {
+      streamRecorded.value = false
+      audioEngine.setSrc(streamUrl(track.id))
+      audioEngine.play().catch(() => {
+        audioEngine.isPlaying.value = false
+      })
     }
   }
 
   function playPrev() {
-    if (audio.currentTime > 3) {
-      audio.currentTime = 0
+    if (audioEngine.getCurrentTime() > 3) {
+      audioEngine.seek(0)
       return
     }
-    if (loopMode.value === 'queue' && currentIndex.value === 0) {
-      const last = queue.value.length - 1
-      const track = queue.value[last]
-      if (track) playTrack(track, undefined, last)
-    } else if (currentIndex.value > 0) {
-      const prev = currentIndex.value - 1
-      const track = queue.value[prev]
-      if (track) playTrack(track, undefined, prev)
+    queueManager.playPrev()
+    const track = queueManager.currentTrack.value
+    if (track) {
+      streamRecorded.value = false
+      audioEngine.setSrc(streamUrl(track.id))
+      audioEngine.play().catch(() => {
+        audioEngine.isPlaying.value = false
+      })
     }
   }
 
   function togglePlay() {
-    if (audio.paused) {
-      audio.play().catch(() => { isPlaying.value = false })
+    if (audioEngine.audio.paused) {
+      audioEngine.play().catch(() => {
+        audioEngine.isPlaying.value = false
+      })
     } else {
-      audio.pause()
+      audioEngine.pause()
     }
   }
 
   function seek(time: number) {
-    audio.currentTime = time
+    audioEngine.seek(time)
   }
 
   function setVolume(vol: number) {
     volume.value = vol
-    audio.volume = vol
+    audioEngine.setVolume(vol)
   }
 
   function cycleLoop() {
-    if (loopMode.value === 'none') loopMode.value = 'queue'
-    else if (loopMode.value === 'queue') loopMode.value = 'track'
-    else loopMode.value = 'none'
+    queueManager.cycleLoop()
   }
 
   function toggleShuffle() {
-    if (!isShuffled.value) {
-      isShuffled.value = true
-      if (currentTrack.value && queue.value.length > 1) {
-        const rest = shuffleArray(queue.value.filter((t) => t.id !== currentTrack.value!.id))
-        queue.value = [currentTrack.value, ...rest]
-        currentIndex.value = 0
-      }
-    } else {
-      isShuffled.value = false
-      if (originalQueue.value.length > 0) {
-        const idx = originalQueue.value.findIndex((t) => t.id === currentTrack.value?.id)
-        queue.value = originalQueue.value
-        currentIndex.value = idx !== -1 ? idx : 0
-      }
-    }
+    queueManager.toggleShuffle()
   }
 
   function addToQueue(track: TrackResponse) {
-    queue.value.push(track)
-    if (originalQueue.value !== queue.value) originalQueue.value.push(track)
+    queueManager.addToQueue(track)
   }
 
   function addTracksToQueue(tracks: TrackResponse[]) {
-    queue.value.push(...tracks)
-    if (originalQueue.value !== queue.value) originalQueue.value.push(...tracks)
+    queueManager.addTracksToQueue(tracks)
   }
 
   function removeFromQueue(index: number) {
-    const removed = queue.value[index]
-    if (!removed) return
-    queue.value.splice(index, 1)
-    const origIdx = originalQueue.value.findIndex((t) => t.id === removed.id)
-    if (origIdx !== -1) originalQueue.value.splice(origIdx, 1)
-    if (index < currentIndex.value) {
-      currentIndex.value--
-    }
+    queueManager.removeFromQueue(index)
   }
 
   function reorderQueue() {
-    if (currentTrack.value) {
-      const newIdx = queue.value.findIndex((t) => t.id === currentTrack.value!.id)
-      if (newIdx !== -1) currentIndex.value = newIdx
-    }
+    queueManager.reorderQueue()
   }
 
   function clearQueue() {
-    if (currentTrack.value) {
-      queue.value = [currentTrack.value]
-      originalQueue.value = [currentTrack.value]
-      currentIndex.value = 0
-    } else {
-      queue.value = []
-      originalQueue.value = []
-      currentIndex.value = -1
-    }
+    queueManager.clearQueue()
   }
 
   function stop() {
-    audio.pause()
-    audio.src = ''
-    currentTrack.value = null
-    queue.value = []
-    originalQueue.value = []
-    currentIndex.value = -1
-    isPlaying.value = false
+    audioEngine.stop()
+    queueManager.reset()
     streamRecorded.value = false
   }
 
@@ -274,42 +220,41 @@ export const usePlayerStore = defineStore('player', () => {
     playing: boolean,
     positionSec: number,
   ) {
-    queue.value = [...queueTracks]
-    originalQueue.value = [...queueTracks]
+    queueManager.queue.value = [...queueTracks]
+    queueManager.originalQueue.value = [...queueTracks]
 
     if (!track) {
-      currentTrack.value = null
-      currentIndex.value = -1
-      audio.pause()
-      isPlaying.value = false
+      queueManager.currentTrack.value = null
+      queueManager.currentIndex.value = -1
+      audioEngine.pause()
       return
     }
 
-    if (!currentTrack.value || currentTrack.value.id !== track.id) {
-      currentTrack.value = track
+    const current = queueManager.currentTrack.value
+    if (!current || current.id !== track.id) {
+      queueManager.currentTrack.value = track
     }
     const idx = queueTracks.findIndex((t) => t.id === track.id)
-    currentIndex.value = idx >= 0 ? idx : 0
+    queueManager.currentIndex.value = idx >= 0 ? idx : 0
 
     const nextSrc = streamUrl(track.id)
-    if (audio.src !== nextSrc) {
-      audio.src = nextSrc
+    if (audioEngine.audio.src !== nextSrc) {
+      audioEngine.setSrc(nextSrc)
     }
 
     const safePos = Number.isFinite(positionSec) ? Math.max(0, positionSec) : 0
     const driftThreshold = playing ? 1.2 : 0.25
-    if (Math.abs(audio.currentTime - safePos) > driftThreshold) {
-      audio.currentTime = safePos
-      currentTime.value = safePos
+    if (Math.abs(audioEngine.currentTime.value - safePos) > driftThreshold) {
+      audioEngine.seek(safePos)
     }
 
-    if (playing && audio.paused) {
-      audio.play().catch(() => {
-        isPlaying.value = false
+    if (playing && audioEngine.audio.paused) {
+      audioEngine.play().catch(() => {
+        audioEngine.isPlaying.value = false
       })
     }
-    if (!playing && !audio.paused) {
-      audio.pause()
+    if (!playing && !audioEngine.audio.paused) {
+      audioEngine.pause()
     }
   }
 
