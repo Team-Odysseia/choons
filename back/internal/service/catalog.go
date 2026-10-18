@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
 	"strings"
 	"sync"
 	"time"
@@ -382,16 +381,10 @@ func (s *Catalog) DeleteAlbumCover(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *Catalog) RandomCoverIDs(ctx context.Context, n int) ([]string, error) {
-	var ids []uuid.UUID
-	if err := s.db.WithContext(ctx).Model(&model.Album{}).Where("cover_key IS NOT NULL").Pluck("id", &ids).Error; err != nil {
-		return nil, err
-	}
-	rand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
-	out := make([]string, 0, min(n, len(ids)))
-	for _, id := range ids[:min(n, len(ids))] {
-		out = append(out, id.String())
-	}
-	return out, nil
+	ids := []string{}
+	err := s.db.WithContext(ctx).Model(&model.Album{}).Where("cover_key IS NOT NULL").
+		Order("random()").Limit(n).Pluck("id::text", &ids).Error
+	return ids, err
 }
 
 // Tracks

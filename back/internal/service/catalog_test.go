@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -618,6 +619,12 @@ func TestRandomCoverIDsAndImageKey(t *testing.T) {
 	got, _ := e.catalog.RandomCoverIDs(e.ctx, 24)
 	if !slices.Equal(got, []string{withCover.ID.String()}) {
 		t.Fatalf("%v", got)
+	}
+	for i := range 3 {
+		e.catalog.CreateAlbum(e.ctx, AlbumInput{Title: fmt.Sprint(i), ArtistID: artist.ID, ReleaseYear: 1, Cover: upload("image/png", pngBytes)})
+	}
+	if got, _ := e.catalog.RandomCoverIDs(e.ctx, 2); len(got) != 2 {
+		t.Fatalf("limit not applied: %v", got)
 	}
 	key, err := e.catalog.ImageKey(e.ctx, "albums", withCover.ID)
 	if err != nil || key == nil || *key != e.coverKey(t, withCover.ID) || !imageKeyLike(*key, "albums", withCover.ID, "png") {

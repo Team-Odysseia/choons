@@ -107,9 +107,9 @@ func TestImages(t *testing.T) {
 	admin.get("/media/images/artists/" + ids.artist).status(http.StatusFound)
 
 	var covers []string
-	s.anon().get("/public/covers").status(200).decode(&covers)
-	if len(covers) != 1 || covers[0] != ids.album {
-		t.Fatalf("%v", covers)
+	res = s.anon().get("/public/covers").status(200).decode(&covers)
+	if len(covers) != 1 || covers[0] != ids.album || res.Header().Get("Cache-Control") != "public, max-age=300" {
+		t.Fatalf("%v %v", covers, res.Header())
 	}
 
 	admin.json(http.MethodDelete, "/admin/albums/"+ids.album+"/cover", nil).status(http.StatusNoContent)

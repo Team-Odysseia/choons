@@ -190,6 +190,9 @@ func (h *Handler) image(kind string) gin.HandlerFunc {
 
 func (h *Handler) publicCovers(c *gin.Context) {
 	out, err := h.Catalog.RandomCoverIDs(c.Request.Context(), 24)
+	if err == nil {
+		c.Header("Cache-Control", "public, max-age=300")
+	}
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 
