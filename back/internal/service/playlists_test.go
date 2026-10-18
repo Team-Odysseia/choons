@@ -107,6 +107,17 @@ func TestPlaylistSummaries(t *testing.T) {
 	if mine[1].TrackCount != 2 || mine[0].TrackCount != 0 || !mine[0].IsPublic {
 		t.Fatalf("%+v", mine)
 	}
+	time.Sleep(2 * time.Millisecond)
+	pls.AddTrack(e.ctx, bob, newer.ID, tr.ID)
+	if mine, _ := pls.Mine(e.ctx, bob); mine[0].ID != newer.ID {
+		t.Fatalf("adding a track must bump updatedAt: %+v", mine)
+	}
+	pls.AddTrack(e.ctx, bob, older.ID, tr.ID)
+	time.Sleep(2 * time.Millisecond)
+	pls.RemoveTrack(e.ctx, bob, newer.ID, tr.ID)
+	if mine, _ := pls.Mine(e.ctx, bob); mine[0].ID != newer.ID {
+		t.Fatalf("removing a track must bump updatedAt: %+v", mine)
+	}
 	public, _ := pls.Public(e.ctx, bob)
 	if len(public) != 1 || public[0].ID != amyPublic.ID {
 		t.Fatalf("public excludes own and private: %+v", public)

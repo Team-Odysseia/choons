@@ -85,6 +85,10 @@ func (s *Playlists) mutate(ctx context.Context, user *model.User, id uuid.UUID, 
 		if err := fn(tx, p); err != nil {
 			return err
 		}
+		p.UpdatedAt = tx.NowFunc()
+		if err := tx.Model(p).UpdateColumn("updated_at", p.UpdatedAt).Error; err != nil {
+			return err
+		}
 		out, err = s.response(tx, p)
 		return err
 	})
@@ -151,7 +155,7 @@ func (s *Playlists) Reorder(ctx context.Context, user *model.User, id uuid.UUID,
 func (s *Playlists) SetVisibility(ctx context.Context, user *model.User, id uuid.UUID, public bool) (dto.Playlist, error) {
 	return s.mutate(ctx, user, id, func(tx *gorm.DB, p *model.Playlist) error {
 		p.IsPublic = public
-		return tx.Model(p).Select("is_public", "updated_at").Updates(p).Error
+		return tx.Model(p).UpdateColumn("is_public", public).Error
 	})
 }
 
