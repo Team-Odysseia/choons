@@ -230,3 +230,37 @@ func TestPartySSETimeout(t *testing.T) {
 		t.Fatal("expected stream to close at timeout")
 	}
 }
+
+func openSSE(t *testing.T, srv *httptest.Server, sess *session, code string) <-chan sseEvent {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/parties/"+code+"/events", nil)
+	req.AddCookie(sess.cookie)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("sse status %d", resp.StatusCode)
+	}
+	events := make(chan sseEvent, 16)
+	go readEvents(t, bufio.NewScanner(resp.Body), events)
+	if ev, _ := next(t, events); ev.name != "state" {
+		t.Fatalf("initial %+v", ev)
+	}
+	return events
+}
+
+func TestPartySSEClosesOnShutdown(t *testing.T) {
+	s := newServer(t)
+	host := s.login("host", model.RoleListener)
+	code := host.json(http.MethodPost, "/parties", map[string]string{"name": "T", "queuePolicy": "EVERYONE"}).status(201).keys()["inviteCode"].(string)
+	srv := httptest.NewServer(s.router)
+	defer srv.Close()
+	events := openSSE(t, srv, host, code)
+
+	s.close()
+	if _, ok := next(t, events); ok {
+		t.Fatal("expected stream to close on shutdown")
+	}
+}

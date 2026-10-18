@@ -43,6 +43,7 @@ type Handler struct {
 	ImageTTL   time.Duration
 	SSETimeout time.Duration
 	Heartbeat  time.Duration
+	Closing    <-chan struct{}
 }
 
 func user(c *gin.Context) *model.User { return auth.CurrentUser(c) }

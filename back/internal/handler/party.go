@@ -204,6 +204,8 @@ func (h *Handler) partyEvents(c *gin.Context) {
 			return
 		case <-timeout.C:
 			return
+		case <-h.Closing:
+			return
 		case <-heartbeat.C:
 			if writeEvent(w, "heartbeat", []byte("ok")) != nil {
 				return
