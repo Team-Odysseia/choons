@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -666,5 +667,33 @@ func TestLrclibClient(t *testing.T) {
 	}
 	if _, err := l.Find(t.Context(), "boom", "a", "b", 1); err == nil {
 		t.Fatal("500 should error")
+	}
+}
+
+func TestLyricsLookupsAreBounded(t *testing.T) {
+	c := NewCatalog(nil, nil, nil)
+	var mu sync.Mutex
+	running, peak := 0, 0
+	release := make(chan struct{})
+	var wg sync.WaitGroup
+	for range 3 * lyricsWorkers {
+		wg.Add(1)
+		c.async(func() {
+			defer wg.Done()
+			mu.Lock()
+			running++
+			peak = max(peak, running)
+			mu.Unlock()
+			<-release
+			mu.Lock()
+			running--
+			mu.Unlock()
+		})
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+	if peak != lyricsWorkers {
+		t.Fatalf("peak concurrency %d want %d", peak, lyricsWorkers)
 	}
 }

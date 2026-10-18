@@ -26,6 +26,7 @@ type LyricsFinder interface {
 const (
 	mostPlayedTTL   = 5 * time.Minute
 	mostPlayedLimit = 100
+	lyricsWorkers   = 4
 )
 
 type ranking struct {
@@ -44,7 +45,18 @@ type Catalog struct {
 }
 
 func NewCatalog(gdb *gorm.DB, store storage.Storage, lyrics LyricsFinder) *Catalog {
-	return &Catalog{db: gdb, store: store, lyrics: lyrics, async: func(f func()) { go f() }, now: time.Now}
+	return &Catalog{db: gdb, store: store, lyrics: lyrics, async: bounded(lyricsWorkers), now: time.Now}
+}
+
+func bounded(workers int) func(func()) {
+	slots := make(chan struct{}, workers)
+	return func(f func()) {
+		go func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			f()
+		}()
+	}
 }
 
 func (s *Catalog) SetAsync(run func(func())) { s.async = run }
