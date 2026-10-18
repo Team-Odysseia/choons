@@ -17,6 +17,7 @@ type recordedEvent struct {
 	name  string
 	code  string
 	state dto.PartyState
+	user  uuid.UUID
 }
 
 type fakePublisher struct {
@@ -27,13 +28,19 @@ type fakePublisher struct {
 func (f *fakePublisher) PublishState(code string, st dto.PartyState) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.events = append(f.events, recordedEvent{"state", code, st})
+	f.events = append(f.events, recordedEvent{name: "state", code: code, state: st})
 }
 
 func (f *fakePublisher) PublishEnded(code string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.events = append(f.events, recordedEvent{name: "ended", code: code})
+}
+
+func (f *fakePublisher) PublishRemoved(code string, user uuid.UUID) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.events = append(f.events, recordedEvent{name: "removed", code: code, user: user})
 }
 
 func (f *fakePublisher) take() []recordedEvent {
@@ -218,6 +225,28 @@ func TestAccessRules(t *testing.T) {
 	wantAppErr(t, err, 403, "User is not in party")
 }
 
+func TestRemovedMembersLoseTheirStream(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyEveryone).InviteCode
+	pe.parties.Join(pe.ctx, pe.guest, code)
+	pe.pub.take()
+
+	pe.parties.Kick(pe.ctx, pe.host, code, pe.guest.ID)
+	ev := pe.pub.take()
+	if len(ev) != 2 || ev[0].name != "removed" || ev[0].code != code || ev[0].user != pe.guest.ID || ev[1].name != "state" {
+		t.Fatalf("kick: %+v", ev)
+	}
+
+	pe.parties.Join(pe.ctx, pe.guest, code)
+	other, _ := pe.parties.Create(pe.ctx, pe.user(t, "h2", model.RoleListener), CreatePartyInput{Name: "o", QueuePolicy: model.PolicyEveryone})
+	pe.pub.take()
+	pe.parties.Join(pe.ctx, pe.guest, other.InviteCode)
+	ev = pe.pub.take()
+	if len(ev) == 0 || ev[0].name != "removed" || ev[0].code != code || ev[0].user != pe.guest.ID {
+		t.Fatalf("joining elsewhere must remove stream from old party: %+v", ev)
+	}
+}
+
 func TestEveryonePolicyLetsGuestsControl(t *testing.T) {
 	pe := newPartyEnv(t)
 	st := pe.create(t, model.PolicyEveryone)
@@ -336,8 +365,8 @@ func TestLeaveAndEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	ev := pe.pub.take()
-	if len(ev) != 1 || ev[0].name != "state" || len(ev[0].state.Members) != 1 {
-		t.Fatalf("guest leave publishes state: %+v", ev)
+	if len(ev) != 2 || ev[0].name != "removed" || ev[0].user != pe.guest.ID || ev[1].name != "state" || len(ev[1].state.Members) != 1 {
+		t.Fatalf("guest leave removes guest stream then publishes state: %+v", ev)
 	}
 	wantAppErr(t, pe.parties.Leave(pe.ctx, pe.guest, code), 403, "User is not in party")
 

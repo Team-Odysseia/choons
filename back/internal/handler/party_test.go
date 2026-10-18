@@ -256,11 +256,34 @@ func TestPartySSEClosesOnShutdown(t *testing.T) {
 	host := s.login("host", model.RoleListener)
 	code := host.json(http.MethodPost, "/parties", map[string]string{"name": "T", "queuePolicy": "EVERYONE"}).status(201).keys()["inviteCode"].(string)
 	srv := httptest.NewServer(s.router)
-	defer srv.Close()
+	t.Cleanup(srv.Close)
 	events := openSSE(t, srv, host, code)
 
 	s.close()
 	if _, ok := next(t, events); ok {
 		t.Fatal("expected stream to close on shutdown")
+	}
+}
+
+func TestKickedMemberStreamEnds(t *testing.T) {
+	s := newServer(t)
+	host := s.login("host", model.RoleListener)
+	guest := s.login("guest", model.RoleListener)
+	code := host.json(http.MethodPost, "/parties", map[string]string{"name": "T", "queuePolicy": "EVERYONE"}).status(201).keys()["inviteCode"].(string)
+	guest.json(http.MethodPost, "/parties/join", map[string]string{"inviteCode": code}).status(200)
+	srv := httptest.NewServer(s.router)
+	t.Cleanup(srv.Close)
+	hostEvents := openSSE(t, srv, host, code)
+	guestEvents := openSSE(t, srv, guest, code)
+
+	host.json(http.MethodPost, "/parties/"+code+"/members/"+guest.user.ID.String()+"/kick", nil).status(200)
+	if ev, ok := next(t, guestEvents); !ok || ev.name != "ended" {
+		t.Fatalf("kicked guest should get ended: %+v %v", ev, ok)
+	}
+	if _, ok := next(t, guestEvents); ok {
+		t.Fatal("kicked guest stream should close")
+	}
+	if ev, ok := next(t, hostEvents); !ok || ev.name != "state" {
+		t.Fatalf("host keeps streaming: %+v %v", ev, ok)
 	}
 }

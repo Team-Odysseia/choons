@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/Team-Odysseia/choons/back/internal/dto"
 )
 
 func TestPublishStateReachesSubscribersOfSameCodeOnly(t *testing.T) {
 	h := NewHub()
-	a := h.Subscribe("abcdefgh")
-	b := h.Subscribe("ABCDEFGH")
-	other := h.Subscribe("ZZZZZZZZ")
+	a := h.Subscribe("abcdefgh", uuid.New())
+	b := h.Subscribe("ABCDEFGH", uuid.New())
+	other := h.Subscribe("ZZZZZZZZ", uuid.New())
 	h.PublishState("AbCdEfGh", dto.PartyState{Name: "x", InviteCode: "ABCDEFGH"})
 	for _, s := range []*Subscriber{a, b} {
 		ev := <-s.C
@@ -32,7 +34,7 @@ func TestPublishStateReachesSubscribersOfSameCodeOnly(t *testing.T) {
 
 func TestPublishEndedClosesSubscribers(t *testing.T) {
 	h := NewHub()
-	s := h.Subscribe("CODE0001")
+	s := h.Subscribe("CODE0001", uuid.New())
 	h.PublishEnded("code0001")
 	ev, ok := <-s.C
 	if !ok || ev.Name != "ended" || string(ev.Data) != "{}" {
@@ -49,7 +51,7 @@ func TestPublishEndedClosesSubscribers(t *testing.T) {
 
 func TestSlowSubscriberIsDropped(t *testing.T) {
 	h := NewHub()
-	slow := h.Subscribe("CODE0002")
+	slow := h.Subscribe("CODE0002", uuid.New())
 	for range subscriberBuffer + 1 {
 		h.PublishState("CODE0002", dto.PartyState{})
 	}
@@ -67,11 +69,41 @@ func TestSlowSubscriberIsDropped(t *testing.T) {
 
 func TestUnsubscribeIsIdempotent(t *testing.T) {
 	h := NewHub()
-	s := h.Subscribe("CODE0003")
+	s := h.Subscribe("CODE0003", uuid.New())
 	h.Unsubscribe(s)
 	h.Unsubscribe(s)
 	h.PublishState("CODE0003", dto.PartyState{})
 	if _, ok := <-s.C; ok {
 		t.Fatal("unsubscribed channel received event")
+	}
+}
+
+func TestPublishRemovedEndsOnlyThatUsersStreams(t *testing.T) {
+	h := NewHub()
+	kicked, stays := uuid.New(), uuid.New()
+	tab1 := h.Subscribe("CODE0004", kicked)
+	tab2 := h.Subscribe("code0004", kicked)
+	other := h.Subscribe("CODE0004", stays)
+	elsewhere := h.Subscribe("CODE0005", kicked)
+
+	h.PublishRemoved("code0004", kicked)
+	for _, s := range []*Subscriber{tab1, tab2} {
+		if ev, ok := <-s.C; !ok || ev.Name != "ended" {
+			t.Fatalf("%+v %v", ev, ok)
+		}
+		if _, ok := <-s.C; ok {
+			t.Fatal("removed user's channel should be closed")
+		}
+	}
+	h.PublishState("CODE0004", dto.PartyState{})
+	h.PublishState("CODE0005", dto.PartyState{})
+	if ev := <-other.C; ev.Name != "state" {
+		t.Fatalf("%+v", ev)
+	}
+	if ev := <-elsewhere.C; ev.Name != "state" {
+		t.Fatalf("other party stream must survive: %+v", ev)
+	}
+	if h.Count("CODE0004") != 1 {
+		t.Fatal(h.Count("CODE0004"))
 	}
 }

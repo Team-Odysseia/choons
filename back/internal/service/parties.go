@@ -26,6 +26,7 @@ const (
 type PartyPublisher interface {
 	PublishState(code string, state dto.PartyState)
 	PublishEnded(code string)
+	PublishRemoved(code string, user uuid.UUID)
 }
 
 type Parties struct {
@@ -38,14 +39,23 @@ func NewParties(gdb *gorm.DB, pub PartyPublisher) *Parties {
 	return &Parties{db: gdb, pub: pub, now: time.Now}
 }
 
+type removal struct {
+	code string
+	user uuid.UUID
+}
+
 type outbox struct {
-	states map[string]dto.PartyState
-	ended  []string
+	states  map[string]dto.PartyState
+	ended   []string
+	removed []removal
 }
 
 func newOutbox() *outbox { return &outbox{states: map[string]dto.PartyState{}} }
 
 func (s *Parties) flush(o *outbox) {
+	for _, r := range o.removed {
+		s.pub.PublishRemoved(r.code, r.user)
+	}
 	for _, code := range o.ended {
 		delete(o.states, code)
 		s.pub.PublishEnded(code)
@@ -262,6 +272,7 @@ func (s *Parties) disconnect(tx *gorm.DB, o *outbox, user *model.User) error {
 		if err := tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error; err != nil {
 			return err
 		}
+		o.removed = append(o.removed, removal{p.InviteCode, m.UserID})
 		if p.Status == model.PartyActive {
 			if _, err := s.stage(tx, o, &p); err != nil {
 				return err
@@ -398,6 +409,7 @@ func (s *Parties) Leave(ctx context.Context, user *model.User, code string) erro
 		if err := tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error; err != nil {
 			return err
 		}
+		o.removed = append(o.removed, removal{p.InviteCode, m.UserID})
 		_, err = s.stage(tx, o, p)
 		return err
 	})
@@ -462,7 +474,15 @@ func (s *Parties) SetDJ(ctx context.Context, user *model.User, code string, targ
 }
 
 func (s *Parties) Kick(ctx context.Context, user *model.User, code string, target uuid.UUID) (dto.PartyState, error) {
-	return s.mutate(ctx, user, code, s.requireHost, func(tx *gorm.DB, p *model.Party) error {
+	var out dto.PartyState
+	err := s.inTx(ctx, func(tx *gorm.DB, o *outbox) error {
+		p, err := s.activeParty(tx, code, true)
+		if err != nil {
+			return err
+		}
+		if err := s.requireHost(tx, p, user); err != nil {
+			return err
+		}
 		m, err := s.targetMember(tx, p, target)
 		if err != nil {
 			return err
@@ -470,8 +490,14 @@ func (s *Parties) Kick(ctx context.Context, user *model.User, code string, targe
 		if m.Host {
 			return apperr.BadRequest("Cannot kick host")
 		}
-		return tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error
+		if err := tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error; err != nil {
+			return err
+		}
+		o.removed = append(o.removed, removal{p.InviteCode, m.UserID})
+		out, err = s.stage(tx, o, p)
+		return err
 	})
+	return out, err
 }
 
 func (s *Parties) AddTracks(ctx context.Context, user *model.User, code string, trackIDs []uuid.UUID) (dto.PartyState, error) {

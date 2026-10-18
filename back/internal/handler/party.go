@@ -169,7 +169,7 @@ func writeEvent(w io.Writer, name string, data []byte) error {
 
 func (h *Handler) partyEvents(c *gin.Context) {
 	code := c.Param("code")
-	sub := h.Hub.Subscribe(code)
+	sub := h.Hub.Subscribe(code, user(c).ID)
 	defer h.Hub.Unsubscribe(sub)
 
 	state, err := h.Parties.State(c.Request.Context(), user(c), code)
