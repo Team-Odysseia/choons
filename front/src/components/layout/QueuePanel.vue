@@ -4,7 +4,10 @@ import { usePlayerStore } from '@/stores/player'
 import { usePartyStore } from '@/stores/party'
 import type { PartyQueueItemResponse } from '@/api/types'
 import draggable from 'vuedraggable'
-import { GripVertical, X } from 'lucide-vue-next'
+import { Lock } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { StatePlate, VfdBadge } from '@/components/vfd'
+import QueueRow from './QueueRow.vue'
 
 const player = usePlayerStore()
 const party = usePartyStore()
@@ -18,12 +21,6 @@ watch(
   },
   { immediate: true },
 )
-
-function formatDuration(secs: number) {
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 function isPlayingItem(item: PartyQueueItemResponse) {
   return item.id === party.state?.playback.queueItemId
@@ -41,17 +38,15 @@ function removePartyItem(item: PartyQueueItemResponse) {
 </script>
 
 <template>
-  <div class="p-4">
+  <div class="px-3 py-3.5">
     <template v-if="party.inParty">
-      <div v-if="partyItems.length === 0" class="text-[13px] text-dimmed text-center py-8">
-        Queue is empty
-      </div>
-      <div v-else>
-        <div class="flex items-center justify-between mb-3">
-          <span class="text-[12px] text-dimmed">
+      <StatePlate v-if="partyItems.length === 0" code="QUEUE EMPTY" message="Queue is empty" />
+      <div v-else class="flex flex-col gap-1">
+        <div class="flex items-center justify-between px-1.5 pb-2.5">
+          <span class="font-display text-lg font-extrabold text-cyan glow-sm">
             {{ partyItems.length }} track{{ partyItems.length !== 1 ? 's' : '' }}
           </span>
-          <span class="text-[11px] text-dimmed">Party queue</span>
+          <VfdBadge tone="amber" label="Party queue" />
         </div>
 
         <draggable
@@ -62,55 +57,38 @@ function removePartyItem(item: PartyQueueItemResponse) {
           @change="onPartyDragChange"
         >
           <template #item="{ element }">
-            <div
+            <QueueRow
               data-testid="party-queue-item"
-              class="flex items-center gap-2 px-2 py-2 rounded transition-colors group"
-              :class="isPlayingItem(element) ? 'bg-muted' : 'hover:bg-muted/50'"
-            >
-              <GripVertical
-                :size="14"
-                class="drag-handle text-dimmed cursor-grab active:cursor-grabbing shrink-0"
-                :class="party.canControl ? '' : 'opacity-40 cursor-not-allowed'"
-              />
-              <div class="flex flex-col min-w-0 flex-1 gap-0.5">
-                <span
-                  class="text-[13px] font-medium truncate"
-                  :class="isPlayingItem(element) ? 'text-primary' : 'text-foreground'"
-                >{{ element.track.title }}</span>
-                <span class="text-[11px] text-muted-foreground truncate">
-                  {{ element.track.artist.name }} · added by {{ element.addedByUsername }}
-                </span>
-              </div>
-              <span class="text-[11px] text-dimmed shrink-0">{{ formatDuration(element.track.durationSeconds) }}</span>
-              <button
-                v-if="party.canControl"
-                class="size-6 flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all shrink-0"
-                title="Remove"
-                @click="removePartyItem(element)"
-              >
-                <X :size="12" />
-              </button>
-            </div>
+              :title="element.track.title"
+              :sub="`${element.track.artist.name} · added by ${element.addedByUsername}`"
+              :duration="element.track.durationSeconds"
+              :current="isPlayingItem(element)"
+              :can-remove="party.canControl"
+              :locked="!party.canControl"
+              @remove="removePartyItem(element)"
+            />
           </template>
         </draggable>
+
+        <p
+          v-if="!party.canControl"
+          data-testid="queue-lock-note"
+          class="flex items-center gap-2 px-2 pt-3 text-xs text-amber"
+        >
+          <Lock :size="12" aria-hidden="true" />
+          Only DJs can reorder the party queue
+        </p>
       </div>
     </template>
 
     <template v-else>
-      <div v-if="player.queue.length === 0" class="text-[13px] text-dimmed text-center py-8">
-        Queue is empty
-      </div>
-      <div v-else>
-        <div class="flex items-center justify-between mb-3">
-          <span class="text-[12px] text-dimmed">
+      <StatePlate v-if="player.queue.length === 0" code="QUEUE EMPTY" message="Queue is empty" />
+      <div v-else class="flex flex-col gap-1">
+        <div class="flex items-center justify-between px-1.5 pb-2.5">
+          <span class="font-display text-lg font-extrabold text-cyan glow-sm">
             {{ player.queue.length }} track{{ player.queue.length !== 1 ? 's' : '' }}
           </span>
-          <button
-            class="text-[12px] text-dimmed hover:text-destructive transition-colors"
-            @click="player.clearQueue()"
-          >
-            Clear
-          </button>
+          <Button variant="ghost" size="sm" class="px-1 hover:text-red" @click="player.clearQueue()">Clear</Button>
         </div>
 
         <draggable
@@ -120,30 +98,15 @@ function removePartyItem(item: PartyQueueItemResponse) {
           @change="player.reorderQueue()"
         >
           <template #item="{ element, index }">
-            <div
-              class="flex items-center gap-2 px-2 py-2 rounded transition-colors group"
-              :class="index === player.currentIndex ? 'bg-muted' : 'hover:bg-muted/50'"
-            >
-              <GripVertical
-                :size="14"
-                class="drag-handle text-dimmed cursor-grab active:cursor-grabbing shrink-0"
-              />
-              <div class="flex flex-col min-w-0 flex-1 gap-0.5">
-                <span
-                  class="text-[13px] font-medium truncate"
-                  :class="index === player.currentIndex ? 'text-primary' : 'text-foreground'"
-                >{{ element.title }}</span>
-                <span class="text-[11px] text-muted-foreground truncate">{{ element.artist.name }}</span>
-              </div>
-              <span class="text-[11px] text-dimmed shrink-0">{{ formatDuration(element.durationSeconds) }}</span>
-              <button
-                class="size-6 flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all shrink-0"
-                title="Remove"
-                @click="player.removeFromQueue(index)"
-              >
-                <X :size="12" />
-              </button>
-            </div>
+            <QueueRow
+              data-testid="queue-item"
+              :title="element.title"
+              :sub="element.artist.name"
+              :duration="element.durationSeconds"
+              :current="index === player.currentIndex"
+              can-remove
+              @remove="player.removeFromQueue(index)"
+            />
           </template>
         </draggable>
       </div>
