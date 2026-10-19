@@ -15,7 +15,7 @@ defineEmits<{ delete: [playlist: PlaylistSummaryResponse] }>()
       </span>
       <span class="flex min-w-0 flex-col gap-0.5">
         <span class="truncate text-[15px] text-fg group-hover:text-cyan">{{ playlist.name }}</span>
-        <span class="text-[13px] text-soft">{{ playlist.trackCount }} tracks</span>
+        <span class="text-[13px] text-soft">{{ playlist.trackCount }} track{{ playlist.trackCount !== 1 ? 's' : '' }}</span>
       </span>
     </RouterLink>
     <VfdBadge :tone="playlist.isPublic ? 'cyan' : 'mute'" :label="playlist.isPublic ? 'Public' : 'Private'" />

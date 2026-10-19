@@ -18,7 +18,7 @@ defineProps<{ playlist: PlaylistSummaryResponse; owner?: string }>()
     </div>
     <span class="truncate text-[15px] text-fg transition-colors group-hover:text-cyan">{{ playlist.name }}</span>
     <span class="-mt-1 truncate text-[13px] text-soft">
-      <template v-if="owner">by {{ owner }} · </template>{{ playlist.trackCount }} tracks
+      <template v-if="owner">by {{ owner }} · </template>{{ playlist.trackCount }} track{{ playlist.trackCount !== 1 ? 's' : '' }}
     </span>
   </RouterLink>
 </template>
