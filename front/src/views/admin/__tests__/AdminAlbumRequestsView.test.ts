@@ -138,4 +138,29 @@ describe('AdminAlbumRequestsView', () => {
 
     expect(mockToastError).toHaveBeenCalledWith('Cannot change status')
   })
+
+  it('blocked requester shows BLOCKED badge and UNBLOCK key', async () => {
+    mockListAll.mockResolvedValue([{ ...requestItem, requesterRequestsBlocked: true }])
+    const wrapper = mountView()
+    await flushPromises()
+    const badge = wrapper.find('[data-testid="blocked-badge"]')
+    expect(badge.text()).toBe('Blocked')
+    expect(badge.classes()).toContain('text-red')
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Unblock requester')).toBe(true)
+  })
+
+  it('shows an all clear plate with no requests', async () => {
+    mockListAll.mockResolvedValue([])
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('No incoming requests.')
+    expect(wrapper.find('[data-code]').text()).toBe('ALL CLEAR')
+  })
+
+  it('shows the pending count readout', async () => {
+    mockListAll.mockResolvedValue([requestItem, { ...requestItem, id: 'r-2', status: 'ACCEPTED' }])
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="pending-readout"]').text()).toContain('001')
+  })
 })

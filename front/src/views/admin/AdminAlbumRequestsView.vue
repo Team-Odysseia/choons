@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { apiErrorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
+import RequestCard from '@/components/music/RequestCard.vue'
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
+import { Readout, StatePlate, VfdBadge } from '@/components/vfd'
 import {
   listAllAlbumRequests,
   setUserRequestBan,
@@ -12,12 +15,7 @@ import type { AlbumRequestResponse } from '@/api/types'
 
 const loading = ref(false)
 const requests = ref<AlbumRequestResponse[]>([])
-
-function statusClass(status: AlbumRequestResponse['status']) {
-  if (status === 'ACCEPTED') return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-  if (status === 'REJECTED') return 'bg-red-500/10 text-red-300 border-red-500/30'
-  return 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-}
+const pendingCount = computed(() => requests.value.filter((r) => r.status === 'PENDING').length)
 
 async function load() {
   loading.value = true
@@ -60,78 +58,31 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
-    <h1 class="text-[28px] font-extrabold mb-6">Album Requests</h1>
+  <div class="flex flex-col gap-6">
+    <AdminPageHeader kicker="Admin · Requests" title="Album Requests">
+      <Readout
+        data-testid="pending-readout"
+        caption="Pending"
+        :value="String(pendingCount).padStart(3, '0')"
+        tone="amber"
+        align="end"
+      />
+    </AdminPageHeader>
 
-    <div v-if="loading" class="text-[13px] text-dimmed">Loading…</div>
-    <div v-else-if="requests.length === 0" class="text-[13px] text-dimmed">No incoming requests.</div>
+    <StatePlate v-if="loading" kind="loading" code="READING…" message="Loading…" />
+    <StatePlate v-else-if="requests.length === 0" code="ALL CLEAR" message="No incoming requests." />
 
     <div v-else class="flex flex-col gap-2">
-      <div
-        v-for="item in requests"
-        :key="item.id"
-        class="rounded-lg border border-border bg-card p-4 flex flex-col gap-3"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex flex-col gap-1">
-            <span class="font-semibold">{{ item.albumName }} · {{ item.artistName }}</span>
-            <span class="text-[13px] text-dimmed">Requested by {{ item.requesterUsername }}</span>
-          </div>
-          <span class="status-pill" :class="statusClass(item.status)">{{ item.status }}</span>
-        </div>
-
-        <a
-          :href="item.externalUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-[13px] text-primary hover:underline break-all"
-        >
-          {{ item.externalUrl }}
-        </a>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            @click="changeStatus(item.id, 'ACCEPTED')"
-          >
-            Accept
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="destructive"
-            @click="changeStatus(item.id, 'REJECTED')"
-          >
-            Reject
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            @click="toggleBlock(item)"
-          >
+      <RequestCard v-for="item in requests" :key="item.id" :request="item" :requester="item.requesterUsername">
+        <template #actions>
+          <VfdBadge v-if="item.requesterRequestsBlocked" data-testid="blocked-badge" tone="red" label="Blocked" />
+          <Button type="button" size="sm" @click="changeStatus(item.id, 'ACCEPTED')">Accept</Button>
+          <Button type="button" size="sm" variant="destructive" @click="changeStatus(item.id, 'REJECTED')">Reject</Button>
+          <Button type="button" size="sm" variant="outline" @click="toggleBlock(item)">
             {{ item.requesterRequestsBlocked ? 'Unblock requester' : 'Block requester' }}
           </Button>
-          <span
-            v-if="item.requesterRequestsBlocked"
-            class="text-[11px] font-semibold text-red-300 border border-red-500/30 rounded-full px-2 py-1"
-          >
-            Blocked
-          </span>
-        </div>
-      </div>
+        </template>
+      </RequestCard>
     </div>
   </div>
 </template>
-
-<style scoped>
-.status-pill {
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 700;
-  border: 1px solid;
-  border-radius: 999px;
-  padding: 6px 8px;
-}
-</style>
