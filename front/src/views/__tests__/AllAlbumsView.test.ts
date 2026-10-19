@@ -10,7 +10,7 @@ import AllAlbumsView from '../AllAlbumsView.vue'
 const mockGetAlbums = vi.fn().mockResolvedValue([])
 
 vi.mock('@/api/albums', () => ({
-  getAlbums: (...args: unknown[]) => mockGetAlbums(...args),
+  getAlbumsPage: (...args: unknown[]) => mockGetAlbums(...args),
   getAlbum: vi.fn(),
   albumImageUrl: vi.fn((id: string) => `/media/images/albums/${id}`),
 }))
@@ -88,6 +88,29 @@ describe('rendering', () => {
     const img = wrapper.find('img')
     expect(img.attributes('alt')).toBeDefined()
     expect(img.attributes('alt')).not.toBe('')
+  })
+})
+
+describe('paging', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('requests newest albums first and loads more on demand', async () => {
+    const page = (offset: number, count: number) =>
+      Array.from({ length: count }, (_, i) => makeAlbum(`al-${offset + i}`, `Album ${offset + i}`, 30))
+    mockGetAlbums.mockResolvedValueOnce(page(0, 100)).mockResolvedValueOnce(page(100, 1))
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(mockGetAlbums).toHaveBeenCalledWith({ page: 0, size: 100, query: '', sort: 'recent' })
+    await wrapper.find('[data-testid="more-albums"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGetAlbums).toHaveBeenLastCalledWith({ page: 1, size: 100, query: '', sort: 'recent' })
+    expect(wrapper.text()).toContain('Album 100')
+    expect(wrapper.find('[data-testid="more-albums"]').exists()).toBe(false)
   })
 })
 

@@ -24,7 +24,7 @@ vi.mock('@/api/albums', () => ({
 
 const mockGetArtists = vi.hoisted(() => vi.fn())
 vi.mock('@/api/artists', () => ({
-  getArtists: mockGetArtists,
+  getAdminArtists: mockGetArtists,
   artistImageUrl: (id: string) => `http://test/media/images/artists/${id}`,
 }))
 
@@ -33,7 +33,7 @@ const mockUpdateAlbumTracks = vi.hoisted(() => vi.fn())
 const mockDeleteTrack = vi.hoisted(() => vi.fn())
 const mockUploadTrack = vi.hoisted(() => vi.fn())
 vi.mock('@/api/tracks', () => ({
-  getTracks: mockGetTracks,
+  getAdminTracks: mockGetTracks,
   updateAlbumTracks: mockUpdateAlbumTracks,
   deleteTrack: mockDeleteTrack,
   uploadTrack: mockUploadTrack,

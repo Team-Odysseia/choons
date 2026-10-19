@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { useFavoritesStore } from '@/stores/favorites'
-import { useArtistsQuery, useRecentAlbumsQuery, useMostPlayedQuery } from '@/composables/queries'
+import { useArtistsInfiniteQuery, useRecentAlbumsQuery, useMostPlayedQuery } from '@/composables/queries'
 import { albumImageUrl } from '@/api/albums'
 import { artistImageUrl } from '@/api/artists'
 import TrackRow from '@/components/music/TrackRow.vue'
@@ -14,7 +14,14 @@ const playlists = usePlaylistsStore()
 const favorites = useFavoritesStore()
 
 const globalSearch = ref('')
-const { data: artists, isPending: artistsLoading } = useArtistsQuery()
+const {
+  data: artistPages,
+  isPending: artistsLoading,
+  hasNextPage: hasMoreArtists,
+  isFetchingNextPage: loadingMoreArtists,
+  fetchNextPage: loadMoreArtists,
+} = useArtistsInfiniteQuery()
+const artists = computed(() => artistPages.value?.pages.flat() ?? [])
 const { data: recentAlbums } = useRecentAlbumsQuery()
 const { data: mostPlayed } = useMostPlayedQuery()
 
@@ -197,7 +204,7 @@ function goToSearch() {
     <section>
       <h2 class="text-lg font-bold mb-4">Artists</h2>
       <div v-if="artistsLoading" class="text-[13px] text-dimmed">Loading…</div>
-      <div v-else-if="!artists?.length" class="text-[13px] text-dimmed">
+      <div v-else-if="!artists.length" class="text-[13px] text-dimmed">
         No artists yet. Ask an admin to add some music.
       </div>
       <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
@@ -219,6 +226,15 @@ function goToSearch() {
           <div class="font-bold text-sm mb-1 truncate">{{ artist.name }}</div>
         </div>
       </div>
+      <button
+        v-if="hasMoreArtists"
+        data-testid="more-artists"
+        class="mt-4 text-[13px] text-dimmed hover:text-foreground transition-colors disabled:opacity-40"
+        :disabled="loadingMoreArtists"
+        @click="loadMoreArtists()"
+      >
+        {{ loadingMoreArtists ? 'Loading…' : 'Load more artists' }}
+      </button>
     </section>
 
   </div>

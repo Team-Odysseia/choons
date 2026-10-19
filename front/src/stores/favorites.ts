@@ -4,6 +4,8 @@ import * as api from '@/api/favorites'
 import type { TrackResponse } from '@/api/types'
 import { toast } from 'vue-sonner'
 
+const CHECK_BATCH_SIZE = 500
+
 export const useFavoritesStore = defineStore('favorites', () => {
   const favoriteIds = ref<Set<string>>(new Set())
   const tracks = ref<TrackResponse[]>([])
@@ -25,15 +27,18 @@ export const useFavoritesStore = defineStore('favorites', () => {
   }
 
   async function fetchStatus(trackIds: string[]) {
-    if (trackIds.length === 0) return
-    try {
-      const ids = await api.checkFavorites(trackIds)
-      const newSet = new Set(favoriteIds.value)
-      for (const trackId of trackIds) newSet.delete(trackId)
-      for (const id of ids) newSet.add(id)
-      favoriteIds.value = newSet
-    } catch {
-      // ignore background status fetch failures
+    const unique = [...new Set(trackIds)]
+    for (let start = 0; start < unique.length; start += CHECK_BATCH_SIZE) {
+      const batch = unique.slice(start, start + CHECK_BATCH_SIZE)
+      try {
+        const ids = await api.checkFavorites(batch)
+        const newSet = new Set(favoriteIds.value)
+        for (const trackId of batch) newSet.delete(trackId)
+        for (const id of ids) newSet.add(id)
+        favoriteIds.value = newSet
+      } catch {
+        return
+      }
     }
   }
 

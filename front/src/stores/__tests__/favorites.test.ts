@@ -73,6 +73,24 @@ describe('useFavoritesStore', () => {
     expect([...store.favoriteIds].sort()).toEqual(['track-2', 'track-9'])
   })
 
+  it('fetchStatus splits large lists into batches the API accepts', async () => {
+    const store = useFavoritesStore()
+    const ids = Array.from({ length: 1201 }, (_, i) => `track-${i}`)
+    mockCheckFavorites.mockImplementation(async (batch: string[]) => batch.filter((id) => id.endsWith('0')))
+
+    await store.fetchStatus([...ids, 'track-0'])
+
+    expect(mockCheckFavorites.mock.calls.map(([batch]) => batch.length)).toEqual([500, 500, 201])
+    expect(store.isFavorited('track-1200')).toBe(true)
+    expect(store.isFavorited('track-1201')).toBe(false)
+  })
+
+  it('fetchStatus does nothing for an empty list', async () => {
+    const store = useFavoritesStore()
+    await store.fetchStatus([])
+    expect(mockCheckFavorites).not.toHaveBeenCalled()
+  })
+
   it('toggle adds favorite optimistically and keeps it on success', async () => {
     const store = useFavoritesStore()
     mockAddFavorite.mockResolvedValue(makeTrack('track-1'))

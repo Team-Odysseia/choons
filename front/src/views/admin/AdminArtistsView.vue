@@ -2,7 +2,7 @@
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { getArtists, searchArtists, createArtist, deleteArtist } from '@/api/artists'
+import { getAdminArtists, searchArtists, createArtist, deleteArtist } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,7 +38,7 @@ watch(search, () => {
 
 async function load() {
   const query = search.value.trim()
-  artists.value = query ? await searchArtists(query, 0, 200) : await getArtists()
+  artists.value = query ? await searchArtists(query, 0, 200) : await getAdminArtists()
 }
 
 async function confirmDelete() {

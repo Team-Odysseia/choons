@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAllAlbumsQuery } from '@/composables/queries'
+import { useAllAlbumsInfiniteQuery } from '@/composables/queries'
 import { albumImageUrl } from '@/api/albums'
 import { Input } from '@/components/ui/input'
 
@@ -21,7 +21,14 @@ onBeforeUnmount(() => {
   if (searchDebounce) clearTimeout(searchDebounce)
 })
 
-const { data: albums, isPending } = useAllAlbumsQuery(debouncedSearch)
+const {
+  data: albumPages,
+  isPending,
+  hasNextPage,
+  isFetchingNextPage,
+  fetchNextPage,
+} = useAllAlbumsInfiniteQuery(debouncedSearch)
+const albums = computed(() => albumPages.value?.pages.flat() ?? [])
 
 function isNew(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
@@ -37,7 +44,7 @@ function isNew(createdAt: string) {
     </div>
 
     <div v-if="isPending" class="text-[13px] text-dimmed">Loading…</div>
-    <div v-else-if="!albums?.length" class="text-[13px] text-dimmed">
+    <div v-else-if="!albums.length" class="text-[13px] text-dimmed">
       No albums yet. Ask an admin to add some music.
     </div>
     <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
@@ -70,5 +77,14 @@ function isNew(createdAt: string) {
         <div class="text-xs text-muted-foreground">{{ album.releaseYear }}</div>
       </div>
     </div>
+    <button
+      v-if="hasNextPage"
+      data-testid="more-albums"
+      class="mt-5 text-[13px] text-dimmed hover:text-foreground transition-colors disabled:opacity-40"
+      :disabled="isFetchingNextPage"
+      @click="fetchNextPage()"
+    >
+      {{ isFetchingNextPage ? 'Loading…' : 'Load more albums' }}
+    </button>
   </div>
 </template>

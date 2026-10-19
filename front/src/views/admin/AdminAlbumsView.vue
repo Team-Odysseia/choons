@@ -2,8 +2,8 @@
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { getArtists } from '@/api/artists'
-import { getAlbums, searchAlbums, createAlbum, deleteAlbum } from '@/api/albums'
+import { getAdminArtists } from '@/api/artists'
+import { getAdminAlbums, searchAlbums, createAlbum, deleteAlbum } from '@/api/albums'
 import { uploadTrack } from '@/api/tracks'
 import type { ArtistResponse, AlbumResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -42,7 +42,7 @@ const search = ref('')
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
-  artists.value = await getArtists()
+  artists.value = await getAdminArtists()
   await loadAlbums()
 })
 
@@ -59,7 +59,7 @@ watch(search, () => {
 
 async function loadAlbums() {
   const query = search.value.trim()
-  albums.value = query ? await searchAlbums(query, { page: 0, size: 300 }) : await getAlbums()
+  albums.value = query ? await searchAlbums(query, { page: 0, size: 200 }) : await getAdminAlbums()
 }
 
 function formatDuration(secs: number) {

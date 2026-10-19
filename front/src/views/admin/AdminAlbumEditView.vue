@@ -3,8 +3,8 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { getAdminAlbum, updateAlbum, deleteAlbumCover, albumImageUrl } from '@/api/albums'
-import { getArtists } from '@/api/artists'
-import { getTracks, updateAlbumTracks, updateTrackLrclibId, deleteTrack, uploadTrack } from '@/api/tracks'
+import { getAdminArtists } from '@/api/artists'
+import { getAdminTracks, updateAlbumTracks, updateTrackLrclibId, deleteTrack, uploadTrack } from '@/api/tracks'
 import type { ArtistResponse, AlbumResponse, TrackResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,11 +54,9 @@ const currentCoverUrl = ref<string | null>(null)
 onMounted(async () => {
   const id = route.params.id as string
   try {
-    const [albumData, artistsData, tracksData] = await Promise.all([
-      getAdminAlbum(id),
-      getArtists(),
-      getTracks(id),
-    ])
+    const albumData = await getAdminAlbum(id)
+    const artistsData = await getAdminArtists()
+    const tracksData = await getAdminTracks(id)
     album.value = albumData
     artists.value = artistsData
     title.value = albumData.title
