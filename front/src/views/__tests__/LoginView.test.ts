@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import LoginView from '../LoginView.vue'
+import { httpError } from '@/test-utils/http'
 import { useAuthStore } from '@/stores/auth'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ describe('submit', () => {
 
   it('exibe toast de credenciais inválidas em erro 401', async () => {
     const { wrapper, auth } = mountLogin()
-    auth.login = vi.fn().mockRejectedValue({ response: { status: 401 } })
+    auth.login = vi.fn().mockRejectedValue(httpError(401))
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -115,7 +116,7 @@ describe('submit', () => {
 
   it('exibe toast genérico em outros erros', async () => {
     const { wrapper, auth } = mountLogin()
-    auth.login = vi.fn().mockRejectedValue({ response: { status: 500 } })
+    auth.login = vi.fn().mockRejectedValue(httpError(500))
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -125,7 +126,7 @@ describe('submit', () => {
 
   it('não redireciona quando login falha', async () => {
     const { wrapper, router, auth } = mountLogin()
-    auth.login = vi.fn().mockRejectedValue({ response: { status: 401 } })
+    auth.login = vi.fn().mockRejectedValue(httpError(401))
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()

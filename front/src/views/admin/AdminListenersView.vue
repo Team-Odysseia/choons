@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { deleteListener, getListeners, registerListener, updateListener } from '@/api/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,8 +31,8 @@ async function loadListeners(query = activeQuery.value) {
   listenersLoading.value = true
   try {
     listeners.value = await getListeners(query.trim() || undefined)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to load listeners')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load listeners'))
   } finally {
     listenersLoading.value = false
   }
@@ -46,8 +47,8 @@ async function submit() {
     toast.success(`Listener "${created.username}" created successfully`)
     addDialogOpen.value = false
     await loadListeners()
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to create listener')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to create listener'))
   } finally {
     loading.value = false
   }
@@ -80,8 +81,8 @@ async function saveEdit() {
     editTarget.value = null
     editPassword.value = ''
     toast.success(`Listener "${updated.username}" updated`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to update listener')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to update listener'))
   }
 }
 
@@ -94,8 +95,8 @@ async function confirmDelete() {
     listeners.value = listeners.value.filter((l) => l.id !== target.id)
     deleteTarget.value = null
     toast.success(`Listener "${target.username}" deleted`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to delete listener')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to delete listener'))
   }
 }
 </script>

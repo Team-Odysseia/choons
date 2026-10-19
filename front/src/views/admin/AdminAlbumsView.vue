@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { getAdminArtists } from '@/api/artists'
 import { getAdminAlbums, searchAlbums, createAlbum, deleteAlbum } from '@/api/albums'
 import { uploadTrack } from '@/api/tracks'
@@ -124,8 +125,8 @@ async function confirmDelete() {
     await deleteAlbum(al.id)
     await loadAlbums()
     toast.success(`"${al.title}" deleted`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to delete album')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to delete album'))
   } finally {
     deletingId.value = null
   }
@@ -172,8 +173,8 @@ async function submit() {
     pendingCover.value = null
     imageUploadRef.value?.reset()
     addDialogOpen.value = false
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to create album')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to create album'))
   } finally {
     loading.value = false
     uploadProgress.value = 0

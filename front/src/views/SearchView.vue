@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { isCancel } from 'axios'
 import { Input } from '@/components/ui/input'
+import { isAbortError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { getPublicPlaylists } from '@/api/playlists'
 import { searchTracks } from '@/api/tracks'
@@ -134,8 +136,8 @@ async function runSearch(rawQuery: string) {
     tracks.value = trackResults
     albums.value = albumResults
     artists.value = artistResults
-  } catch (e: any) {
-    if (e.name !== 'AbortError' && e.name !== 'CanceledError') throw e
+  } catch (e) {
+    if (!isCancel(e) && !isAbortError(e)) throw e
   } finally {
     loading.value = false
   }

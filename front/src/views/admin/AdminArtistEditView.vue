@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { getAdminArtist, updateArtist, deleteArtistAvatar, artistImageUrl } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -58,8 +59,8 @@ async function save() {
     imageUploadRef.value?.reset()
 
     toast.success(`Artist "${updated.name}" saved`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to save artist')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to save artist'))
   } finally {
     loading.value = false
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
-import { AxiosError, AxiosHeaders } from 'axios'
+import { httpError } from '@/test-utils/http'
 import AddToPlaylistDialog from '../AddToPlaylistDialog.vue'
 import { usePlaylistsStore } from '@/stores/playlists'
 
@@ -15,10 +15,6 @@ vi.mock('vue-sonner', () => ({
   toast: { success: mockToastSuccess, error: mockToastError, info: mockToastInfo },
 }))
 
-function httpError(status: number, error: string) {
-  const config = { headers: new AxiosHeaders() }
-  return new AxiosError('fail', 'ERR', config, null, { status, statusText: '', headers: {}, config, data: { error } })
-}
 
 vi.mock('@/api/playlists', () => ({
   getPlaylists: vi.fn().mockResolvedValue([]),

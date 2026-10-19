@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { httpError } from '@/test-utils/http'
 import AdminAlbumRequestsView from '../AdminAlbumRequestsView.vue'
 
 const mockToastSuccess = vi.hoisted(() => vi.fn())
@@ -126,7 +127,7 @@ describe('AdminAlbumRequestsView', () => {
 
   it('shows api failure toast', async () => {
     mockListAll.mockResolvedValue([requestItem])
-    mockUpdateStatus.mockRejectedValue({ response: { data: { error: 'Cannot change status' } } })
+    mockUpdateStatus.mockRejectedValue(httpError(400, 'Cannot change status'))
 
     const wrapper = mountView()
     await flushPromises()

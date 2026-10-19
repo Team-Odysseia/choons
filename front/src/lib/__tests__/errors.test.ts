@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { AxiosError, AxiosHeaders } from 'axios'
-import { apiErrorMessage, apiStatus } from '../errors'
+import { apiErrorMessage, apiStatus, isAbortError } from '../errors'
 
 function axiosError(status: number, data: unknown) {
   const config = { headers: new AxiosHeaders() }
@@ -37,5 +37,18 @@ describe('apiStatus', () => {
 
   it('is undefined without a response', () => {
     expect(apiStatus(new Error('network'))).toBeUndefined()
+  })
+})
+
+describe('isAbortError', () => {
+  it('recognizes aborted fetches', () => {
+    expect(isAbortError(new DOMException('aborted', 'AbortError'))).toBe(true)
+    expect(isAbortError({ name: 'AbortError' })).toBe(true)
+  })
+
+  it('rejects other errors', () => {
+    expect(isAbortError(new Error('boom'))).toBe(false)
+    expect(isAbortError(null)).toBe(false)
+    expect(isAbortError('AbortError')).toBe(false)
   })
 })

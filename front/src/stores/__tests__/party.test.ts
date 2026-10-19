@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { AxiosError, AxiosHeaders } from 'axios'
+import { AxiosError } from 'axios'
+import { httpError } from '@/test-utils/http'
 import { usePartyStore } from '../party'
 import { emitter } from '@/lib/emitter'
 import type { PartyStateResponse } from '@/api/types'
@@ -62,10 +63,6 @@ class FakeEventSource {
 
 vi.stubGlobal('EventSource', FakeEventSource)
 
-function httpError(status: number, error: string) {
-  const config = { headers: new AxiosHeaders() }
-  return new AxiosError('fail', 'ERR', config, null, { status, statusText: '', headers: {}, config, data: { error } })
-}
 
 function makePartyState(overrides?: Partial<PartyStateResponse>): PartyStateResponse {
   return {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -29,8 +30,8 @@ async function load() {
   loading.value = true
   try {
     requests.value = await listMyAlbumRequests()
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to load requests')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load requests'))
   } finally {
     loading.value = false
   }
@@ -55,8 +56,8 @@ async function submit() {
     artistName.value = ''
     externalUrl.value = ''
     toast.success('Request sent to admins')
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to send request')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to send request'))
   } finally {
     submitting.value = false
   }
@@ -67,8 +68,8 @@ async function removeRequest(id: string) {
     await deleteAlbumRequest(id)
     requests.value = requests.value.filter((r) => r.id !== id)
     toast.success('Request deleted')
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to delete request')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to delete request'))
     await load()
   }
 }

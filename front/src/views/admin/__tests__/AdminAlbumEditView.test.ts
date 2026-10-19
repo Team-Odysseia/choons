@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { httpError } from '@/test-utils/http'
 import AdminAlbumEditView from '../AdminAlbumEditView.vue'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -234,7 +235,7 @@ describe('save', () => {
   })
 
   it('shows error toast on save failure', async () => {
-    mockUpdateAlbum.mockRejectedValue({ response: { data: { error: 'Save failed' } } })
+    mockUpdateAlbum.mockRejectedValue(httpError(400, 'Save failed'))
     const { wrapper } = await mountView()
 
     await wrapper.find('form').trigger('submit')

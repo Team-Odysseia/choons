@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { httpError } from '@/test-utils/http'
 import AlbumRequestsView from '../AlbumRequestsView.vue'
 
 const mockToastSuccess = vi.hoisted(() => vi.fn())
@@ -121,7 +122,7 @@ describe('AlbumRequestsView', () => {
 
   it('shows backend conflict message on delete failure', async () => {
     mockListMine.mockResolvedValue([pendingReq])
-    mockDelete.mockRejectedValue({ response: { data: { error: 'Only pending requests can be deleted' } } })
+    mockDelete.mockRejectedValue(httpError(400, 'Only pending requests can be deleted'))
 
     const wrapper = mountView()
     await flushPromises()

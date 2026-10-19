@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { getAdminArtists, searchArtists, createArtist, deleteArtist } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -50,8 +51,8 @@ async function confirmDelete() {
       await deleteArtist(artist.id)
       await load()
       toast.success(`"${artist.name}" deleted`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to delete artist')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to delete artist'))
   } finally {
     deletingId.value = null
   }
@@ -68,8 +69,8 @@ async function submit() {
     imageUploadRef.value?.reset()
     addDialogOpen.value = false
     toast.success(`Artist "${created.name}" created successfully`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to create artist')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to create artist'))
   } finally {
     loading.value = false
   }

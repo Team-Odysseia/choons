@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { usePartyStore } from '@/stores/party'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,8 +40,8 @@ async function onLeave() {
       await party.leave()
       toast.success('Left party')
     }
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to update party state')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to update party state'))
   }
 }
 </script>
