@@ -14,7 +14,7 @@ const subtitle = computed(() => props.meta ?? props.album.artist.name)
 
 <template>
   <RouterLink
-    :to="{ name: 'album', params: { id: album.id } }"
+    :to="`/library/albums/${album.id}`"
     class="album-card group flex w-[184px] shrink-0 flex-col gap-2.5 focus-visible:outline-none"
   >
     <div class="relative size-[184px]">
@@ -24,7 +24,7 @@ const subtitle = computed(() => props.meta ?? props.album.artist.name)
         :alt="album.title"
         class="absolute inset-0 shadow-[0_8px_18px_#000000cc] transition-[border-color,box-shadow] group-hover:border-cyan-dim group-hover:shadow-[0_8px_18px_#000000cc,0_0_18px_#5CF6E833] group-focus-visible:border-cyan"
       />
-      <VfdBadge v-if="isNew" tone="amber" label="New" class="absolute left-2 top-2" />
+      <VfdBadge v-if="isNew" tone="amber" label="NEW" class="absolute left-2 top-2" />
       <IconKey
         v-if="playable"
         :icon="Play"

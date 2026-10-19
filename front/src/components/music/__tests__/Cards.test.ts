@@ -44,9 +44,9 @@ describe('AlbumCard', () => {
 
   it('shows NEW badge when isNew', async () => {
     const plain = mount(AlbumCard, { props: { album: makeAlbum() }, ...(await routerPlugin()) })
-    expect(plain.text()).not.toContain('New')
+    expect(plain.text()).not.toContain('NEW')
     const fresh = mount(AlbumCard, { props: { album: makeAlbum(), isNew: true }, ...(await routerPlugin()) })
-    expect(fresh.text()).toContain('New')
+    expect(fresh.text()).toContain('NEW')
   })
 
   it('uses meta when given, otherwise artist name', async () => {

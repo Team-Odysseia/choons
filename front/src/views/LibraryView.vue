@@ -4,10 +4,14 @@ import { useRouter } from 'vue-router'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useArtistsInfiniteQuery, useRecentAlbumsQuery, useMostPlayedQuery } from '@/composables/queries'
-import { albumImageUrl } from '@/api/albums'
-import { artistImageUrl } from '@/api/artists'
 import TrackRow from '@/components/music/TrackRow.vue'
+import TrackListHeader from '@/components/music/TrackListHeader.vue'
+import AlbumCard from '@/components/music/AlbumCard.vue'
+import PlaylistTile from '@/components/music/PlaylistTile.vue'
+import ArtistCard from '@/components/music/ArtistCard.vue'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { PageHeader, SectionHeader, StatePlate } from '@/components/vfd'
 
 const router = useRouter()
 const playlists = usePlaylistsStore()
@@ -65,178 +69,87 @@ function goToSearch() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-10">
+  <div class="flex flex-col gap-9">
+    <div class="flex flex-col gap-5 md:flex-row md:items-end md:gap-6">
+      <PageHeader kicker="Source · Library" title="Library" class="flex-1" />
+      <Input
+        v-model="globalSearch"
+        class="md:max-w-[380px]"
+        placeholder="Search public playlists, songs, albums, artists"
+        @keydown.enter="goToSearch"
+      />
+    </div>
 
-    <section>
-      <div class="max-w-[760px]">
-        <Input
-          v-model="globalSearch"
-          placeholder="Search public playlists, songs, albums, artists"
-          @keydown.enter="goToSearch"
-        />
+    <section v-if="recentPlaylists.length > 0" class="flex flex-col gap-[18px]">
+      <SectionHeader title="Your Playlists" :count="playlists.playlists.length" see-all @see-all="router.push('/playlists')" />
+      <div class="flex flex-wrap gap-x-6 gap-y-5">
+        <PlaylistTile v-for="pl in recentPlaylists" :key="pl.id" :playlist="pl" />
       </div>
     </section>
 
-    <!-- Playlists quick access -->
-    <section v-if="recentPlaylists.length > 0">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-bold">Your Playlists</h2>
-        <button
-          class="text-[13px] font-semibold text-dimmed hover:text-foreground transition-colors"
-          @click="router.push('/playlists')"
-        >See all</button>
-      </div>
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-        <div
-          v-for="pl in recentPlaylists"
-          :key="pl.id"
-          class="flex items-center gap-3 bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors group"
-          @click="router.push(`/playlists/${pl.id}`)"
-        >
-          <div class="size-10 bg-muted group-hover:bg-accent rounded flex items-center justify-center text-[18px] shrink-0 transition-colors">♫</div>
-          <div class="flex flex-col min-w-0">
-            <span class="text-[13px] font-semibold truncate">{{ pl.name }}</span>
-            <span class="text-[11px] text-dimmed">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
-          </div>
-        </div>
+    <section v-if="recentAlbums?.length" class="flex flex-col gap-[18px]">
+      <SectionHeader
+        title="Recently Added"
+        :count="recentAlbums.length"
+        see-all
+        see-all-label="See all albums"
+        arrows
+        prev-label="Scroll left"
+        next-label="Scroll right"
+        @see-all="router.push('/library/albums')"
+        @prev="scrollSwiper('left')"
+        @next="scrollSwiper('right')"
+      />
+      <div ref="swiperRef" data-testid="recent-albums" class="swiper-track flex gap-6 overflow-x-auto pb-2">
+        <AlbumCard v-for="album in recentAlbums" :key="album.id" :album="album" :is-new="isNew(album.createdAt)" />
       </div>
     </section>
 
-    <!-- Recently added albums swiper -->
-    <section v-if="recentAlbums?.length">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-bold">Recently Added</h2>
-        <div class="flex items-center gap-2">
-          <button
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            aria-label="Scroll left"
-            @click="scrollSwiper('left')"
-          >‹</button>
-          <button
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            aria-label="Scroll right"
-            @click="scrollSwiper('right')"
-          >›</button>
-          <button
-            class="text-[13px] font-semibold text-dimmed hover:text-foreground transition-colors ml-1"
-            @click="router.push('/library/albums')"
-          >See all albums</button>
-        </div>
-      </div>
-      <div ref="swiperRef" class="swiper-track flex gap-4 overflow-x-auto pb-2">
-        <div
-          v-for="album in recentAlbums"
-          :key="album.id"
-          class="shrink-0 w-[160px] bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/library/albums/${album.id}`)"
-        >
-          <div class="relative mb-3">
-            <img
-              v-if="album.coverUrl"
-              :src="albumImageUrl(album.id)"
-              :alt="album.title + ' cover'"
-              class="w-full aspect-square rounded object-cover"
-            />
-            <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[36px]">
-              ♪
-            </div>
-            <span
-              v-if="isNew(album.createdAt)"
-              class="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded"
-            >NEW</span>
-          </div>
-          <div class="font-bold text-sm truncate">{{ album.title }}</div>
-          <div class="text-xs text-muted-foreground truncate mt-0.5">{{ album.artist.name }}</div>
-        </div>
+    <section v-if="playlists.publicPlaylists.length > 0" class="flex flex-col gap-[18px]">
+      <SectionHeader
+        title="Community Playlists"
+        :count="playlists.publicPlaylists.length"
+        arrows
+        prev-label="Scroll left"
+        next-label="Scroll right"
+        @prev="scrollCommunity('left')"
+        @next="scrollCommunity('right')"
+      />
+      <div ref="communityRef" class="swiper-track flex gap-6 overflow-x-auto pb-2">
+        <PlaylistTile v-for="pl in playlists.publicPlaylists" :key="pl.id" :playlist="pl" />
       </div>
     </section>
 
-    <!-- Community Playlists -->
-    <section v-if="playlists.publicPlaylists.length > 0">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-bold">Community Playlists</h2>
-        <div class="flex items-center gap-2">
-          <button
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            aria-label="Scroll left"
-            @click="scrollCommunity('left')"
-          >‹</button>
-          <button
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            aria-label="Scroll right"
-            @click="scrollCommunity('right')"
-          >›</button>
-        </div>
-      </div>
-      <div ref="communityRef" class="swiper-track flex gap-3 overflow-x-auto pb-2">
-        <div
-          v-for="pl in playlists.publicPlaylists"
-          :key="pl.id"
-          class="shrink-0 w-[180px] flex items-center gap-3 bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/playlists/${pl.id}`)"
-        >
-          <div class="size-10 bg-muted rounded flex items-center justify-center text-[18px] shrink-0">♫</div>
-          <div class="flex flex-col min-w-0">
-            <span class="text-[13px] font-semibold truncate">{{ pl.name }}</span>
-            <span class="text-[11px] text-dimmed">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
-          </div>
-        </div>
-      </div>
+    <section v-if="mostPlayed?.length" class="flex flex-col gap-1.5">
+      <SectionHeader title="Most Played" class="mb-3" />
+      <TrackListHeader />
+      <TrackRow
+        v-for="(track, i) in mostPlayed"
+        :key="track.id"
+        :track="track"
+        :queue="mostPlayed"
+        :index="i"
+        :show-add-to-queue="true"
+        :show-add-to-playlist="true"
+      />
     </section>
 
-    <!-- Most Played -->
-    <section v-if="mostPlayed?.length">
-      <h2 class="text-lg font-bold mb-4">Most Played</h2>
-      <div class="flex flex-col">
-        <TrackRow
-          v-for="(track, i) in mostPlayed"
-          :key="track.id"
-          :track="track"
-          :queue="mostPlayed"
-          :index="i"
-          :show-add-to-queue="true"
-          :show-add-to-playlist="true"
-        />
+    <section data-testid="artists-section" class="flex flex-col gap-[18px]">
+      <SectionHeader title="Artists" :count="artists.length || undefined" />
+      <StatePlate v-if="artistsLoading" kind="loading" code="READING…" message="Loading…" />
+      <StatePlate v-else-if="!artists.length" code="NO ARTISTS" message="No artists yet. Ask an admin to add some music." />
+      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] justify-items-center gap-x-4 gap-y-6">
+        <ArtistCard v-for="artist in artists" :key="artist.id" :artist="artist" />
+      </div>
+      <div v-if="hasMoreArtists" class="flex justify-center pt-2">
+        <Button
+          data-testid="more-artists"
+          variant="outline"
+          :disabled="loadingMoreArtists"
+          @click="loadMoreArtists()"
+        >{{ loadingMoreArtists ? 'Loading…' : 'Load more artists' }}</Button>
       </div>
     </section>
-
-    <!-- Artists -->
-    <section>
-      <h2 class="text-lg font-bold mb-4">Artists</h2>
-      <div v-if="artistsLoading" class="text-[13px] text-dimmed">Loading…</div>
-      <div v-else-if="!artists.length" class="text-[13px] text-dimmed">
-        No artists yet. Ask an admin to add some music.
-      </div>
-      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
-        <div
-          v-for="artist in artists"
-          :key="artist.id"
-          class="bg-card rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted"
-          @click="router.push(`/library/artists/${artist.id}`)"
-        >
-          <img
-            v-if="artist.avatarUrl"
-            :src="artistImageUrl(artist.id)"
-            :alt="artist.name + ' avatar'"
-            class="w-full aspect-square rounded-full object-cover mb-3"
-          />
-          <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[40px] font-extrabold text-muted-foreground mb-3">
-            {{ artist.name[0]?.toUpperCase() }}
-          </div>
-          <div class="font-bold text-sm mb-1 truncate">{{ artist.name }}</div>
-        </div>
-      </div>
-      <button
-        v-if="hasMoreArtists"
-        data-testid="more-artists"
-        class="mt-4 text-[13px] text-dimmed hover:text-foreground transition-colors disabled:opacity-40"
-        :disabled="loadingMoreArtists"
-        @click="loadMoreArtists()"
-      >
-        {{ loadingMoreArtists ? 'Loading…' : 'Load more artists' }}
-      </button>
-    </section>
-
   </div>
 </template>
 

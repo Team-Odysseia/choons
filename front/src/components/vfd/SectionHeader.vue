@@ -11,10 +11,12 @@ interface Props {
   arrows?: boolean
   expanded?: boolean
   prevDisabled?: boolean
+  prevLabel?: string
+  nextLabel?: string
   nextDisabled?: boolean
 }
 
-withDefaults(defineProps<Props>(), { seeAllLabel: 'See all' })
+withDefaults(defineProps<Props>(), { seeAllLabel: 'See all', prevLabel: 'Previous', nextLabel: 'Next' })
 defineEmits<{ 'see-all': []; prev: []; next: [] }>()
 </script>
 
@@ -28,8 +30,8 @@ defineEmits<{ 'see-all': []; prev: []; next: [] }>()
       <slot name="actions" />
       <Button v-if="seeAll" variant="ghost" size="sm" @click="$emit('see-all')">{{ expanded ? 'Show less' : seeAllLabel }}</Button>
       <template v-if="arrows">
-        <IconKey :icon="ChevronLeft" label="Previous" :size="32" :disabled="prevDisabled" @click="$emit('prev')" />
-        <IconKey :icon="ChevronRight" label="Next" :size="32" :disabled="nextDisabled" @click="$emit('next')" />
+        <IconKey :icon="ChevronLeft" :label="prevLabel" :size="32" :disabled="prevDisabled" @click="$emit('prev')" />
+        <IconKey :icon="ChevronRight" :label="nextLabel" :size="32" :disabled="nextDisabled" @click="$emit('next')" />
       </template>
     </div>
   </div>

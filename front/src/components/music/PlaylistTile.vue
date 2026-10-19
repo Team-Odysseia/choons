@@ -7,7 +7,7 @@ defineProps<{ playlist: PlaylistSummaryResponse; owner?: string }>()
 
 <template>
   <RouterLink
-    :to="{ name: 'playlist', params: { id: playlist.id } }"
+    :to="`/playlists/${playlist.id}`"
     class="group flex w-[184px] shrink-0 flex-col gap-2.5"
   >
     <div

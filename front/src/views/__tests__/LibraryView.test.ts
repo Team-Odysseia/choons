@@ -112,14 +112,14 @@ describe('recently added albums swiper', () => {
   it('does not render swiper when no albums', async () => {
     const { wrapper } = mountView()
     await flushPromises()
-    expect(wrapper.find('.swiper-track').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="recent-albums"]').exists()).toBe(false)
   })
 
   it('renders album cards when albums are returned', async () => {
     mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album One', 3)])
     const { wrapper } = mountView()
     await flushPromises()
-    expect(wrapper.find('.swiper-track').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="recent-albums"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Album One')
     expect(wrapper.text()).toContain('Test Artist')
   })
@@ -159,7 +159,7 @@ describe('recently added albums swiper', () => {
     mockGetAlbums.mockResolvedValue([makeAlbum('al-42', 'Nav Album', 3)])
     const { wrapper, router } = mountView()
     await flushPromises()
-    const card = wrapper.find('.swiper-track > div')
+    const card = wrapper.find('[data-testid="recent-albums"] a')
     await card.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/library/albums/al-42')
@@ -263,6 +263,7 @@ describe('artists section', () => {
     const { wrapper } = mountView()
     await flushPromises()
     expect(wrapper.text()).toContain('No artists yet')
+    expect(wrapper.find('[data-testid="artists-section"] [data-code]').text()).toBe('NO ARTISTS')
   })
 
   it('renders artist names', async () => {

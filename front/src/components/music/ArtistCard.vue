@@ -10,7 +10,7 @@ const initial = computed(() => props.artist.name.charAt(0).toUpperCase())
 
 <template>
   <RouterLink
-    :to="{ name: 'artist', params: { id: artist.id } }"
+    :to="`/library/artists/${artist.id}`"
     class="group flex w-[150px] shrink-0 flex-col items-center gap-3"
   >
     <div
