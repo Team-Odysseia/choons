@@ -7,8 +7,13 @@ import { isAbortError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { getPublicPlaylists } from '@/api/playlists'
 import { searchTracks } from '@/api/tracks'
-import { searchAlbums, albumImageUrl } from '@/api/albums'
-import { searchArtists, artistImageUrl } from '@/api/artists'
+import { searchAlbums } from '@/api/albums'
+import { searchArtists } from '@/api/artists'
+import AlbumCard from '@/components/music/AlbumCard.vue'
+import ArtistCard from '@/components/music/ArtistCard.vue'
+import PlaylistTile from '@/components/music/PlaylistTile.vue'
+import SongCard from '@/components/music/SongCard.vue'
+import { PageHeader, Readout, SectionHeader, StatePlate } from '@/components/vfd'
 import type {
   PlaylistSummaryResponse,
   TrackResponse,
@@ -67,6 +72,10 @@ const artistsPreview = computed(() =>
   showAllArtists.value ? artists.value : artists.value.slice(0, 20),
 )
 
+const hits = computed(
+  () => playlists.value.length + tracks.value.length + albums.value.length + artists.value.length,
+)
+
 const hasResults = computed(
   () => playlists.value.length || tracks.value.length || albums.value.length || artists.value.length,
 )
@@ -81,12 +90,6 @@ function onInput() {
   searchDebounce = setTimeout(() => {
     submitSearch()
   }, 220)
-}
-
-function formatDuration(secs: number) {
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
 }
 
 function scrollSection(el: HTMLElement | null, direction: 'left' | 'right') {
@@ -146,226 +149,113 @@ async function runSearch(rawQuery: string) {
 
 <template>
   <div class="flex flex-col gap-8">
-    <section>
-      <div class="max-w-[760px] flex items-center gap-2">
-        <Input
-          v-model="searchInput"
-          placeholder="Search public playlists, songs, albums, artists"
-          @input="onInput"
-          @keydown.enter="submitSearch"
-        />
-        <Button variant="outline" @click="submitSearch">Search</Button>
-      </div>
-    </section>
+    <PageHeader kicker="Source · Search" title="Search" />
 
-    <div v-if="!searchInput.trim()" class="text-[13px] text-dimmed">
-      Start typing to search across playlists, songs, albums, and artists.
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <Input
+        v-model="searchInput"
+        class="flex-1"
+        aria-label="Search query"
+        placeholder="Search public playlists, songs, albums, artists"
+        @input="onInput"
+        @keydown.enter="submitSearch"
+      />
+      <div class="flex items-end gap-4">
+        <Button @click="submitSearch">Search</Button>
+        <Readout data-testid="hits-readout" caption="Hits" :value="String(hits).padStart(2, '0')" size="sm" class="[&_[data-value]]:text-[26px]" />
+      </div>
     </div>
-    <div v-else-if="loading" class="text-[13px] text-dimmed">Searching…</div>
-    <div v-else-if="!hasResults" class="text-[13px] text-dimmed">No results found.</div>
 
-    <section v-if="playlists.length > 0" class="flex flex-col gap-3">
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-lg font-bold">Public Playlists ({{ playlists.length }})</h2>
-        <div class="flex items-center gap-2">
-          <button
-            v-if="!showAllPlaylists"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(playlistsRef, 'left')"
-          >‹</button>
-          <button
-            v-if="!showAllPlaylists"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(playlistsRef, 'right')"
-          >›</button>
-          <Button
-            variant="outline"
-            @click="showAllPlaylists = !showAllPlaylists"
-          >{{ showAllPlaylists ? 'Show less' : 'See all' }}</Button>
-        </div>
-      </div>
+    <StatePlate
+      v-if="!searchInput.trim()"
+      code="STANDBY"
+      message="Start typing to search across playlists, songs, albums, and artists."
+    />
+    <StatePlate v-else-if="loading" kind="loading" code="SEEK…" message="Searching…" />
+    <StatePlate v-else-if="!hasResults" code="NO SIGNAL" message="No results found." />
 
+    <section v-if="playlists.length > 0" class="flex flex-col gap-[18px]">
+      <SectionHeader
+        title="Public Playlists"
+        :count="playlists.length"
+        see-all
+        :expanded="showAllPlaylists"
+        :arrows="!showAllPlaylists"
+        @see-all="showAllPlaylists = !showAllPlaylists"
+        @prev="scrollSection(playlistsRef, 'left')"
+        @next="scrollSection(playlistsRef, 'right')"
+      />
       <div
-        v-if="!showAllPlaylists"
         ref="playlistsRef"
-        class="swiper-track flex gap-3 overflow-x-auto pb-2"
+        :class="showAllPlaylists ? 'flex flex-wrap gap-6' : 'swiper-track flex gap-6 overflow-x-auto pb-2'"
       >
-        <div
-          v-for="pl in playlistsPreview"
-          :key="pl.id"
-          class="shrink-0 w-[210px] flex items-center gap-3 bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/playlists/${pl.id}`)"
-        >
-          <div class="size-10 bg-muted rounded flex items-center justify-center text-[18px] shrink-0">♫</div>
-          <div class="flex flex-col min-w-0">
-            <span class="text-[13px] font-semibold truncate">{{ pl.name }}</span>
-            <span class="text-[11px] text-dimmed">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
-          </div>
-        </div>
-      </div>
-      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-        <div
-          v-for="pl in playlistsPreview"
-          :key="pl.id"
-          class="flex items-center gap-3 bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/playlists/${pl.id}`)"
-        >
-          <div class="size-10 bg-muted rounded flex items-center justify-center text-[18px] shrink-0">♫</div>
-          <div class="flex flex-col min-w-0">
-            <span class="text-[13px] font-semibold truncate">{{ pl.name }}</span>
-            <span class="text-[11px] text-dimmed">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
-          </div>
-        </div>
+        <PlaylistTile v-for="pl in playlistsPreview" :key="pl.id" :playlist="pl" />
       </div>
     </section>
 
-    <section v-if="tracks.length > 0" class="flex flex-col gap-3">
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-lg font-bold">Songs ({{ tracks.length }})</h2>
-        <div class="flex items-center gap-2">
-          <button
-            v-if="!showAllTracks"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(tracksRef, 'left')"
-          >‹</button>
-          <button
-            v-if="!showAllTracks"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(tracksRef, 'right')"
-          >›</button>
-          <Button variant="outline" @click="showAllTracks = !showAllTracks">{{ showAllTracks ? 'Show less' : 'See all' }}</Button>
-        </div>
-      </div>
-
+    <section v-if="tracks.length > 0" class="flex flex-col gap-[18px]">
+      <SectionHeader
+        title="Songs"
+        :count="tracks.length"
+        see-all
+        :expanded="showAllTracks"
+        :arrows="!showAllTracks"
+        @see-all="showAllTracks = !showAllTracks"
+        @prev="scrollSection(tracksRef, 'left')"
+        @next="scrollSection(tracksRef, 'right')"
+      />
       <div
-        v-if="!showAllTracks"
         ref="tracksRef"
-        class="swiper-track flex gap-3 overflow-x-auto pb-2"
+        :class="
+          showAllTracks
+            ? 'grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4'
+            : 'swiper-track grid auto-cols-[300px] grid-flow-col grid-rows-2 gap-4 overflow-x-auto pb-2'
+        "
       >
-        <div
+        <SongCard
           v-for="track in tracksPreview"
           :key="track.id"
-          class="shrink-0 w-[250px] bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="openTrackInAlbum(track.album.id, track.id)"
-        >
-          <div class="text-sm font-semibold truncate">{{ track.title }}</div>
-          <div class="text-xs text-muted-foreground truncate mt-0.5">{{ track.artist.name }} · {{ track.album.title }}</div>
-          <div class="text-xs text-dimmed mt-1">{{ formatDuration(track.durationSeconds) }}</div>
-        </div>
-      </div>
-      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
-        <div
-          v-for="track in tracksPreview"
-          :key="track.id"
-          class="bg-card rounded-lg px-3 py-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="openTrackInAlbum(track.album.id, track.id)"
-        >
-          <div class="text-sm font-semibold truncate">{{ track.title }}</div>
-          <div class="text-xs text-muted-foreground truncate mt-0.5">{{ track.artist.name }} · {{ track.album.title }}</div>
-          <div class="text-xs text-dimmed mt-1">{{ formatDuration(track.durationSeconds) }}</div>
-        </div>
+          :track="track"
+          @play="openTrackInAlbum(track.album.id, track.id)"
+        />
       </div>
     </section>
 
-    <section v-if="albums.length > 0" class="flex flex-col gap-3">
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-lg font-bold">Albums ({{ albums.length }})</h2>
-        <div class="flex items-center gap-2">
-          <button
-            v-if="!showAllAlbums"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(albumsRef, 'left')"
-          >‹</button>
-          <button
-            v-if="!showAllAlbums"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(albumsRef, 'right')"
-          >›</button>
-          <Button variant="outline" @click="showAllAlbums = !showAllAlbums">{{ showAllAlbums ? 'Show less' : 'See all' }}</Button>
-        </div>
-      </div>
-
+    <section v-if="albums.length > 0" class="flex flex-col gap-[18px]">
+      <SectionHeader
+        title="Albums"
+        :count="albums.length"
+        see-all
+        :expanded="showAllAlbums"
+        :arrows="!showAllAlbums"
+        @see-all="showAllAlbums = !showAllAlbums"
+        @prev="scrollSection(albumsRef, 'left')"
+        @next="scrollSection(albumsRef, 'right')"
+      />
       <div
-        v-if="!showAllAlbums"
         ref="albumsRef"
-        class="swiper-track flex gap-3 overflow-x-auto pb-2"
+        :class="showAllAlbums ? 'flex flex-wrap gap-x-6 gap-y-8' : 'swiper-track flex gap-6 overflow-x-auto pb-2'"
       >
-        <div
-          v-for="album in albumsPreview"
-          :key="album.id"
-          class="shrink-0 w-[180px] bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/library/albums/${album.id}`)"
-        >
-          <img v-if="album.coverUrl" :src="albumImageUrl(album.id)" :alt="album.title + ' cover'" class="w-full aspect-square rounded object-cover mb-2" />
-          <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[38px] mb-2">♪</div>
-          <div class="text-sm font-semibold truncate">{{ album.title }}</div>
-          <div class="text-xs text-muted-foreground truncate">{{ album.artist.name }}</div>
-        </div>
-      </div>
-      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-        <div
-          v-for="album in albumsPreview"
-          :key="album.id"
-          class="bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/library/albums/${album.id}`)"
-        >
-          <img v-if="album.coverUrl" :src="albumImageUrl(album.id)" :alt="album.title + ' cover'" class="w-full aspect-square rounded object-cover mb-2" />
-          <div v-else class="w-full aspect-square bg-muted rounded flex items-center justify-center text-[38px] mb-2">♪</div>
-          <div class="text-sm font-semibold truncate">{{ album.title }}</div>
-          <div class="text-xs text-muted-foreground truncate">{{ album.artist.name }}</div>
-        </div>
+        <AlbumCard v-for="album in albumsPreview" :key="album.id" :album="album" />
       </div>
     </section>
 
-    <section v-if="artists.length > 0" class="flex flex-col gap-3">
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-lg font-bold">Artists ({{ artists.length }})</h2>
-        <div class="flex items-center gap-2">
-          <button
-            v-if="!showAllArtists"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(artistsRef, 'left')"
-          >‹</button>
-          <button
-            v-if="!showAllArtists"
-            class="size-7 rounded-full bg-card hover:bg-muted transition-colors flex items-center justify-center text-dimmed hover:text-foreground"
-            @click="scrollSection(artistsRef, 'right')"
-          >›</button>
-          <Button variant="outline" @click="showAllArtists = !showAllArtists">{{ showAllArtists ? 'Show less' : 'See all' }}</Button>
-        </div>
-      </div>
-
+    <section v-if="artists.length > 0" class="flex flex-col gap-[18px]">
+      <SectionHeader
+        title="Artists"
+        :count="artists.length"
+        see-all
+        :expanded="showAllArtists"
+        :arrows="!showAllArtists"
+        @see-all="showAllArtists = !showAllArtists"
+        @prev="scrollSection(artistsRef, 'left')"
+        @next="scrollSection(artistsRef, 'right')"
+      />
       <div
-        v-if="!showAllArtists"
         ref="artistsRef"
-        class="swiper-track flex gap-3 overflow-x-auto pb-2"
+        :class="showAllArtists ? 'flex flex-wrap gap-x-6 gap-y-8' : 'swiper-track flex gap-6 overflow-x-auto pb-2'"
       >
-        <div
-          v-for="artist in artistsPreview"
-          :key="artist.id"
-          class="shrink-0 w-[170px] bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/library/artists/${artist.id}`)"
-        >
-          <img v-if="artist.avatarUrl" :src="artistImageUrl(artist.id)" :alt="artist.name + ' avatar'" class="w-full aspect-square rounded-full object-cover mb-2" />
-          <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[36px] font-extrabold text-muted-foreground mb-2">
-            {{ artist.name[0]?.toUpperCase() }}
-          </div>
-          <div class="text-sm font-semibold truncate">{{ artist.name }}</div>
-        </div>
-      </div>
-      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-        <div
-          v-for="artist in artistsPreview"
-          :key="artist.id"
-          class="bg-card rounded-lg p-3 cursor-pointer hover:bg-muted transition-colors"
-          @click="router.push(`/library/artists/${artist.id}`)"
-        >
-          <img v-if="artist.avatarUrl" :src="artistImageUrl(artist.id)" :alt="artist.name + ' avatar'" class="w-full aspect-square rounded-full object-cover mb-2" />
-          <div v-else class="w-full aspect-square bg-muted rounded-full flex items-center justify-center text-[36px] font-extrabold text-muted-foreground mb-2">
-            {{ artist.name[0]?.toUpperCase() }}
-          </div>
-          <div class="text-sm font-semibold truncate">{{ artist.name }}</div>
-        </div>
+        <ArtistCard v-for="artist in artistsPreview" :key="artist.id" :artist="artist" />
       </div>
     </section>
   </div>
@@ -375,7 +265,6 @@ async function runSearch(rawQuery: string) {
 .swiper-track {
   scrollbar-width: none;
 }
-
 .swiper-track::-webkit-scrollbar {
   display: none;
 }
