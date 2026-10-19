@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { usePlaylistsStore } from '@/stores/playlists'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,7 +17,13 @@ const creating = ref(false)
 const showForm = ref(false)
 const deleteTarget = ref<{ id: string; name: string } | null>(null)
 
-onMounted(() => playlists.fetchMyPlaylists())
+onMounted(async () => {
+  try {
+    await playlists.fetchMyPlaylists()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load playlists'))
+  }
+})
 
 async function create() {
   if (!newName.value.trim()) return
@@ -25,6 +33,8 @@ async function create() {
     newName.value = ''
     showForm.value = false
     router.push(`/playlists/${pl.id}`)
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to create playlist'))
   } finally {
     creating.value = false
   }
@@ -35,9 +45,14 @@ function askRemove(id: string, name: string) {
 }
 
 async function removeConfirmed() {
-  if (!deleteTarget.value) return
-  await playlists.deletePlaylist(deleteTarget.value.id)
+  const target = deleteTarget.value
+  if (!target) return
   deleteTarget.value = null
+  try {
+    await playlists.deletePlaylist(target.id)
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to delete playlist'))
+  }
 }
 </script>
 

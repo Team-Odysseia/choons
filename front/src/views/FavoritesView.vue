@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { useFavoritesStore } from '@/stores/favorites'
+import { apiErrorMessage } from '@/lib/errors'
 import TrackRow from '@/components/music/TrackRow.vue'
 
 const favorites = useFavoritesStore()
 
-onMounted(() => {
-  void favorites.fetchFavorites()
+onMounted(async () => {
+  try {
+    await favorites.fetchFavorites()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load favorites'))
+  }
 })
 </script>
 

@@ -9,7 +9,7 @@ const route = useRoute()
 const router = useRouter()
 const id = computed(() => route.params.id as string)
 
-const { data: artist, isPending } = useArtistQuery(id)
+const { data: artist, isPending, isError } = useArtistQuery(id)
 const { data: albums } = useAlbumsQuery(id)
 
 function isNew(createdAt: string) {
@@ -74,5 +74,6 @@ function isNew(createdAt: string) {
       </div>
     </div>
   </div>
+  <div v-else-if="isError" class="text-[13px] text-dimmed">This artist is not available.</div>
   <div v-else class="text-[13px] text-dimmed">Loading…</div>
 </template>
