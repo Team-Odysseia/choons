@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestNormalizePostgresURI(t *testing.T) {
 	cases := []struct {
@@ -79,5 +82,40 @@ func TestLoadParsesOverrides(t *testing.T) {
 	t.Setenv("STREAM_URL_TTL", "forever")
 	if _, err := Load(); err == nil {
 		t.Fatal("invalid duration accepted")
+	}
+}
+
+func TestLoadTelemetry(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@db/choons")
+	t.Setenv("JWT_SECRET", "0123456789abcdef0123456789abcdef")
+	t.Setenv("R2_ENDPOINT", "https://r2.test")
+	t.Setenv("R2_ACCESS_KEY", "k")
+	t.Setenv("R2_SECRET_KEY", "s")
+	t.Setenv("POSTHOG_KEY", "")
+	t.Setenv("POSTHOG_HOST", "")
+	t.Setenv("APP_ENV", "")
+	t.Setenv("SLOW_REQUEST_THRESHOLD", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PostHogKey != "" || cfg.PostHogHost != "https://us.i.posthog.com" || cfg.AppEnv != "development" || cfg.SlowRequestThreshold != time.Second {
+		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
+
+	t.Setenv("POSTHOG_KEY", "phc_test")
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("SLOW_REQUEST_THRESHOLD", "750ms")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.PostHogKey != "phc_test" || cfg.AppEnv != "production" || cfg.SlowRequestThreshold != 750*time.Millisecond {
+		t.Fatalf("unexpected config: %+v", cfg)
+	}
+
+	t.Setenv("SLOW_REQUEST_THRESHOLD", "soon")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for invalid SLOW_REQUEST_THRESHOLD")
 	}
 }

@@ -16,6 +16,7 @@ type ErrorBody struct {
 }
 
 func Fail(c *gin.Context, err error) {
+	_ = c.Error(err)
 	var appErr *apperr.Error
 	switch {
 	case errors.As(err, &appErr):

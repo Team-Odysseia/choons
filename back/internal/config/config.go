@@ -28,6 +28,11 @@ type Config struct {
 	TrustedProxies []string
 	AdminUsername  string
 	AdminPassword  string
+
+	AppEnv               string
+	PostHogKey           string
+	PostHogHost          string
+	SlowRequestThreshold time.Duration
 }
 
 func Load() (Config, error) {
@@ -52,6 +57,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	slow, err := duration("SLOW_REQUEST_THRESHOLD", time.Second)
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
 		Port:           env("PORT", "8080"),
 		DatabaseURL:    dbURL,
@@ -70,6 +79,11 @@ func Load() (Config, error) {
 		TrustedProxies: list(env("TRUSTED_PROXIES", "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7")),
 		AdminUsername:  os.Getenv("ADMIN_USERNAME"),
 		AdminPassword:  os.Getenv("ADMIN_PASSWORD"),
+
+		AppEnv:               env("APP_ENV", "development"),
+		PostHogKey:           os.Getenv("POSTHOG_KEY"),
+		PostHogHost:          env("POSTHOG_HOST", "https://us.i.posthog.com"),
+		SlowRequestThreshold: slow,
 	}, nil
 }
 

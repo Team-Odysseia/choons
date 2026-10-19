@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/posthog/posthog-go"
 
 	"github.com/Team-Odysseia/choons/back/internal/auth"
 	"github.com/Team-Odysseia/choons/back/internal/config"
@@ -122,6 +123,11 @@ func serve(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	events, closeEvents, err := telemetryClient(cfg)
+	if err != nil {
+		return err
+	}
+	defer closeEvents()
 	gdb, err := db.Open(cfg.DatabaseURL)
 	if err != nil {
 		return err
@@ -181,6 +187,9 @@ func serve(ctx context.Context) error {
 		TrustedProxies: cfg.TrustedProxies,
 		LoginLimiter:   loginLimiter,
 		StreamLimiter:  streamLimiter,
+		Telemetry:      events,
+		Environment:    cfg.AppEnv,
+		SlowThreshold:  cfg.SlowRequestThreshold,
 	})
 	if err != nil {
 		return err
@@ -214,4 +223,23 @@ func serve(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+func telemetryClient(cfg config.Config) (posthog.EnqueueClient, func(), error) {
+	if cfg.PostHogKey == "" {
+		slog.Info("telemetry disabled, POSTHOG_KEY not set")
+		return nil, func() {}, nil
+	}
+	client, err := posthog.NewWithConfig(cfg.PostHogKey, posthog.Config{
+		Endpoint:        cfg.PostHogHost,
+		ShutdownTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, func() {
+		if err := client.Close(); err != nil {
+			slog.Warn("telemetry close failed", "err", err)
+		}
+	}, nil
 }

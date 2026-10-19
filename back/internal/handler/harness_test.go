@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/posthog/posthog-go"
 
 	"github.com/Team-Odysseia/choons/back/internal/auth"
 	"github.com/Team-Odysseia/choons/back/internal/httpx"
@@ -48,6 +49,7 @@ type opts struct {
 	streamPerMin int
 	heartbeat    time.Duration
 	sseTimeout   time.Duration
+	events       posthog.EnqueueClient
 }
 
 func newServer(t *testing.T, o ...opts) *server {
@@ -76,6 +78,7 @@ func newServer(t *testing.T, o ...opts) *server {
 		CORSOrigins:   []string{testOrigin},
 		LoginLimiter:  httpx.NewRateLimiter(cfg.loginPerMin),
 		StreamLimiter: httpx.NewRateLimiter(cfg.streamPerMin),
+		Telemetry:     cfg.events,
 	})
 	if err != nil {
 		t.Fatal(err)

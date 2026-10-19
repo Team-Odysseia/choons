@@ -6,7 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const allowedMethods = "GET,POST,PUT,DELETE,OPTIONS"
+const (
+	allowedMethods  = "GET,POST,PUT,DELETE,OPTIONS"
+	RequestIDHeader = "X-Request-ID"
+)
 
 func CORS(origins []string) gin.HandlerFunc {
 	allowed := make(map[string]struct{}, len(origins))
@@ -37,12 +40,14 @@ func CORS(origins []string) gin.HandlerFunc {
 			h.Add("Vary", "Access-Control-Request-Method")
 			h.Add("Vary", "Access-Control-Request-Headers")
 			h.Set("Access-Control-Allow-Methods", allowedMethods)
+			h.Set("Access-Control-Max-Age", "600")
 			if req := c.GetHeader("Access-Control-Request-Headers"); req != "" {
 				h.Set("Access-Control-Allow-Headers", req)
 			}
 			c.AbortWithStatus(http.StatusOK)
 			return
 		}
+		h.Set("Access-Control-Expose-Headers", RequestIDHeader)
 		c.Next()
 	}
 }

@@ -98,6 +98,8 @@ Purpose: fast orientation map for future tasks in this repo.
   - `POSTGRES_URI` (jdbc form accepted) + `POSTGRES_USER`/`POSTGRES_PASS`, or `DATABASE_URL`
   - `JWT_SECRET` (>= 32 bytes, no fallback), `R2_ENDPOINT`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`
   - optional: `CORS_ALLOWED_ORIGINS`, `AUTH_COOKIE_SECURE`, `R2_BUCKET`, TTLs, rate limits, `ADMIN_USERNAME`/`ADMIN_PASSWORD`
+  - optional telemetry: `POSTHOG_KEY` (empty = disabled), `POSTHOG_HOST`, `APP_ENV`, `SLOW_REQUEST_THRESHOLD` (default `1s`)
+- Telemetry (PostHog US Cloud): `back/internal/telemetry` middleware (first in chain, replaces `gin.Recovery`) sets `X-Request-ID`, sends 5xx/panics as `$exception`, 4xx (not 401, matched routes only) as `api_request_failed`, slow as `api_request_slow` (SSE/uploads/healthz exempt). Frontend `src/lib/telemetry.ts` (posthog-js, `VITE_POSTHOG_KEY`/`VITE_POSTHOG_HOST`) captures JS/Vue/router exceptions, network errors, client-side slow requests, audio errors, session replay; sends `X-POSTHOG-SESSION-ID`/`X-POSTHOG-DISTINCT-ID` so backend events link to replays. Netlify proxies `/ingest/*` to PostHog (`front/public/_redirects`).
 - Production DB is Supabase (Postgres 17); its schema predates Hibernate (prototype tables `artist_albums`, `artist_tracks`, `schema_migrations` are unused). Backups: `~/Backups/choons/`.
 - `netlify.toml` deploys frontend from `front/` with `bun run build-only` and publishes `front/dist`.
 - `back/Dockerfile` multi-stage → distroless static (~26MB image, ~10MB RSS idle), healthcheck via `choons health`.

@@ -1,11 +1,16 @@
 package handler
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/posthog/posthog-go"
 
 	"github.com/Team-Odysseia/choons/back/internal/auth"
 	"github.com/Team-Odysseia/choons/back/internal/httpx"
 	"github.com/Team-Odysseia/choons/back/internal/model"
+	"github.com/Team-Odysseia/choons/back/internal/telemetry"
 )
 
 type RouterConfig struct {
@@ -13,6 +18,9 @@ type RouterConfig struct {
 	TrustedProxies []string
 	LoginLimiter   *httpx.RateLimiter
 	StreamLimiter  *httpx.RateLimiter
+	Telemetry      posthog.EnqueueClient
+	Environment    string
+	SlowThreshold  time.Duration
 }
 
 func (h *Handler) Router(cfg RouterConfig) (*gin.Engine, error) {
@@ -21,7 +29,13 @@ func (h *Handler) Router(cfg RouterConfig) (*gin.Engine, error) {
 	if err := r.SetTrustedProxies(cfg.TrustedProxies); err != nil {
 		return nil, err
 	}
-	r.Use(gin.Recovery())
+	r.Use(telemetry.Middleware(telemetry.Options{
+		Client:      cfg.Telemetry,
+		Environment: cfg.Environment,
+		Slow:        cfg.SlowThreshold,
+		SkipSlow:    func(c *gin.Context) bool { return slowExempt(c.Request.Method, c.FullPath()) },
+		User:        telemetryUser,
+	}))
 	r.Use(httpx.CORS(cfg.CORSOrigins))
 	guard, err := httpx.CrossOriginGuard(cfg.CORSOrigins)
 	if err != nil {
@@ -129,4 +143,23 @@ func (h *Handler) Router(cfg RouterConfig) (*gin.Engine, error) {
 	admin.DELETE("/tracks/:id", h.deleteTrack)
 
 	return r, nil
+}
+
+func slowExempt(method, route string) bool {
+	switch {
+	case uploadRoutes[method+" "+route]:
+		return true
+	case method == http.MethodGet && (route == "/healthz" || route == "/parties/:code/events"):
+		return true
+	default:
+		return false
+	}
+}
+
+func telemetryUser(c *gin.Context) (telemetry.User, bool) {
+	u := auth.CurrentUser(c)
+	if u == nil {
+		return telemetry.User{}, false
+	}
+	return telemetry.User{ID: u.ID.String(), Role: string(u.Role)}, true
 }

@@ -108,6 +108,9 @@ func TestFailMapping(t *testing.T) {
 		if w.Code != tc.status || w.Body.String() != tc.body {
 			t.Errorf("%v: got %d %s", tc.err, w.Code, w.Body.String())
 		}
+		if last := c.Errors.Last(); last == nil || !errors.Is(last.Err, tc.err) {
+			t.Errorf("%v: not recorded on context, got %v", tc.err, c.Errors)
+		}
 	}
 }
 
@@ -130,7 +133,7 @@ func TestCORS(t *testing.T) {
 	h := w.Header()
 	if w.Code != 200 || h.Get("Access-Control-Allow-Origin") != "http://localhost:5173" ||
 		h.Get("Access-Control-Allow-Credentials") != "true" || h.Get("Access-Control-Allow-Methods") != allowedMethods ||
-		h.Get("Access-Control-Allow-Headers") != "content-type" {
+		h.Get("Access-Control-Allow-Headers") != "content-type" || h.Get("Access-Control-Max-Age") != "600" {
 		t.Fatalf("preflight: %d %v", w.Code, h)
 	}
 
@@ -155,7 +158,8 @@ func TestCORS(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.Header.Set("Origin", "http://localhost:5173")
 	r.ServeHTTP(w, req)
-	if w.Header().Get("Access-Control-Allow-Origin") != "http://localhost:5173" {
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://localhost:5173" ||
+		w.Header().Get("Access-Control-Expose-Headers") != "X-Request-ID" {
 		t.Fatalf("allowed simple: %v", w.Header())
 	}
 }
