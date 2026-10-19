@@ -100,6 +100,13 @@ func (s *Playlists) AddTrack(ctx context.Context, user *model.User, id, trackID 
 		if _, err := first[model.Track](tx.Select("id"), "Track", trackID); err != nil {
 			return err
 		}
+		var dup int64
+		if err := tx.Model(&model.PlaylistTrack{}).Where("playlist_id = ? AND track_id = ?", id, trackID).Count(&dup).Error; err != nil {
+			return err
+		}
+		if dup > 0 {
+			return apperr.Conflict("Track already in playlist")
+		}
 		var n int64
 		if err := tx.Model(&model.PlaylistTrack{}).Where("playlist_id = ?", id).Count(&n).Error; err != nil {
 			return err

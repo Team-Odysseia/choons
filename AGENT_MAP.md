@@ -57,14 +57,14 @@ Purpose: fast orientation map for future tasks in this repo.
 ## 4) Backend Endpoint Map (`back/internal/handler/router.go`)
 
 - `/auth` (`/login`, `/logout`, `/register` admin, `/me`) -> `handler/catalog.go` + `service/users.go`
-- `/music` (artists, albums, tracks, most-played) -> `handler/catalog.go` + `service/catalog.go`
+- `/music` (artists, albums (`sort=recent`), tracks, most-played) -> `handler/catalog.go` + `service/catalog.go`; unpaged lists default `size=100` (max 200) — admin UIs use unpaged `/admin/artists|albums|tracks`
 - `/stream/:id` (302 to presigned R2 URL), `/stream/:id/played` -> `handler/catalog.go`
 - `/media/images/{albums,artists}/:id` (302 presigned), `/public/covers` -> `handler/catalog.go`
-- `/playlists` (CRUD + tracks + reorder + visibility) -> `handler/library.go` + `service/playlists.go`
+- `/playlists` (CRUD + tracks + reorder + visibility; duplicate track add -> 409) -> `handler/library.go` + `service/playlists.go`
 - `/favorites` -> `handler/library.go` + `service/library.go`
 - `/album-requests` (LISTENER only) + `/admin/album-requests` -> `handler/library.go` + `service/library.go`
 - `/admin` listeners/artists/albums/tracks (multipart uploads) -> `handler/catalog.go`, `handler/library.go`
-- `/parties` (lifecycle, queue, playback, members, SSE `/:code/events`) -> `handler/party.go` + `service/parties.go` + `party/hub.go`
+- `/parties` (lifecycle, queue, playback, members, SSE `/:code/events`) -> `handler/party.go` + `service/parties.go` + `party/hub.go`; state carries `revision` (clients drop older) and `playback.queueItemId`; `play` takes optional `queueItemId`, `next` optional `expectedQueueItemId` (no-op if stale)
 
 ## 5) Security/Auth Hotspots
 

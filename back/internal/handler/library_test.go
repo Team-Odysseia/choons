@@ -30,6 +30,7 @@ func TestPlaylistEndpoints(t *testing.T) {
 	if len(p["tracks"].([]any)) != 1 {
 		t.Fatalf("%v", p)
 	}
+	bob.json(http.MethodPost, "/playlists/"+id+"/tracks", map[string]string{"trackId": ids.track}).errorIs(409, "Track already in playlist")
 	amy.get("/playlists/"+id).errorIs(403, "Access denied")
 	bob.json(http.MethodPut, "/playlists/"+id+"/visibility", map[string]bool{"isPublic": true}).status(200)
 	amy.get("/playlists/" + id).status(200)

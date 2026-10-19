@@ -36,9 +36,11 @@ func TestPlaylistCrudAndAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, _ = pls.AddTrack(e.ctx, bob, p.ID, t2.ID)
-	p, _ = pls.AddTrack(e.ctx, bob, p.ID, t1.ID)
-	if !slices.Equal(trackIDs(p), []uuid.UUID{t1.ID, t2.ID, t1.ID}) {
-		t.Fatalf("duplicates allowed, appended: %v", trackIDs(p))
+	_, err = pls.AddTrack(e.ctx, bob, p.ID, t1.ID)
+	wantAppErr(t, err, 409, "Track already in playlist")
+	p, _ = pls.Get(e.ctx, bob, p.ID)
+	if !slices.Equal(trackIDs(p), []uuid.UUID{t1.ID, t2.ID}) {
+		t.Fatalf("duplicate add must not append: %v", trackIDs(p))
 	}
 	if p.Tracks[0].Album.Artist.Name != "A" {
 		t.Fatal("tracks not fully loaded")
@@ -58,7 +60,7 @@ func TestPlaylistCrudAndAccess(t *testing.T) {
 	if err != nil || !p.IsPublic {
 		t.Fatalf("%+v %v", p, err)
 	}
-	if got, err := pls.Get(e.ctx, amy, p.ID); err != nil || len(got.Tracks) != 3 {
+	if got, err := pls.Get(e.ctx, amy, p.ID); err != nil || len(got.Tracks) != 2 {
 		t.Fatalf("public playlist readable by others: %v", err)
 	}
 	_, err = pls.SetVisibility(e.ctx, amy, p.ID, false)
@@ -66,7 +68,7 @@ func TestPlaylistCrudAndAccess(t *testing.T) {
 
 	p, err = pls.RemoveTrack(e.ctx, bob, p.ID, t1.ID)
 	if err != nil || !slices.Equal(trackIDs(p), []uuid.UUID{t2.ID}) {
-		t.Fatalf("remove removes all copies: %v %v", trackIDs(p), err)
+		t.Fatalf("remove: %v %v", trackIDs(p), err)
 	}
 	var positions []int
 	e.db.Model(&model.PlaylistTrack{}).Where("playlist_id = ?", p.ID).Order("position").Pluck("position", &positions)
@@ -88,13 +90,14 @@ func TestPlaylistSummaries(t *testing.T) {
 	pls := NewPlaylists(e.db)
 	bob := e.user(t, "bob", model.RoleListener)
 	amy := e.user(t, "amy", model.RoleListener)
-	tr := e.track(t, e.album(t, e.artist(t, "A"), "x", 1), "t", 1)
+	album := e.album(t, e.artist(t, "A"), "x", 1)
+	tr, tr2, tr3 := e.track(t, album, "t", 1), e.track(t, album, "t2", 2), e.track(t, album, "t3", 3)
 
 	older, _ := pls.Create(e.ctx, bob, "older")
 	time.Sleep(2 * time.Millisecond)
 	newer, _ := pls.Create(e.ctx, bob, "newer")
 	pls.AddTrack(e.ctx, bob, newer.ID, tr.ID)
-	pls.AddTrack(e.ctx, bob, newer.ID, tr.ID)
+	pls.AddTrack(e.ctx, bob, newer.ID, tr2.ID)
 	pls.SetVisibility(e.ctx, bob, older.ID, true)
 	amyPublic, _ := pls.Create(e.ctx, amy, "amy public")
 	pls.SetVisibility(e.ctx, amy, amyPublic.ID, true)
@@ -108,7 +111,7 @@ func TestPlaylistSummaries(t *testing.T) {
 		t.Fatalf("%+v", mine)
 	}
 	time.Sleep(2 * time.Millisecond)
-	pls.AddTrack(e.ctx, bob, newer.ID, tr.ID)
+	pls.AddTrack(e.ctx, bob, newer.ID, tr3.ID)
 	if mine, _ := pls.Mine(e.ctx, bob); mine[0].ID != newer.ID {
 		t.Fatalf("adding a track must bump updatedAt: %+v", mine)
 	}
@@ -159,9 +162,8 @@ func TestPlaylistReorder(t *testing.T) {
 	_, err = pls.Reorder(e.ctx, e.user(t, "amy", model.RoleListener), p.ID, []uuid.UUID{a.ID, b.ID, c.ID})
 	wantAppErr(t, err, 403, "Access denied")
 
-	p, _ = pls.AddTrack(e.ctx, bob, p.ID, a.ID)
-	_, err = pls.Reorder(e.ctx, bob, p.ID, []uuid.UUID{a.ID, b.ID, c.ID, uuid.New()})
-	wantAppErr(t, err, 400, "Reorder list must contain all playlist tracks exactly once")
+	_, err = pls.AddTrack(e.ctx, bob, p.ID, a.ID)
+	wantAppErr(t, err, 409, "Track already in playlist")
 }
 
 func TestPlaylistLargeReorderAndCompaction(t *testing.T) {
