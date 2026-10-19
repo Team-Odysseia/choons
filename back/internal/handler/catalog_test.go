@@ -60,14 +60,15 @@ func TestCatalogJSONContract(t *testing.T) {
 	if body := bob.get("/music/tracks?page=5").Body.String(); body != "[]" {
 		t.Fatalf("empty list body %q", body)
 	}
+	bob.get("/music/albums?sort=recent&size=1").status(200).decode(&list)
+	if len(list) != 1 || list[0]["title"] != "Untrue" {
+		t.Fatalf("%v", list)
+	}
+	bob.get("/music/albums?sort=oldest").errorIs(400, "sort must be one of: recent")
 	bob.get("/music/albums?artistId=nope").errorIs(400, "Invalid artistId")
 	bob.get("/music/tracks?size=abc").errorIs(400, "size must be a number")
 	bob.get("/music/artists/"+ids.album).errorIs(404, "Artist not found: "+ids.album)
 
-	bob.get("/music/tracks/most-played").status(200).decode(&list)
-	if len(list) != 0 {
-		t.Fatal("no plays yet")
-	}
 	bob.json(http.MethodPost, "/stream/"+ids.track+"/played", nil).status(http.StatusNoContent)
 	bob.get("/music/tracks/most-played?limit=5").status(200).decode(&list)
 	if len(list) != 1 || list[0]["id"] != ids.track {
@@ -103,7 +104,7 @@ func TestImages(t *testing.T) {
 	ids := s.seedCatalog(admin)
 
 	res := s.anon().get("/media/images/albums/" + ids.album).status(http.StatusFound)
-	if !strings.HasPrefix(res.Header().Get("Location"), "https://r2.test/images/albums/"+ids.album+".png") ||
+	if loc := res.Header().Get("Location"); !strings.HasPrefix(loc, "https://r2.test/images/albums/"+ids.album+"-") || !strings.Contains(loc, ".png") ||
 		res.Header().Get("Cache-Control") != "private, max-age=1800" {
 		t.Fatalf("%v", res.Header())
 	}
@@ -111,9 +112,9 @@ func TestImages(t *testing.T) {
 	admin.get("/media/images/artists/" + ids.artist).status(http.StatusFound)
 
 	var covers []string
-	s.anon().get("/public/covers").status(200).decode(&covers)
-	if len(covers) != 1 || covers[0] != ids.album {
-		t.Fatalf("%v", covers)
+	res = s.anon().get("/public/covers").status(200).decode(&covers)
+	if len(covers) != 1 || covers[0] != ids.album || res.Header().Get("Cache-Control") != "public, max-age=300" {
+		t.Fatalf("%v %v", covers, res.Header())
 	}
 
 	admin.json(http.MethodDelete, "/admin/albums/"+ids.album+"/cover", nil).status(http.StatusNoContent)
@@ -202,6 +203,15 @@ func TestBatchUpload(t *testing.T) {
 		field("titles", "One"), field("durations", "1"), field("durations", "2"),
 		filePart("files", "audio/mpeg", mp3),
 	).errorIs(400, "Mismatched batch upload lists: files=1 titles=1 durations=2")
+	admin.multipart(http.MethodPost, "/admin/tracks/batch",
+		field("albumId", ids.album), field("artistId", ids.artist),
+		field("titles", "One"), field("durations", "long"),
+		filePart("files", "audio/mpeg", mp3),
+	).errorIs(400, "durations must be numbers")
+	admin.raw(http.MethodPost, "/admin/tracks/batch", "multipart/form-data; boundary=x", strings.NewReader("garbage")).
+		errorIs(400, "Malformed multipart request")
+	admin.raw(http.MethodPut, "/admin/albums/"+ids.album+"/tracks", "application/json", strings.NewReader("{")).
+		errorIs(400, "Malformed request body")
 }
 
 func TestAdminListenersAndRequests(t *testing.T) {

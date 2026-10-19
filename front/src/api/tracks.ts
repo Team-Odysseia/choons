@@ -22,6 +22,9 @@ export const searchTracks = (
     })
     .then((r) => r.data)
 
+export const getAdminTracks = (albumId: string) =>
+  client.get<TrackResponse[]>('/admin/tracks', { params: { albumId } }).then((r) => r.data)
+
 export const getMostPlayedTracks = (limit = 10) =>
   client
     .get<TrackResponse[]>('/music/tracks/most-played', { params: { limit } })

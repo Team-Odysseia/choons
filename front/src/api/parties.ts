@@ -34,9 +34,9 @@ export const removePartyQueueTrack = (inviteCode: string, itemId: string) =>
 export const reorderPartyQueue = (inviteCode: string, orderedItemIds: string[]) =>
   client.put<PartyStateResponse>(`/parties/${inviteCode}/queue/reorder`, { orderedItemIds }).then((r) => r.data)
 
-export const partyPlay = (inviteCode: string, trackId: string, positionSec: number) =>
+export const partyPlay = (inviteCode: string, trackId: string, positionSec: number, queueItemId?: string | null) =>
   client
-    .post<PartyStateResponse>(`/parties/${inviteCode}/playback/play`, { trackId, positionSec })
+    .post<PartyStateResponse>(`/parties/${inviteCode}/playback/play`, { trackId, positionSec, queueItemId: queueItemId ?? undefined })
     .then((r) => r.data)
 
 export const partyPause = (inviteCode: string, positionSec: number) =>
@@ -45,8 +45,13 @@ export const partyPause = (inviteCode: string, positionSec: number) =>
 export const partySeek = (inviteCode: string, positionSec: number) =>
   client.post<PartyStateResponse>(`/parties/${inviteCode}/playback/seek`, { positionSec }).then((r) => r.data)
 
-export const partyNext = (inviteCode: string) =>
-  client.post<PartyStateResponse>(`/parties/${inviteCode}/playback/next`).then((r) => r.data)
+export const partyNext = (inviteCode: string, expectedQueueItemId?: string | null) =>
+  client
+    .post<PartyStateResponse>(
+      `/parties/${inviteCode}/playback/next`,
+      expectedQueueItemId ? { expectedQueueItemId } : undefined,
+    )
+    .then((r) => r.data)
 
 export const partyPrev = (inviteCode: string) =>
   client.post<PartyStateResponse>(`/parties/${inviteCode}/playback/prev`).then((r) => r.data)

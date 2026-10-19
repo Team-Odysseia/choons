@@ -2,8 +2,9 @@
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { getArtists } from '@/api/artists'
-import { getAlbums, searchAlbums, createAlbum, deleteAlbum } from '@/api/albums'
+import { apiErrorMessage } from '@/lib/errors'
+import { getAdminArtists } from '@/api/artists'
+import { getAdminAlbums, searchAlbums, createAlbum, deleteAlbum } from '@/api/albums'
 import { uploadTrack } from '@/api/tracks'
 import type { ArtistResponse, AlbumResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -42,7 +43,11 @@ const search = ref('')
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
-  artists.value = await getArtists()
+  try {
+    artists.value = await getAdminArtists()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load artists'))
+  }
   await loadAlbums()
 })
 
@@ -59,7 +64,11 @@ watch(search, () => {
 
 async function loadAlbums() {
   const query = search.value.trim()
-  albums.value = query ? await searchAlbums(query, { page: 0, size: 300 }) : await getAlbums()
+  try {
+    albums.value = query ? await searchAlbums(query, { page: 0, size: 200 }) : await getAdminAlbums()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load albums'))
+  }
 }
 
 function formatDuration(secs: number) {
@@ -124,8 +133,8 @@ async function confirmDelete() {
     await deleteAlbum(al.id)
     await loadAlbums()
     toast.success(`"${al.title}" deleted`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to delete album')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to delete album'))
   } finally {
     deletingId.value = null
   }
@@ -172,8 +181,8 @@ async function submit() {
     pendingCover.value = null
     imageUploadRef.value?.reset()
     addDialogOpen.value = false
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to create album')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to create album'))
   } finally {
     loading.value = false
     uploadProgress.value = 0

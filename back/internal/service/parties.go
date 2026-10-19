@@ -18,14 +18,16 @@ import (
 )
 
 const (
-	inviteAlphabet  = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	inviteLength    = 8
-	partyIdleWindow = 5 * time.Minute
+	inviteAlphabet     = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	inviteLength       = 8
+	partyIdleWindow    = 5 * time.Minute
+	unknownDurationCap = 2 * time.Hour
 )
 
 type PartyPublisher interface {
 	PublishState(code string, state dto.PartyState)
 	PublishEnded(code string)
+	PublishRemoved(code string, user uuid.UUID)
 }
 
 type Parties struct {
@@ -38,14 +40,23 @@ func NewParties(gdb *gorm.DB, pub PartyPublisher) *Parties {
 	return &Parties{db: gdb, pub: pub, now: time.Now}
 }
 
+type removal struct {
+	code string
+	user uuid.UUID
+}
+
 type outbox struct {
-	states map[string]dto.PartyState
-	ended  []string
+	states  map[string]dto.PartyState
+	ended   []string
+	removed []removal
 }
 
 func newOutbox() *outbox { return &outbox{states: map[string]dto.PartyState{}} }
 
 func (s *Parties) flush(o *outbox) {
+	for _, r := range o.removed {
+		s.pub.PublishRemoved(r.code, r.user)
+	}
 	for _, code := range o.ended {
 		delete(o.states, code)
 		s.pub.PublishEnded(code)
@@ -153,9 +164,26 @@ func (s *Parties) playback(tx *gorm.DB, partyID uuid.UUID) (*model.PartyPlayback
 	return &st, nil
 }
 
-func (s *Parties) savePlayback(tx *gorm.DB, st *model.PartyPlaybackState, trackID *uuid.UUID, playing bool, pos float64) error {
-	st.TrackID, st.Playing, st.AnchorPositionSec, st.AnchorEpochMs = trackID, playing, max(pos, 0), s.nowMs()
-	return tx.Model(st).Select("track_id", "playing", "anchor_position_sec", "anchor_epoch_ms", "updated_at").Updates(st).Error
+func (s *Parties) savePlayback(tx *gorm.DB, st *model.PartyPlaybackState, item, trackID *uuid.UUID, playing bool, pos float64) error {
+	st.QueueItemID, st.TrackID, st.Playing, st.AnchorPositionSec, st.AnchorEpochMs = item, trackID, playing, max(pos, 0), s.nowMs()
+	return tx.Model(st).Select("queue_item_id", "track_id", "playing", "anchor_position_sec", "anchor_epoch_ms", "updated_at").Updates(st).Error
+}
+
+func playingItem(st *model.PartyPlaybackState, items []model.PartyQueueItem) *model.PartyQueueItem {
+	for i := range items {
+		if st.QueueItemID != nil && items[i].ID == *st.QueueItemID {
+			return &items[i]
+		}
+	}
+	if st.QueueItemID != nil || st.TrackID == nil {
+		return nil
+	}
+	for i := range items {
+		if items[i].TrackID == *st.TrackID {
+			return &items[i]
+		}
+	}
+	return nil
 }
 
 func (s *Parties) queue(tx *gorm.DB, partyID uuid.UUID) ([]model.PartyQueueItem, error) {
@@ -165,20 +193,10 @@ func (s *Parties) queue(tx *gorm.DB, partyID uuid.UUID) ([]model.PartyQueueItem,
 }
 
 func (s *Parties) normalizeQueue(tx *gorm.DB, partyID uuid.UUID) ([]model.PartyQueueItem, error) {
-	items, err := s.queue(tx, partyID)
-	if err != nil {
+	if err := compactPositions(tx, "party_queue_items", "party_id", partyID, "position, created_at, id"); err != nil {
 		return nil, err
 	}
-	for i := range items {
-		if items[i].Position == i {
-			continue
-		}
-		items[i].Position = i
-		if err := tx.Model(&items[i]).Update("position", i).Error; err != nil {
-			return nil, err
-		}
-	}
-	return items, nil
+	return s.queue(tx, partyID)
 }
 
 func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) {
@@ -195,7 +213,7 @@ func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) 
 	if err != nil {
 		return dto.PartyState{}, err
 	}
-	pb := dto.PartyPlayback{Playing: st.Playing, AnchorPositionSec: st.AnchorPositionSec, AnchorEpochMs: st.AnchorEpochMs}
+	pb := dto.PartyPlayback{QueueItemID: st.QueueItemID, Playing: st.Playing, AnchorPositionSec: st.AnchorPositionSec, AnchorEpochMs: st.AnchorEpochMs}
 	if st.TrackID != nil {
 		t, err := first[model.Track](tracksQuery(tx), "Track", *st.TrackID)
 		if err != nil {
@@ -205,7 +223,7 @@ func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) 
 		pb.Track = &dt
 	}
 	return dto.PartyState{
-		ID: p.ID, InviteCode: p.InviteCode, Name: p.Name, QueuePolicy: p.QueuePolicy, HostUserID: p.HostUserID,
+		ID: p.ID, Revision: p.Revision, InviteCode: p.InviteCode, Name: p.Name, QueuePolicy: p.QueuePolicy, HostUserID: p.HostUserID,
 		Members: dto.Map(members, func(m *model.PartyMember) dto.PartyMember {
 			return dto.PartyMember{UserID: m.UserID, Username: m.User.Username, Host: m.Host, DJ: m.DJ, Connected: m.Connected}
 		}),
@@ -217,6 +235,9 @@ func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) 
 }
 
 func (s *Parties) stage(tx *gorm.DB, o *outbox, p *model.Party) (dto.PartyState, error) {
+	if err := tx.Raw(`UPDATE parties SET revision = revision + 1 WHERE id = ? RETURNING revision`, p.ID).Scan(&p.Revision).Error; err != nil {
+		return dto.PartyState{}, err
+	}
 	st, err := s.assemble(tx, p)
 	if err != nil {
 		return dto.PartyState{}, err
@@ -262,6 +283,7 @@ func (s *Parties) disconnect(tx *gorm.DB, o *outbox, user *model.User) error {
 		if err := tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error; err != nil {
 			return err
 		}
+		o.removed = append(o.removed, removal{p.InviteCode, m.UserID})
 		if p.Status == model.PartyActive {
 			if _, err := s.stage(tx, o, &p); err != nil {
 				return err
@@ -398,6 +420,7 @@ func (s *Parties) Leave(ctx context.Context, user *model.User, code string) erro
 		if err := tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error; err != nil {
 			return err
 		}
+		o.removed = append(o.removed, removal{p.InviteCode, m.UserID})
 		_, err = s.stage(tx, o, p)
 		return err
 	})
@@ -462,7 +485,15 @@ func (s *Parties) SetDJ(ctx context.Context, user *model.User, code string, targ
 }
 
 func (s *Parties) Kick(ctx context.Context, user *model.User, code string, target uuid.UUID) (dto.PartyState, error) {
-	return s.mutate(ctx, user, code, s.requireHost, func(tx *gorm.DB, p *model.Party) error {
+	var out dto.PartyState
+	err := s.inTx(ctx, func(tx *gorm.DB, o *outbox) error {
+		p, err := s.activeParty(tx, code, true)
+		if err != nil {
+			return err
+		}
+		if err := s.requireHost(tx, p, user); err != nil {
+			return err
+		}
 		m, err := s.targetMember(tx, p, target)
 		if err != nil {
 			return err
@@ -470,8 +501,14 @@ func (s *Parties) Kick(ctx context.Context, user *model.User, code string, targe
 		if m.Host {
 			return apperr.BadRequest("Cannot kick host")
 		}
-		return tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error
+		if err := tx.Delete(&model.PartyMember{}, "id = ?", m.ID).Error; err != nil {
+			return err
+		}
+		o.removed = append(o.removed, removal{p.InviteCode, m.UserID})
+		out, err = s.stage(tx, o, p)
+		return err
 	})
+	return out, err
 }
 
 func (s *Parties) AddTracks(ctx context.Context, user *model.User, code string, trackIDs []uuid.UUID) (dto.PartyState, error) {
@@ -483,14 +520,15 @@ func (s *Parties) AddTracks(ctx context.Context, user *model.User, code string, 
 		if err != nil {
 			return err
 		}
+		if err := requireTracks(tx, trackIDs); err != nil {
+			return err
+		}
+		added := make([]model.PartyQueueItem, len(trackIDs))
 		for i, id := range trackIDs {
-			if _, err := first[model.Track](tx.Select("id"), "Track", id); err != nil {
-				return err
-			}
-			item := model.PartyQueueItem{PartyID: p.ID, TrackID: id, AddedByUserID: user.ID, Position: len(items) + i}
-			if err := tx.Omit("Track", "AddedBy").Create(&item).Error; err != nil {
-				return err
-			}
+			added[i] = model.PartyQueueItem{PartyID: p.ID, TrackID: id, AddedByUserID: user.ID, Position: len(items) + i}
+		}
+		if err := tx.Omit("Track", "AddedBy").Create(&added).Error; err != nil {
+			return err
 		}
 		if len(items) > 0 {
 			return nil
@@ -499,8 +537,7 @@ func (s *Parties) AddTracks(ctx context.Context, user *model.User, code string, 
 		if err != nil {
 			return err
 		}
-		head := trackIDs[0]
-		return s.savePlayback(tx, st, &head, true, 0)
+		return s.savePlayback(tx, st, &added[0].ID, &added[0].TrackID, true, 0)
 	})
 }
 
@@ -514,19 +551,21 @@ func (s *Parties) RemoveItem(ctx context.Context, user *model.User, code string,
 		if err != nil {
 			return err
 		}
-		if err := tx.Delete(&model.PartyQueueItem{}, "id = ?", target.ID).Error; err != nil {
-			return err
-		}
-		items, err := s.normalizeQueue(tx, p.ID)
-		if err != nil {
-			return err
-		}
 		st, err := s.playback(tx, p.ID)
 		if err != nil {
 			return err
 		}
-		if st.TrackID == nil || *st.TrackID != target.TrackID {
-			return nil
+		before, err := s.queue(tx, p.ID)
+		if err != nil {
+			return err
+		}
+		current := playingItem(st, before)
+		if err := tx.Delete(&model.PartyQueueItem{}, "id = ?", target.ID).Error; err != nil {
+			return err
+		}
+		items, err := s.normalizeQueue(tx, p.ID)
+		if err != nil || current == nil || current.ID != target.ID {
+			return err
 		}
 		return s.playHead(tx, st, items)
 	})
@@ -534,10 +573,9 @@ func (s *Parties) RemoveItem(ctx context.Context, user *model.User, code string,
 
 func (s *Parties) playHead(tx *gorm.DB, st *model.PartyPlaybackState, items []model.PartyQueueItem) error {
 	if len(items) == 0 {
-		return s.savePlayback(tx, st, nil, false, 0)
+		return s.savePlayback(tx, st, nil, nil, false, 0)
 	}
-	head := items[0].TrackID
-	return s.savePlayback(tx, st, &head, true, 0)
+	return s.savePlayback(tx, st, &items[0].ID, &items[0].TrackID, true, 0)
 }
 
 func (s *Parties) Reorder(ctx context.Context, user *model.User, code string, itemIDs []uuid.UUID) (dto.PartyState, error) {
@@ -560,16 +598,11 @@ func (s *Parties) Reorder(ctx context.Context, user *model.User, code string, it
 			}
 			seen[id] = true
 		}
-		for i, id := range itemIDs {
-			if err := tx.Model(&model.PartyQueueItem{}).Where("id = ?", id).Update("position", i).Error; err != nil {
-				return err
-			}
-		}
-		return nil
+		return setPositions(tx, "party_queue_items", itemIDs)
 	})
 }
 
-func (s *Parties) Play(ctx context.Context, user *model.User, code string, trackID uuid.UUID, pos float64) (dto.PartyState, error) {
+func (s *Parties) Play(ctx context.Context, user *model.User, code string, trackID uuid.UUID, queueItemID *uuid.UUID, pos float64) (dto.PartyState, error) {
 	return s.mutate(ctx, user, code, s.requireControl, func(tx *gorm.DB, p *model.Party) error {
 		if _, err := first[model.Track](tx.Select("id"), "Track", trackID); err != nil {
 			return err
@@ -578,8 +611,44 @@ func (s *Parties) Play(ctx context.Context, user *model.User, code string, track
 		if err != nil {
 			return err
 		}
-		return s.savePlayback(tx, st, &trackID, true, pos)
+		item, err := s.resolvePlayItem(tx, p.ID, st, trackID, queueItemID)
+		if err != nil {
+			return err
+		}
+		return s.savePlayback(tx, st, item, &trackID, true, pos)
 	})
+}
+
+func (s *Parties) resolvePlayItem(tx *gorm.DB, partyID uuid.UUID, st *model.PartyPlaybackState, trackID uuid.UUID, queueItemID *uuid.UUID) (*uuid.UUID, error) {
+	if queueItemID != nil {
+		var item model.PartyQueueItem
+		err := tx.Where("id = ? AND party_id = ?", *queueItemID, partyID).First(&item).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperr.NotFound("Queue item not found")
+		}
+		if err != nil {
+			return nil, err
+		}
+		if item.TrackID != trackID {
+			return nil, apperr.BadRequest("Queue item does not match track")
+		}
+		return &item.ID, nil
+	}
+	items, err := s.queue(tx, partyID)
+	if err != nil {
+		return nil, err
+	}
+	if st.TrackID != nil && *st.TrackID == trackID {
+		if current := playingItem(st, items); current != nil {
+			return &current.ID, nil
+		}
+	}
+	for i := range items {
+		if items[i].TrackID == trackID {
+			return &items[i].ID, nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *Parties) Pause(ctx context.Context, user *model.User, code string, pos float64) (dto.PartyState, error) {
@@ -588,7 +657,7 @@ func (s *Parties) Pause(ctx context.Context, user *model.User, code string, pos 
 		if err != nil {
 			return err
 		}
-		return s.savePlayback(tx, st, st.TrackID, false, pos)
+		return s.savePlayback(tx, st, st.QueueItemID, st.TrackID, false, pos)
 	})
 }
 
@@ -598,11 +667,11 @@ func (s *Parties) Seek(ctx context.Context, user *model.User, code string, pos f
 		if err != nil {
 			return err
 		}
-		return s.savePlayback(tx, st, st.TrackID, st.Playing, pos)
+		return s.savePlayback(tx, st, st.QueueItemID, st.TrackID, st.Playing, pos)
 	})
 }
 
-func (s *Parties) Next(ctx context.Context, user *model.User, code string) (dto.PartyState, error) {
+func (s *Parties) Next(ctx context.Context, user *model.User, code string, expectedItemID *uuid.UUID) (dto.PartyState, error) {
 	return s.mutate(ctx, user, code, s.requireControl, func(tx *gorm.DB, p *model.Party) error {
 		st, err := s.playback(tx, p.ID)
 		if err != nil {
@@ -612,18 +681,16 @@ func (s *Parties) Next(ctx context.Context, user *model.User, code string) (dto.
 		if err != nil {
 			return err
 		}
-		if st.TrackID != nil {
-			for _, it := range items {
-				if it.TrackID != *st.TrackID {
-					continue
-				}
-				if err := tx.Delete(&model.PartyQueueItem{}, "id = ?", it.ID).Error; err != nil {
-					return err
-				}
-				if items, err = s.normalizeQueue(tx, p.ID); err != nil {
-					return err
-				}
-				break
+		current := playingItem(st, items)
+		if expectedItemID != nil && (current == nil || current.ID != *expectedItemID) {
+			return nil
+		}
+		if current != nil {
+			if err := tx.Delete(&model.PartyQueueItem{}, "id = ?", current.ID).Error; err != nil {
+				return err
+			}
+			if items, err = s.normalizeQueue(tx, p.ID); err != nil {
+				return err
 			}
 		}
 		return s.playHead(tx, st, items)
@@ -636,7 +703,7 @@ func (s *Parties) Prev(ctx context.Context, user *model.User, code string) (dto.
 		if err != nil || st.TrackID == nil {
 			return err
 		}
-		return s.savePlayback(tx, st, st.TrackID, true, 0)
+		return s.savePlayback(tx, st, st.QueueItemID, st.TrackID, true, 0)
 	})
 }
 
@@ -645,7 +712,8 @@ func (s *Parties) CloseIdle(ctx context.Context) (int, error) {
 	if err := s.db.WithContext(ctx).Where("status = ?", model.PartyActive).Find(&parties).Error; err != nil {
 		return 0, err
 	}
-	cutoff := s.now().Add(-partyIdleWindow).UnixMilli()
+	nowMs := s.nowMs()
+	cutoff := nowMs - partyIdleWindow.Milliseconds()
 	closed := 0
 	for i := range parties {
 		code := parties[i].InviteCode
@@ -661,7 +729,12 @@ func (s *Parties) CloseIdle(ctx context.Context) (int, error) {
 			case errors.Is(err, gorm.ErrRecordNotFound):
 			case err != nil:
 				return err
-			case st.Playing || st.AnchorEpochMs > cutoff:
+			case st.Playing:
+				end, err := s.playbackEndMs(tx, &st)
+				if err != nil || end > cutoff {
+					return err
+				}
+			case st.AnchorEpochMs > cutoff:
 				return nil
 			}
 			didClose = true
@@ -675,6 +748,20 @@ func (s *Parties) CloseIdle(ctx context.Context) (int, error) {
 		}
 	}
 	return closed, nil
+}
+
+func (s *Parties) playbackEndMs(tx *gorm.DB, st *model.PartyPlaybackState) (int64, error) {
+	remaining := unknownDurationCap.Seconds()
+	if st.TrackID != nil {
+		var duration int
+		if err := tx.Model(&model.Track{}).Where("id = ?", *st.TrackID).Pluck("duration_seconds", &duration).Error; err != nil {
+			return 0, err
+		}
+		if duration > 0 {
+			remaining = max(float64(duration)-st.AnchorPositionSec, 0)
+		}
+	}
+	return st.AnchorEpochMs + int64(remaining*1000), nil
 }
 
 func (s *Parties) RunCleanup(ctx context.Context, every time.Duration) {

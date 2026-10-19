@@ -49,6 +49,52 @@ func cascadeCount(t *testing.T, gdb *gorm.DB) int64 {
 	return n
 }
 
+var addedColumns = []string{"parties.revision", "party_playback_state.queue_item_id"}
+
+func requireDeferredPlaylistPosition(t *testing.T, gdb *gorm.DB) {
+	t.Helper()
+	var uniques []struct {
+		Name     string
+		Deferred bool
+	}
+	err := gdb.Raw(`SELECT i.relname AS name, coalesce(c.condeferred, false) AS deferred
+		FROM pg_index x
+		JOIN pg_class i ON i.oid = x.indexrelid
+		LEFT JOIN pg_constraint c ON c.conindid = x.indexrelid
+		WHERE x.indrelid = 'playlist_tracks'::regclass AND x.indisunique AND NOT x.indisprimary`).Scan(&uniques).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uniques) != 1 || !uniques[0].Deferred {
+		t.Fatalf("playlist position uniqueness must be a single deferred constraint: %+v", uniques)
+	}
+}
+
+func requireIndexes(t *testing.T, gdb *gorm.DB) {
+	t.Helper()
+	want := []struct{ table, cols string }{
+		{"party_queue_items", "track_id"},
+		{"party_queue_items", "added_by_user_id"},
+		{"party_playback_state", "track_id"},
+		{"parties", "host_user_id"},
+		{"tracks", "created_at,id"},
+	}
+	for _, w := range want {
+		var n int64
+		err := gdb.Raw(`SELECT count(*) FROM pg_index x
+			WHERE x.indrelid = ?::regclass
+			  AND (SELECT string_agg(a.attname, ',' ORDER BY k.ord)
+			       FROM unnest(x.indkey::int2[]) WITH ORDINALITY AS k(attnum, ord)
+			       JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum) = ?`, w.table, w.cols).Scan(&n).Error
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == 0 {
+			t.Errorf("missing index on %s(%s)", w.table, w.cols)
+		}
+	}
+}
+
 func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 	fresh := pgtest.NewDB(t)
 
@@ -62,6 +108,12 @@ func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 		t.Fatalf("migrate legacy schema: %v", err)
 	}
 	got := columns(t, fresh)
+	for _, key := range addedColumns {
+		if _, ok := got[key]; !ok {
+			t.Errorf("missing added column %s", key)
+		}
+		delete(got, key)
+	}
 	if len(got) != len(want) {
 		t.Fatalf("column count: fresh=%d hibernate=%d", len(got), len(want))
 	}
@@ -75,12 +127,16 @@ func TestMigrateFreshMatchesHibernateSchema(t *testing.T) {
 			t.Errorf("column %s: fresh=%+v hibernate=%+v", key, g, w)
 		}
 	}
-	if n := cascadeCount(t, legacy); n != 19 {
-		t.Errorf("legacy cascading FKs = %d, want 19", n)
+	if n := cascadeCount(t, legacy); n != 20 {
+		t.Errorf("legacy cascading FKs = %d, want 20", n)
 	}
-	if n := cascadeCount(t, fresh); n != 19 {
-		t.Errorf("fresh cascading FKs = %d, want 19", n)
+	if n := cascadeCount(t, fresh); n != 20 {
+		t.Errorf("fresh cascading FKs = %d, want 20", n)
 	}
+	requireDeferredPlaylistPosition(t, fresh)
+	requireDeferredPlaylistPosition(t, legacy)
+	requireIndexes(t, fresh)
+	requireIndexes(t, legacy)
 }
 
 //go:embed testdata/prod_schema.sql
@@ -109,9 +165,11 @@ func TestMigrateProductionSchema(t *testing.T) {
 	if len(pk) != 1 || pk[0] != "id" {
 		t.Fatalf("playlist_tracks pk = %v, want [id]", pk)
 	}
-	if n := cascadeCount(t, gdb); n != 19 {
-		t.Errorf("cascading FKs = %d, want 19", n)
+	if n := cascadeCount(t, gdb); n != 20 {
+		t.Errorf("cascading FKs = %d, want 20", n)
 	}
+	requireDeferredPlaylistPosition(t, gdb)
+	requireIndexes(t, gdb)
 
 	user, artist, album, track, playlist := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	must := func(sql string, args ...any) {

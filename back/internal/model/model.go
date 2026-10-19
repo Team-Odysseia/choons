@@ -147,6 +147,7 @@ type Party struct {
 	HostUserID  uuid.UUID `gorm:"type:uuid"`
 	QueuePolicy QueuePolicy
 	Status      PartyStatus
+	Revision    int64
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
@@ -167,6 +168,7 @@ type PartyPlaybackState struct {
 	PartyID           uuid.UUID  `gorm:"type:uuid"`
 	TrackID           *uuid.UUID `gorm:"type:uuid"`
 	Track             *Track
+	QueueItemID       *uuid.UUID `gorm:"type:uuid"`
 	Playing           bool
 	AnchorPositionSec float64
 	AnchorEpochMs     int64

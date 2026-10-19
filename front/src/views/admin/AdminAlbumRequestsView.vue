@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { apiErrorMessage } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import {
   listAllAlbumRequests,
@@ -22,8 +23,8 @@ async function load() {
   loading.value = true
   try {
     requests.value = await listAllAlbumRequests()
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to load requests')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load requests'))
   } finally {
     loading.value = false
   }
@@ -35,8 +36,8 @@ async function changeStatus(id: string, status: 'ACCEPTED' | 'REJECTED') {
     const idx = requests.value.findIndex((r) => r.id === id)
     if (idx !== -1) requests.value[idx] = updated
     toast.success(`Request ${status.toLowerCase()}`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to update status')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to update status'))
   }
 }
 
@@ -50,8 +51,8 @@ async function toggleBlock(item: AlbumRequestResponse) {
         : req,
     )
     toast.success(updated.requestsBlocked ? 'Requester blocked' : 'Requester unblocked')
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to update requester block')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to update requester block'))
   }
 }
 

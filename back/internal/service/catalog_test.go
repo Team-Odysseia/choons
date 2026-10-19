@@ -2,10 +2,13 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -28,8 +31,8 @@ func TestCreateArtistWithAndWithoutAvatar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "images/artists/" + withAvatar.ID.String() + ".png"
-	if !e.store.Has(key) || e.store.Objects[key].ContentType != "image/png" {
+	key := e.avatarKey(t, withAvatar.ID)
+	if !imageKeyLike(key, "artists", withAvatar.ID, "png") || !e.store.Has(key) || e.store.Objects[key].ContentType != "image/png" {
 		t.Fatalf("avatar not stored: %v", e.store.Keys())
 	}
 	if withAvatar.AvatarURL == nil || *withAvatar.AvatarURL != "/media/images/artists/"+withAvatar.ID.String() || *withAvatar.Bio != "Warp" {
@@ -82,20 +85,49 @@ func TestCreateArtistStorageFailureRollsBack(t *testing.T) {
 func TestUpdateArtistReplacesAvatarAndDeletesStaleKey(t *testing.T) {
 	e := newEnv(t)
 	a, _ := e.catalog.CreateArtist(e.ctx, ArtistInput{Name: "Old", Avatar: upload("image/png", pngBytes)})
-	oldKey := "images/artists/" + a.ID.String() + ".png"
+	oldKey := e.avatarKey(t, a.ID)
 	bio := "new bio"
 	got, err := e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "New", Bio: &bio, Avatar: upload("image/jpeg", jpgBytes)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	newKey := "images/artists/" + a.ID.String() + ".jpg"
-	if got.Name != "New" || *got.Bio != "new bio" || !e.store.Has(newKey) || e.store.Has(oldKey) {
+	newKey := e.avatarKey(t, a.ID)
+	if got.Name != "New" || *got.Bio != "new bio" || !imageKeyLike(newKey, "artists", a.ID, "jpg") || !e.store.Has(newKey) || e.store.Has(oldKey) {
 		t.Fatalf("%+v keys=%v", got, e.store.Keys())
+	}
+
+	if _, err := e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "New", Avatar: upload("image/jpeg", jpgBytes)}); err != nil {
+		t.Fatal(err)
+	}
+	if sameExt := e.avatarKey(t, a.ID); sameExt == newKey || !e.store.Has(sameExt) || e.store.Has(newKey) {
+		t.Fatalf("same-extension replace must use a fresh key: %s -> %s keys=%v", newKey, sameExt, e.store.Keys())
 	}
 
 	got, err = e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "Newer"})
 	if err != nil || got.AvatarURL == nil || got.Bio != nil {
 		t.Fatalf("update without avatar should keep it and clear bio: %+v %v", got, err)
+	}
+}
+
+func TestFailedImageUpdateKeepsCurrentObject(t *testing.T) {
+	e := newEnv(t)
+	e.artist(t, "Taken")
+	a, _ := e.catalog.CreateArtist(e.ctx, ArtistInput{Name: "Mine", Avatar: upload("image/png", pngBytes)})
+	avatar := e.avatarKey(t, a.ID)
+	if _, err := e.catalog.UpdateArtist(e.ctx, a.ID, ArtistInput{Name: "Taken", Avatar: upload("image/png", pngBytes)}); err == nil {
+		t.Fatal("expected duplicate name error")
+	}
+	if e.avatarKey(t, a.ID) != avatar || !e.store.Has(avatar) || len(e.store.Keys()) != 1 {
+		t.Fatalf("live avatar lost or orphan left: key=%s keys=%v", avatar, e.store.Keys())
+	}
+
+	al, _ := e.catalog.CreateAlbum(e.ctx, AlbumInput{Title: "x", ArtistID: a.ID, ReleaseYear: 1, Cover: upload("image/png", pngBytes)})
+	cover := e.coverKey(t, al.ID)
+	if _, err := e.catalog.UpdateAlbum(e.ctx, al.ID, AlbumInput{Title: "x", ArtistID: uuid.New(), ReleaseYear: 1, Cover: upload("image/png", pngBytes)}); err == nil {
+		t.Fatal("expected unknown artist error")
+	}
+	if e.coverKey(t, al.ID) != cover || !e.store.Has(cover) || len(e.store.Keys()) != 2 {
+		t.Fatalf("live cover lost or orphan left: key=%s keys=%v", cover, e.store.Keys())
 	}
 }
 
@@ -206,7 +238,7 @@ func TestListAlbumsOrderingAndSearch(t *testing.T) {
 	e.album(t, a, "Syro", 2014)
 	e.album(t, a, "Drukqs", 2001)
 
-	all, _ := e.catalog.ListAlbums(e.ctx, nil, "", nil)
+	all, _ := e.catalog.ListAlbums(e.ctx, nil, "", false, nil)
 	titles := func(as []dto.Album) []string {
 		out := []string{}
 		for _, x := range as {
@@ -217,16 +249,20 @@ func TestListAlbumsOrderingAndSearch(t *testing.T) {
 	if !slices.Equal(titles(all), []string{"Drukqs", "Syro", "Burial", "Untrue"}) {
 		t.Fatalf("artist name then title: %v", titles(all))
 	}
-	byArtist, _ := e.catalog.ListAlbums(e.ctx, &b.ID, "", nil)
+	byArtist, _ := e.catalog.ListAlbums(e.ctx, &b.ID, "", false, nil)
 	if !slices.Equal(titles(byArtist), []string{"Untrue", "Burial"}) {
 		t.Fatalf("release year desc: %v", titles(byArtist))
 	}
-	search, _ := e.catalog.ListAlbums(e.ctx, nil, "aphex", nil)
+	search, _ := e.catalog.ListAlbums(e.ctx, nil, "aphex", false, nil)
 	if !slices.Equal(titles(search), []string{"Drukqs", "Syro"}) {
 		t.Fatalf("search by artist name: %v", titles(search))
 	}
 	if all[0].Artist.Name != "Aphex" {
 		t.Fatalf("artist not preloaded: %+v", all[0])
+	}
+	recent, _ := e.catalog.ListAlbums(e.ctx, nil, "", true, &Page{Size: 2})
+	if !slices.Equal(titles(recent), []string{"Drukqs", "Syro"}) {
+		t.Fatalf("recent sorts newest first before paging: %v", titles(recent))
 	}
 }
 
@@ -336,8 +372,8 @@ func TestUploadBatchIsAtomic(t *testing.T) {
 	if e.count(t, "tracks") != 0 {
 		t.Fatal("first track persisted after batch failure")
 	}
-	if len(e.store.Keys()) != 0 || len(e.store.Deleted) != 1 {
-		t.Fatalf("uploaded object not cleaned up: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
+	if len(e.store.Keys()) != 0 || len(e.store.Deleted) != 0 {
+		t.Fatalf("unknown album must be rejected before uploading: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
 	}
 	if len(e.lyrics.calls) != 0 {
 		t.Fatal("lyrics must not run for rolled back uploads")
@@ -347,6 +383,44 @@ func TestUploadBatchIsAtomic(t *testing.T) {
 	out, err := e.catalog.UploadTracks(e.ctx, inputs)
 	if err != nil || len(out) != 2 || out[0].Title != "one" || out[1].Title != "two" {
 		t.Fatalf("%v %v", out, err)
+	}
+}
+
+func TestFailedWriteAfterUploadRemovesObjects(t *testing.T) {
+	e := newEnv(t)
+	e.artist(t, "Dup")
+	_, err := e.catalog.CreateArtist(e.ctx, ArtistInput{Name: "Dup", Avatar: upload("image/png", pngBytes)})
+	if !errors.Is(err, gorm.ErrDuplicatedKey) {
+		t.Fatalf("want duplicate key, got %v", err)
+	}
+	if len(e.store.Keys()) != 0 {
+		t.Fatalf("avatar of rejected artist left behind: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
+	}
+
+	artist := e.artist(t, "A")
+	album := e.album(t, artist, "x", 1)
+	failTrackInserts(t, e.db)
+	_, err = e.catalog.UploadTracks(e.ctx, []TrackInput{
+		{Title: "one", AlbumID: album.ID, ArtistID: artist.ID, TrackNumber: 1, Audio: upload("audio/mpeg", mp3Bytes)},
+		{Title: "two", AlbumID: album.ID, ArtistID: artist.ID, TrackNumber: 2, Audio: upload("audio/mpeg", mp3Bytes)},
+	})
+	if err == nil {
+		t.Fatal("expected insert failure")
+	}
+	if e.count(t, "tracks") != 0 || len(e.store.Keys()) != 0 {
+		t.Fatalf("uploaded audio not cleaned up: keys=%v deleted=%v", e.store.Keys(), e.store.Deleted)
+	}
+}
+
+func failTrackInserts(t *testing.T, gdb *gorm.DB) {
+	t.Helper()
+	err := gdb.Callback().Create().Before("gorm:create").Register("test:fail_tracks", func(tx *gorm.DB) {
+		if tx.Statement.Table == "tracks" {
+			_ = tx.AddError(errors.New("insert failed"))
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -413,6 +487,53 @@ func TestMostPlayed(t *testing.T) {
 	wantAppErr(t, e.catalog.RecordPlay(e.ctx, u.ID, uuid.New()), 404, "")
 }
 
+func TestMostPlayedCachesRanking(t *testing.T) {
+	e := newEnv(t)
+	clock := time.UnixMilli(1_700_000_000_000)
+	e.catalog.now = func() time.Time { return clock }
+	album := e.album(t, e.artist(t, "A"), "x", 1)
+	a, b := e.track(t, album, "a", 1), e.track(t, album, "b", 2)
+	u := e.user(t, "u", model.RoleListener)
+	play := func(tr *model.Track, n int) {
+		for range n {
+			if err := e.catalog.RecordPlay(e.ctx, u.ID, tr.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	top := func(limit int) []uuid.UUID {
+		out, err := e.catalog.MostPlayed(e.ctx, limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ids(out, func(t dto.Track) uuid.UUID { return t.ID })
+	}
+
+	play(a, 2)
+	if got := top(10); !slices.Equal(got, []uuid.UUID{a.ID}) {
+		t.Fatalf("%v", got)
+	}
+	play(b, 5)
+	clock = clock.Add(mostPlayedTTL - time.Second)
+	if got := top(10); !slices.Equal(got, []uuid.UUID{a.ID}) {
+		t.Fatalf("ranking should be cached: %v", got)
+	}
+	e.db.Model(&model.Track{}).Where("id = ?", a.ID).Update("title", "renamed")
+	if out, _ := e.catalog.MostPlayed(e.ctx, 10); out[0].Title != "renamed" {
+		t.Fatal("track rows must load fresh")
+	}
+	clock = clock.Add(2 * time.Second)
+	if got := top(10); !slices.Equal(got, []uuid.UUID{b.ID, a.ID}) {
+		t.Fatalf("ranking should refresh after ttl: %v", got)
+	}
+	if err := e.catalog.DeleteTrack(e.ctx, b.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := top(1); !slices.Equal(got, []uuid.UUID{a.ID}) {
+		t.Fatalf("deleted tracks drop out and limit still fills from ranking: %v", got)
+	}
+}
+
 func TestMostPlayedEmpty(t *testing.T) {
 	e := newEnv(t)
 	top, err := e.catalog.MostPlayed(e.ctx, 10)
@@ -438,6 +559,22 @@ func TestUpdateAlbumTracksValidatesOwnershipAtomically(t *testing.T) {
 	out, err := e.catalog.UpdateAlbumTracks(e.ctx, al1.ID, []TrackUpdate{{ID: &t1.ID, Title: "renamed", TrackNumber: 5}})
 	if err != nil || out[0].Title != "renamed" || out[0].TrackNumber != 5 {
 		t.Fatalf("%+v %v", out, err)
+	}
+
+	missing := uuid.New()
+	_, err = e.catalog.UpdateAlbumTracks(e.ctx, al1.ID, []TrackUpdate{{ID: &missing, Title: "x"}})
+	wantAppErr(t, err, 404, "Track not found: "+missing.String())
+
+	t3 := e.track(t, al1, "t3", 2)
+	out, err = e.catalog.UpdateAlbumTracks(e.ctx, al1.ID, []TrackUpdate{
+		{ID: &t3.ID, Title: "first", TrackNumber: 1},
+		{ID: &t1.ID, Title: "second", TrackNumber: 2},
+	})
+	if err != nil || len(out) != 2 || out[0].ID != t3.ID || out[0].Title != "first" || out[1].ID != t1.ID || out[1].TrackNumber != 2 || out[1].Album.Artist.Name != "A" {
+		t.Fatalf("batch update keeps input order and loads relations: %+v %v", out, err)
+	}
+	if out, err := e.catalog.UpdateAlbumTracks(e.ctx, al1.ID, nil); err != nil || out == nil || len(out) != 0 {
+		t.Fatalf("empty update: %v %v", out, err)
 	}
 }
 
@@ -488,8 +625,14 @@ func TestRandomCoverIDsAndImageKey(t *testing.T) {
 	if !slices.Equal(got, []string{withCover.ID.String()}) {
 		t.Fatalf("%v", got)
 	}
+	for i := range 3 {
+		e.catalog.CreateAlbum(e.ctx, AlbumInput{Title: fmt.Sprint(i), ArtistID: artist.ID, ReleaseYear: 1, Cover: upload("image/png", pngBytes)})
+	}
+	if got, _ := e.catalog.RandomCoverIDs(e.ctx, 2); len(got) != 2 {
+		t.Fatalf("limit not applied: %v", got)
+	}
 	key, err := e.catalog.ImageKey(e.ctx, "albums", withCover.ID)
-	if err != nil || key == nil || *key != "images/albums/"+withCover.ID.String()+".png" {
+	if err != nil || key == nil || *key != e.coverKey(t, withCover.ID) || !imageKeyLike(*key, "albums", withCover.ID, "png") {
 		t.Fatalf("%v %v", key, err)
 	}
 	key, err = e.catalog.ImageKey(e.ctx, "artists", artist.ID)
@@ -528,5 +671,33 @@ func TestLrclibClient(t *testing.T) {
 	}
 	if _, err := l.Find(t.Context(), "boom", "a", "b", 1); err == nil {
 		t.Fatal("500 should error")
+	}
+}
+
+func TestLyricsLookupsAreBounded(t *testing.T) {
+	c := NewCatalog(nil, nil, nil)
+	var mu sync.Mutex
+	running, peak := 0, 0
+	release := make(chan struct{})
+	var wg sync.WaitGroup
+	for range 3 * lyricsWorkers {
+		wg.Add(1)
+		c.async(func() {
+			defer wg.Done()
+			mu.Lock()
+			running++
+			peak = max(peak, running)
+			mu.Unlock()
+			<-release
+			mu.Lock()
+			running--
+			mu.Unlock()
+		})
+	}
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+	if peak != lyricsWorkers {
+		t.Fatalf("peak concurrency %d want %d", peak, lyricsWorkers)
 	}
 }

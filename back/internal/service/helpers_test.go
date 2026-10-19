@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -123,4 +124,35 @@ func ids[T any](items []T, id func(T) uuid.UUID) []uuid.UUID {
 		out[i] = id(it)
 	}
 	return out
+}
+
+func (e *env) avatarKey(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	var a model.Artist
+	if err := e.db.First(&a, "id = ?", id).Error; err != nil || a.AvatarKey == nil {
+		t.Fatalf("artist %s has no avatar: %v", id, err)
+	}
+	return *a.AvatarKey
+}
+
+func (e *env) coverKey(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	var a model.Album
+	if err := e.db.First(&a, "id = ?", id).Error; err != nil || a.CoverKey == nil {
+		t.Fatalf("album %s has no cover: %v", id, err)
+	}
+	return *a.CoverKey
+}
+
+func imageKeyLike(key, kind string, id uuid.UUID, ext string) bool {
+	rest, ok := strings.CutPrefix(key, "images/"+kind+"/"+id.String()+"-")
+	if !ok {
+		return false
+	}
+	version, ok := strings.CutSuffix(rest, "."+ext)
+	if !ok {
+		return false
+	}
+	_, err := uuid.Parse(version)
+	return err == nil
 }

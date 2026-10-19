@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useAuthStore } from '@/stores/auth'
+import { apiStatus } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,11 +46,8 @@ async function submit() {
   try {
     await auth.login(username.value, password.value)
     router.push('/library')
-  } catch (e: any) {
-    toast.error(
-      e.response?.status === 401 ? 'Invalid username or password' : 'Login failed. Please try again.',
-    )
-    console.log('Login error:', e)
+  } catch (e) {
+    toast.error(apiStatus(e) === 401 ? 'Invalid username or password' : 'Login failed. Please try again.')
   }
 }
 </script>

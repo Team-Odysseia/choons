@@ -17,9 +17,8 @@ app.use(pinia)
 app.use(router)
 app.use(VueQueryPlugin)
 
-// Restore session before first navigation
 const auth = useAuthStore()
-auth.fetchMe().finally(() => {
+auth.restoreSession().finally(() => {
   if (auth.isAuthenticated) {
     const party = usePartyStore()
     party.setCurrentUserId(auth.user!.id)

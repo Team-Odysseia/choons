@@ -13,12 +13,12 @@ const mockGetArtists = vi.fn().mockResolvedValue([])
 const mockGetMostPlayedTracks = vi.fn().mockResolvedValue([])
 
 vi.mock('@/api/albums', () => ({
-  getAlbums: (...args: unknown[]) => mockGetAlbums(...args),
+  getRecentAlbums: (...args: unknown[]) => mockGetAlbums(...args),
   getAlbum: vi.fn(),
   albumImageUrl: vi.fn((id: string) => `/media/images/albums/${id}`),
 }))
 vi.mock('@/api/artists', () => ({
-  getArtists: () => mockGetArtists(),
+  getArtistsPage: (...args: unknown[]) => mockGetArtists(...args),
   getArtist: vi.fn(),
   artistImageUrl: vi.fn((id: string) => `/media/images/artists/${id}`),
 }))
@@ -101,6 +101,12 @@ describe('recently added albums swiper', () => {
     mockGetAlbums.mockResolvedValue([])
     mockGetArtists.mockResolvedValue([])
     mockGetMostPlayedTracks.mockResolvedValue([])
+  })
+
+  it('asks the server for the ten newest albums', async () => {
+    mountView()
+    await flushPromises()
+    expect(mockGetAlbums).toHaveBeenCalledWith(10)
   })
 
   it('does not render swiper when no albums', async () => {
@@ -264,5 +270,22 @@ describe('artists section', () => {
     const { wrapper } = mountView()
     await flushPromises()
     expect(wrapper.text()).toContain('The Beatles')
+    expect(wrapper.find('[data-testid="more-artists"]').exists()).toBe(false)
+  })
+
+  it('loads the next page of artists on demand', async () => {
+    const page = (offset: number, count: number) =>
+      Array.from({ length: count }, (_, i) => ({ ...artist, id: `a-${offset + i}`, name: `Artist ${offset + i}` }))
+    mockGetArtists.mockResolvedValueOnce(page(0, 100)).mockResolvedValueOnce(page(100, 3))
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="more-artists"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGetArtists).toHaveBeenNthCalledWith(1, 0, 100)
+    expect(mockGetArtists).toHaveBeenNthCalledWith(2, 1, 100)
+    expect(wrapper.text()).toContain('Artist 102')
+    expect(wrapper.find('[data-testid="more-artists"]').exists()).toBe(false)
   })
 })

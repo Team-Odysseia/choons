@@ -28,6 +28,8 @@ function makeTrack(n: number): TrackResponse {
   }
 }
 
+const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve))
+
 const t1 = makeTrack(1)
 const t2 = makeTrack(2)
 const t3 = makeTrack(3)
@@ -363,8 +365,8 @@ describe('evento ended', () => {
     let resolveNext: (() => void) | null = null
     const nextMock = vi.fn(
       () =>
-        new Promise<boolean>((resolve) => {
-          resolveNext = () => resolve(true)
+        new Promise<void>((resolve) => {
+          resolveNext = () => resolve()
         }),
     )
 
@@ -377,9 +379,94 @@ describe('evento ended', () => {
     expect(nextMock).toHaveBeenCalledTimes(1)
 
     ;(resolveNext as unknown as (() => void))?.()
-    await Promise.resolve()
+    await flushPromises()
     audioMock._emit('ended')
     expect(nextMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('party auto-advance', () => {
+  it('releases the in-flight guard when the advance fails', async () => {
+    const nextMock = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined)
+    const store = usePlayerStore()
+    emitter.emit('party:joined', { next: nextMock })
+    store.playQueue([t1, t2], 0)
+
+    audioMock._emit('ended')
+    await flushPromises()
+    audioMock._emit('ended')
+
+    expect(nextMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('never advances the local queue while in a party', async () => {
+    const store = usePlayerStore()
+    emitter.emit('party:joined', { next: vi.fn().mockResolvedValue(undefined) })
+    store.playQueue([t1, t2], 0)
+
+    audioMock._emit('ended')
+    await Promise.resolve()
+
+    expect(store.currentTrack?.id).toBe(t1.id)
+  })
+})
+
+describe('party state sync', () => {
+  function partyState(queueItemId: string, playing = true) {
+    return {
+      id: 'p-1',
+      revision: 1,
+      inviteCode: 'ABC123',
+      name: 'Party',
+      queuePolicy: 'DJ_ONLY' as const,
+      hostUserId: 'u-host',
+      members: [],
+      queue: [
+        { id: 'item-a', position: 0, track: t1, addedByUserId: 'u', addedByUsername: 'u' },
+        { id: 'item-b', position: 1, track: t2, addedByUserId: 'u', addedByUsername: 'u' },
+        { id: 'item-a2', position: 2, track: t1, addedByUserId: 'u', addedByUsername: 'u' },
+      ],
+      playback: { track: t1, queueItemId, playing, anchorPositionSec: 0, anchorEpochMs: Date.now() },
+    }
+  }
+
+  it('highlights the playing queue item, not the first duplicate', () => {
+    const store = usePlayerStore()
+
+    emitter.emit('party:stateChanged', partyState('item-a2'))
+
+    expect(store.currentIndex).toBe(2)
+  })
+
+  it('does not reload audio when the same track stays current', () => {
+    const store = usePlayerStore()
+    emitter.emit('party:stateChanged', partyState('item-a'))
+    const loaded = audioMock.src
+    audioMock.src = 'https://normalized.example/stream/track-1'
+
+    emitter.emit('party:stateChanged', partyState('item-a'))
+
+    expect(loaded).toBe('http://test/stream/track-1')
+    expect(audioMock.src).toBe('https://normalized.example/stream/track-1')
+    expect(store.currentTrack?.id).toBe(t1.id)
+  })
+
+  it('records a stream for each party track', () => {
+    usePlayerStore()
+    emitter.emit('party:stateChanged', partyState('item-a'))
+    audioMock.duration = 100
+    audioMock.currentTime = 40
+    audioMock._emit('durationchange')
+    audioMock._emit('timeupdate')
+    expect(recordStreamMock).toHaveBeenCalledWith(t1.id)
+
+    const next = partyState('item-b')
+    next.playback.track = t2
+    emitter.emit('party:stateChanged', next)
+    audioMock.currentTime = 40
+    audioMock._emit('timeupdate')
+
+    expect(recordStreamMock).toHaveBeenCalledWith(t2.id)
   })
 })
 

@@ -4,6 +4,9 @@ import type { ArtistResponse } from './types'
 export const getArtists = () =>
   client.get<ArtistResponse[]>('/music/artists').then((r) => r.data)
 
+export const getArtistsPage = (page: number, size: number) =>
+  client.get<ArtistResponse[]>('/music/artists', { params: { page, size } }).then((r) => r.data)
+
 export const searchArtists = (query: string, page = 0, size = 100, signal?: AbortSignal) =>
   client
     .get<ArtistResponse[]>('/music/artists', { params: { query, page, size }, signal })
@@ -21,6 +24,9 @@ export const createArtist = (name: string, bio: string, avatarFile?: File | null
     .post<ArtistResponse>('/admin/artists', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     .then((r) => r.data)
 }
+
+export const getAdminArtists = () =>
+  client.get<ArtistResponse[]>('/admin/artists').then((r) => r.data)
 
 export const getAdminArtist = (id: string) =>
   client.get<ArtistResponse>(`/admin/artists/${id}`).then((r) => r.data)

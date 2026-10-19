@@ -2,7 +2,8 @@
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { getArtists, searchArtists, createArtist, deleteArtist } from '@/api/artists'
+import { apiErrorMessage } from '@/lib/errors'
+import { getAdminArtists, searchArtists, createArtist, deleteArtist } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,7 +39,11 @@ watch(search, () => {
 
 async function load() {
   const query = search.value.trim()
-  artists.value = query ? await searchArtists(query, 0, 200) : await getArtists()
+  try {
+    artists.value = query ? await searchArtists(query, 0, 200) : await getAdminArtists()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load artists'))
+  }
 }
 
 async function confirmDelete() {
@@ -50,8 +55,8 @@ async function confirmDelete() {
       await deleteArtist(artist.id)
       await load()
       toast.success(`"${artist.name}" deleted`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to delete artist')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to delete artist'))
   } finally {
     deletingId.value = null
   }
@@ -68,8 +73,8 @@ async function submit() {
     imageUploadRef.value?.reset()
     addDialogOpen.value = false
     toast.success(`Artist "${created.name}" created successfully`)
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to create artist')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to create artist'))
   } finally {
     loading.value = false
   }

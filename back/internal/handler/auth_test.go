@@ -58,4 +58,6 @@ func TestRegister(t *testing.T) {
 	}
 	admin.json(http.MethodPost, "/auth/register", map[string]string{"username": "newbie", "password": "secret1"}).errorIs(409, "Username already exists")
 	s.anon().json(http.MethodPost, "/auth/login", map[string]string{"username": "newbie", "password": "secret1"}).status(200)
+	admin.json(http.MethodPost, "/auth/register", map[string]string{"username": "long", "password": strings.Repeat("p", 100)}).
+		errorIs(400, "Password must be at least 6 characters and at most 72 bytes")
 }

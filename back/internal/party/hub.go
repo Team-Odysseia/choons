@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
+
 	"github.com/Team-Odysseia/choons/back/internal/dto"
 )
 
@@ -19,23 +21,25 @@ type Event struct {
 type Subscriber struct {
 	C      chan Event
 	code   string
+	user   uuid.UUID
 	closed bool
 }
 
 type Hub struct {
-	mu   sync.Mutex
-	subs map[string]map[*Subscriber]struct{}
+	mu       sync.Mutex
+	subs     map[string]map[*Subscriber]struct{}
+	revision map[string]int64
 }
 
 func NewHub() *Hub {
-	return &Hub{subs: map[string]map[*Subscriber]struct{}{}}
+	return &Hub{subs: map[string]map[*Subscriber]struct{}{}, revision: map[string]int64{}}
 }
 
 func normalize(code string) string { return strings.ToUpper(code) }
 
-func (h *Hub) Subscribe(code string) *Subscriber {
+func (h *Hub) Subscribe(code string, user uuid.UUID) *Subscriber {
 	code = normalize(code)
-	s := &Subscriber{C: make(chan Event, subscriberBuffer), code: code}
+	s := &Subscriber{C: make(chan Event, subscriberBuffer), code: code, user: user}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.subs[code] == nil {
@@ -66,16 +70,20 @@ func (h *Hub) removeLocked(s *Subscriber) {
 	}
 }
 
-func (h *Hub) broadcast(code string, ev Event) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for s := range h.subs[normalize(code)] {
-		select {
-		case s.C <- ev:
-		default:
-			slog.Warn("dropping slow party subscriber", "code", s.code)
-			h.removeLocked(s)
-		}
+var endedEvent = Event{Name: "ended", Data: []byte("{}")}
+
+func (h *Hub) broadcastLocked(code string, ev Event) {
+	for s := range h.subs[code] {
+		h.sendLocked(s, ev)
+	}
+}
+
+func (h *Hub) sendLocked(s *Subscriber, ev Event) {
+	select {
+	case s.C <- ev:
+	default:
+		slog.Warn("dropping slow party subscriber", "code", s.code)
+		h.removeLocked(s)
 	}
 }
 
@@ -85,14 +93,35 @@ func (h *Hub) PublishState(code string, state dto.PartyState) {
 		slog.Error("marshal party state", "err", err)
 		return
 	}
-	h.broadcast(code, Event{Name: "state", Data: data})
+	code = normalize(code)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if last, ok := h.revision[code]; ok && state.Revision <= last {
+		return
+	}
+	h.revision[code] = state.Revision
+	h.broadcastLocked(code, Event{Name: "state", Data: data})
 }
 
 func (h *Hub) PublishEnded(code string) {
-	h.broadcast(code, Event{Name: "ended", Data: []byte("{}")})
+	code = normalize(code)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.revision, code)
+	h.broadcastLocked(code, endedEvent)
+	for s := range h.subs[code] {
+		h.removeLocked(s)
+	}
+}
+
+func (h *Hub) PublishRemoved(code string, user uuid.UUID) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for s := range h.subs[normalize(code)] {
+		if s.user != user {
+			continue
+		}
+		h.sendLocked(s, endedEvent)
 		h.removeLocked(s)
 	}
 }

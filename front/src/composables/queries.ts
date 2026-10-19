@@ -1,22 +1,24 @@
 import { computed } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
-import { getArtists, getArtist, searchArtists } from '@/api/artists'
-import { getAlbums, getAlbum, searchAlbums } from '@/api/albums'
+import { useInfiniteQuery, useQuery } from '@tanstack/vue-query'
+import { getArtist, getArtistsPage } from '@/api/artists'
+import { getAlbums, getAlbum, getAlbumsPage, getRecentAlbums, searchAlbums } from '@/api/albums'
 import { getTracks, getMostPlayedTracks } from '@/api/tracks'
 import type { Ref } from 'vue'
 
 const FIVE_MINUTES = 5 * 60 * 1000
+export const LIST_PAGE_SIZE = 100
+const RECENT_ALBUMS = 10
 
-export const useArtistsQuery = (query?: Ref<string | undefined>, page?: Ref<number>, size = 100) =>
-  useQuery({
-    queryKey: computed(() => ['artists', query?.value ?? '', page?.value ?? 0, size]),
-    queryFn: () => {
-      const normalized = query?.value?.trim() ?? ''
-      if (!normalized) {
-        return getArtists()
-      }
-      return searchArtists(normalized, page?.value ?? 0, size)
-    },
+function nextPage<T>(lastPage: T[], allPages: T[][]) {
+  return lastPage.length === LIST_PAGE_SIZE ? allPages.length : undefined
+}
+
+export const useArtistsInfiniteQuery = () =>
+  useInfiniteQuery({
+    queryKey: ['artists', 'pages'],
+    queryFn: ({ pageParam }) => getArtistsPage(pageParam, LIST_PAGE_SIZE),
+    initialPageParam: 0,
+    getNextPageParam: nextPage,
     staleTime: FIVE_MINUTES,
   })
 
@@ -47,28 +49,19 @@ export const useAlbumsQuery = (
 
 export const useRecentAlbumsQuery = () =>
   useQuery({
-    queryKey: ['albums'],
-    queryFn: () => getAlbums(),
+    queryKey: ['albums', 'recent', RECENT_ALBUMS],
+    queryFn: () => getRecentAlbums(RECENT_ALBUMS),
     staleTime: FIVE_MINUTES,
-    select: (albums) =>
-      [...albums]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 10),
   })
 
-export const useAllAlbumsQuery = (query?: Ref<string | undefined>, page?: Ref<number>, size = 100) =>
-  useQuery({
-    queryKey: computed(() => ['albums', 'all', query?.value ?? '', page?.value ?? 0, size]),
-    queryFn: () => {
-      const normalized = query?.value?.trim() ?? ''
-      if (!normalized) {
-        return getAlbums()
-      }
-      return searchAlbums(normalized, { page: page?.value ?? 0, size })
-    },
+export const useAllAlbumsInfiniteQuery = (query: Ref<string>) =>
+  useInfiniteQuery({
+    queryKey: computed(() => ['albums', 'all', query.value]),
+    queryFn: ({ pageParam }) =>
+      getAlbumsPage({ page: pageParam, size: LIST_PAGE_SIZE, query: query.value, sort: 'recent' }),
+    initialPageParam: 0,
+    getNextPageParam: nextPage,
     staleTime: FIVE_MINUTES,
-    select: (albums) =>
-      [...albums].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
   })
 
 export const useAlbumQuery = (id: Ref<string>) =>

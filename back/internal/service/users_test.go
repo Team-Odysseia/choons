@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -144,4 +145,27 @@ func TestDeleteListenerWithDependentData(t *testing.T) {
 			t.Errorf("%s has %d rows", table, n)
 		}
 	}
+}
+
+func TestPasswordPolicy(t *testing.T) {
+	e := newEnv(t)
+	users := NewUsers(e.db)
+	tooLong := strings.Repeat("p", 73)
+	const msg = "Password must be at least 6 characters and at most 72 bytes"
+
+	_, err := users.Register(e.ctx, "long", tooLong, model.RoleListener)
+	wantAppErr(t, err, 400, msg)
+	_, err = users.Register(e.ctx, "short", "12345", model.RoleListener)
+	wantAppErr(t, err, 400, msg)
+	if _, err := users.Register(e.ctx, "edge", strings.Repeat("é", 36), model.RoleListener); err != nil {
+		t.Fatalf("72-byte password rejected: %v", err)
+	}
+	_, err = users.EnsureAdmin(e.ctx, "root", "123")
+	wantAppErr(t, err, 400, msg)
+
+	bob := e.user(t, "bob", model.RoleListener)
+	_, err = users.UpdateListener(e.ctx, bob.ID, "bob", "a")
+	wantAppErr(t, err, 400, msg)
+	_, err = users.UpdateListener(e.ctx, bob.ID, "bob", tooLong)
+	wantAppErr(t, err, 400, msg)
 }

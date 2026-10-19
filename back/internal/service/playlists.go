@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -84,6 +85,10 @@ func (s *Playlists) mutate(ctx context.Context, user *model.User, id uuid.UUID, 
 		if err := fn(tx, p); err != nil {
 			return err
 		}
+		p.UpdatedAt = tx.NowFunc()
+		if err := tx.Model(p).UpdateColumn("updated_at", p.UpdatedAt).Error; err != nil {
+			return err
+		}
 		out, err = s.response(tx, p)
 		return err
 	})
@@ -94,6 +99,13 @@ func (s *Playlists) AddTrack(ctx context.Context, user *model.User, id, trackID 
 	return s.mutate(ctx, user, id, func(tx *gorm.DB, p *model.Playlist) error {
 		if _, err := first[model.Track](tx.Select("id"), "Track", trackID); err != nil {
 			return err
+		}
+		var dup int64
+		if err := tx.Model(&model.PlaylistTrack{}).Where("playlist_id = ? AND track_id = ?", id, trackID).Count(&dup).Error; err != nil {
+			return err
+		}
+		if dup > 0 {
+			return apperr.Conflict("Track already in playlist")
 		}
 		var n int64
 		if err := tx.Model(&model.PlaylistTrack{}).Where("playlist_id = ?", id).Count(&n).Error; err != nil {
@@ -108,15 +120,7 @@ func (s *Playlists) RemoveTrack(ctx context.Context, user *model.User, id, track
 		if err := tx.Where("playlist_id = ? AND track_id = ?", id, trackID).Delete(&model.PlaylistTrack{}).Error; err != nil {
 			return err
 		}
-		var entries []model.PlaylistTrack
-		if err := tx.Where("playlist_id = ?", id).Order("position ASC").Find(&entries).Error; err != nil {
-			return err
-		}
-		order := make([]uuid.UUID, len(entries))
-		for i, e := range entries {
-			order[i] = e.ID
-		}
-		return setPositions(tx, "playlist_tracks", order)
+		return compactPositions(tx, "playlist_tracks", "playlist_id", id, "position, id")
 	})
 }
 
@@ -158,7 +162,7 @@ func (s *Playlists) Reorder(ctx context.Context, user *model.User, id uuid.UUID,
 func (s *Playlists) SetVisibility(ctx context.Context, user *model.User, id uuid.UUID, public bool) (dto.Playlist, error) {
 	return s.mutate(ctx, user, id, func(tx *gorm.DB, p *model.Playlist) error {
 		p.IsPublic = public
-		return tx.Model(p).Select("is_public", "updated_at").Updates(p).Error
+		return tx.Model(p).UpdateColumn("is_public", public).Error
 	})
 }
 
@@ -189,15 +193,17 @@ func setPositions(tx *gorm.DB, table string, orderedIDs []uuid.UUID) error {
 	if len(orderedIDs) == 0 {
 		return nil
 	}
+	ids := make([]string, len(orderedIDs))
 	for i, id := range orderedIDs {
-		if err := tx.Table(table).Where("id = ?", id).Update("position", -(i + 1)).Error; err != nil {
-			return err
-		}
+		ids[i] = id.String()
 	}
-	for i, id := range orderedIDs {
-		if err := tx.Table(table).Where("id = ?", id).Update("position", i).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	return tx.Exec(`UPDATE `+table+` AS t SET position = v.ord - 1
+		FROM unnest(?::uuid[]) WITH ORDINALITY AS v(id, ord)
+		WHERE t.id = v.id AND t.position <> v.ord - 1`, "{"+strings.Join(ids, ",")+"}").Error
+}
+
+func compactPositions(tx *gorm.DB, table, scope string, scopeID uuid.UUID, order string) error {
+	return tx.Exec(`UPDATE `+table+` AS t SET position = r.pos
+		FROM (SELECT id, row_number() OVER (ORDER BY `+order+`) - 1 AS pos FROM `+table+` WHERE `+scope+` = ?) AS r
+		WHERE t.id = r.id AND t.position <> r.pos`, scopeID).Error
 }

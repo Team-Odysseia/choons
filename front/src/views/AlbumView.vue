@@ -21,7 +21,7 @@ const playlists = usePlaylistsStore()
 const favorites = useFavoritesStore()
 
 const id = computed(() => route.params.id as string)
-const { data: album, isPending } = useAlbumQuery(id)
+const { data: album, isPending, isError } = useAlbumQuery(id)
 const { data: tracks } = useAlbumTracksQuery(id)
 
 const albumDialogOpen = ref(false)
@@ -93,10 +93,11 @@ onBeforeUnmount(() => {
         <div class="text-xs font-bold uppercase tracking-widest text-dimmed mb-1">Album</div>
         <h1 class="text-[24px] md:text-[28px] font-extrabold mb-1">{{ album.title }}</h1>
         <div class="text-sm mt-2">
-          <span
-            class="font-semibold cursor-pointer hover:underline"
+          <button
+            type="button"
+            class="font-semibold hover:underline"
             @click="router.push(`/library/artists/${album.artist.id}`)"
-          >{{ album.artist.name }}</span>
+          >{{ album.artist.name }}</button>
           <span class="text-[13px] text-dimmed"> · {{ album.releaseYear }}</span>
           <span class="text-[13px] text-dimmed"> · {{ trackList.length }} tracks</span>
         </div>
@@ -151,6 +152,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
   </div>
+  <div v-else-if="isError" class="text-[13px] text-dimmed">This album is not available.</div>
   <div v-else class="text-[13px] text-dimmed">Loading…</div>
 
   <AddToPlaylistDialog

@@ -76,9 +76,12 @@ func deleteObjects(ctx context.Context, store storage.Storage, keys []string) {
 	}
 }
 
-func withUploads(ctx context.Context, gdb *gorm.DB, store storage.Storage, fn func(tx *gorm.DB, up *uploads) error) error {
+func withUploads(ctx context.Context, gdb *gorm.DB, store storage.Storage, upload func(up *uploads) error, write func(tx *gorm.DB) error) error {
 	up := &uploads{store: store}
-	err := gdb.WithContext(ctx).Transaction(func(tx *gorm.DB) error { return fn(tx, up) })
+	err := upload(up)
+	if err == nil {
+		err = gdb.WithContext(ctx).Transaction(write)
+	}
 	if err != nil {
 		deleteObjects(context.WithoutCancel(ctx), store, up.keys)
 	}

@@ -23,6 +23,12 @@ func (h *Handler) Router(cfg RouterConfig) (*gin.Engine, error) {
 	}
 	r.Use(gin.Recovery())
 	r.Use(httpx.CORS(cfg.CORSOrigins))
+	guard, err := httpx.CrossOriginGuard(cfg.CORSOrigins)
+	if err != nil {
+		return nil, err
+	}
+	r.Use(guard)
+	r.Use(limitBody)
 	r.Use(auth.Authenticate(h.Tokens, h.Cookie, h.Users.Get))
 	r.NoRoute(notFound)
 
@@ -102,22 +108,22 @@ func (h *Handler) Router(cfg RouterConfig) (*gin.Engine, error) {
 
 	admin.GET("/artists", h.adminListArtists)
 	admin.GET("/artists/:id", h.getArtist)
-	admin.POST("/artists", limitBody, h.createArtist)
-	admin.PUT("/artists/:id", limitBody, h.updateArtist)
+	admin.POST("/artists", h.createArtist)
+	admin.PUT("/artists/:id", h.updateArtist)
 	admin.DELETE("/artists/:id", h.deleteArtist)
 	admin.DELETE("/artists/:id/avatar", h.deleteArtistAvatar)
 
 	admin.GET("/albums", h.adminListAlbums)
 	admin.GET("/albums/:id", h.getAlbum)
-	admin.POST("/albums", limitBody, h.createAlbum)
-	admin.PUT("/albums/:id", limitBody, h.updateAlbum)
+	admin.POST("/albums", h.createAlbum)
+	admin.PUT("/albums/:id", h.updateAlbum)
 	admin.DELETE("/albums/:id", h.deleteAlbum)
 	admin.DELETE("/albums/:id/cover", h.deleteAlbumCover)
 	admin.PUT("/albums/:id/tracks", h.updateAlbumTracks)
 
 	admin.GET("/tracks", h.adminListTracks)
-	admin.POST("/tracks", limitBody, h.uploadTrack)
-	admin.POST("/tracks/batch", limitBody, h.uploadBatch)
+	admin.POST("/tracks", h.uploadTrack)
+	admin.POST("/tracks/batch", h.uploadBatch)
 	admin.PUT("/tracks/:id", h.updateTrack)
 	admin.PUT("/tracks/:id/lrclib-id", h.updateLrclib)
 	admin.DELETE("/tracks/:id", h.deleteTrack)

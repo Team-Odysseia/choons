@@ -17,6 +17,13 @@ const volumePercent = computed(() => Math.round(player.volume * 100))
 
 const showVolumeLabel = ref(false)
 
+const prevDisabled = computed(() =>
+  party.inParty ? !party.canControl || !party.state?.playback.track : !player.hasPrev,
+)
+const nextDisabled = computed(() =>
+  party.inParty ? !party.canControl || !party.state?.playback.track : !player.hasNext,
+)
+
 function formatTime(secs: number) {
   if (!secs || isNaN(secs)) return '0:00'
   const m = Math.floor(secs / 60)
@@ -76,11 +83,12 @@ function onTogglePlay() {
       toast.error('Only DJs can control playback in this party')
       return
     }
-    if (!party.state?.playback.track) return
+    const playback = party.state?.playback
+    if (!playback?.track) return
     if (player.isPlaying) {
       void party.pause(player.currentTime)
     } else {
-      void party.play(party.state.playback.track.id, player.currentTime)
+      void party.play(playback.track.id, player.currentTime, playback.queueItemId)
     }
     return
   }
@@ -152,7 +160,7 @@ function onTogglePlay() {
         <button
           data-testid="prev-btn"
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          :disabled="!player.hasPrev || (party.inParty && !party.canControl)"
+          :disabled="prevDisabled"
           @click="onPrev"
         >
           <SkipBack :size="20" />
@@ -169,7 +177,7 @@ function onTogglePlay() {
         <button
           data-testid="next-btn"
           class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          :disabled="!player.hasNext || (party.inParty && !party.canControl)"
+          :disabled="nextDisabled"
           @click="onNext"
         >
           <SkipForward :size="20" />
@@ -232,7 +240,7 @@ function onTogglePlay() {
           <button
             data-testid="prev-btn"
             class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="!player.hasPrev || (party.inParty && !party.canControl)"
+            :disabled="prevDisabled"
             @click="onPrev"
           >
             <SkipBack :size="20" />
@@ -249,7 +257,7 @@ function onTogglePlay() {
           <button
             data-testid="next-btn"
             class="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="!player.hasNext || (party.inParty && !party.canControl)"
+            :disabled="nextDisabled"
             @click="onNext"
           >
             <SkipForward :size="20" />

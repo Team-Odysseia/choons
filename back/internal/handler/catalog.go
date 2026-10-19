@@ -80,13 +80,29 @@ func (h *Handler) listAlbums(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
+	recent, err := albumSort(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	p, err := page(c)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, c.Query("query"), p)
+	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, c.Query("query"), recent, p)
 	httpx.JSON(c, http.StatusOK, out, err)
+}
+
+func albumSort(c *gin.Context) (bool, error) {
+	switch c.Query("sort") {
+	case "":
+		return false, nil
+	case "recent":
+		return true, nil
+	default:
+		return false, apperr.BadRequest("sort must be one of: recent")
+	}
 }
 
 func (h *Handler) getAlbum(c *gin.Context) {
@@ -190,6 +206,9 @@ func (h *Handler) image(kind string) gin.HandlerFunc {
 
 func (h *Handler) publicCovers(c *gin.Context) {
 	out, err := h.Catalog.RandomCoverIDs(c.Request.Context(), 24)
+	if err == nil {
+		c.Header("Cache-Control", "public, max-age=300")
+	}
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 
@@ -252,7 +271,7 @@ func (h *Handler) adminListAlbums(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, "", nil)
+	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, "", false, nil)
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 
@@ -309,7 +328,11 @@ func (h *Handler) updateAlbumTracks(c *gin.Context) {
 	}
 	var updates []service.TrackUpdate
 	if err := json.NewDecoder(c.Request.Body).Decode(&updates); err != nil {
-		httpx.Fail(c, apperr.BadRequest("Malformed request body"))
+		httpx.Fail(c, httpx.ValidationError(err))
+		return
+	}
+	if len(updates) > maxBatchItems {
+		httpx.Fail(c, apperr.BadRequest("At most %d tracks can be updated at once", maxBatchItems))
 		return
 	}
 	for i := range updates {

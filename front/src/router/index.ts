@@ -85,7 +85,7 @@ const router = createRouter({
           path: 'requests',
           name: 'album-requests',
           component: () => import('@/views/AlbumRequestsView.vue'),
-          meta: { shell: 'form' },
+          meta: { shell: 'form', requiresListener: true },
         },
       ],
     },
@@ -154,6 +154,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
+  await auth.restoreSession()
 
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login' }
@@ -165,6 +166,10 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAdmin && !auth.isAdmin) {
     return { path: '/library' }
+  }
+
+  if (to.meta.requiresListener && auth.isAdmin) {
+    return { path: '/admin/album-requests' }
   }
 })
 

@@ -17,6 +17,7 @@ type recordedEvent struct {
 	name  string
 	code  string
 	state dto.PartyState
+	user  uuid.UUID
 }
 
 type fakePublisher struct {
@@ -27,13 +28,19 @@ type fakePublisher struct {
 func (f *fakePublisher) PublishState(code string, st dto.PartyState) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.events = append(f.events, recordedEvent{"state", code, st})
+	f.events = append(f.events, recordedEvent{name: "state", code: code, state: st})
 }
 
 func (f *fakePublisher) PublishEnded(code string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.events = append(f.events, recordedEvent{name: "ended", code: code})
+}
+
+func (f *fakePublisher) PublishRemoved(code string, user uuid.UUID) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.events = append(f.events, recordedEvent{name: "removed", code: code, user: user})
 }
 
 func (f *fakePublisher) take() []recordedEvent {
@@ -218,6 +225,45 @@ func TestAccessRules(t *testing.T) {
 	wantAppErr(t, err, 403, "User is not in party")
 }
 
+func TestRemovedMembersLoseTheirStream(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyEveryone).InviteCode
+	pe.parties.Join(pe.ctx, pe.guest, code)
+	pe.pub.take()
+
+	pe.parties.Kick(pe.ctx, pe.host, code, pe.guest.ID)
+	ev := pe.pub.take()
+	if len(ev) != 2 || ev[0].name != "removed" || ev[0].code != code || ev[0].user != pe.guest.ID || ev[1].name != "state" {
+		t.Fatalf("kick: %+v", ev)
+	}
+
+	pe.parties.Join(pe.ctx, pe.guest, code)
+	other, _ := pe.parties.Create(pe.ctx, pe.user(t, "h2", model.RoleListener), CreatePartyInput{Name: "o", QueuePolicy: model.PolicyEveryone})
+	pe.pub.take()
+	pe.parties.Join(pe.ctx, pe.guest, other.InviteCode)
+	ev = pe.pub.take()
+	if len(ev) == 0 || ev[0].name != "removed" || ev[0].code != code || ev[0].user != pe.guest.ID {
+		t.Fatalf("joining elsewhere must remove stream from old party: %+v", ev)
+	}
+}
+
+func TestStateRevisionIncreasesPerMutation(t *testing.T) {
+	pe := newPartyEnv(t)
+	created := pe.create(t, model.PolicyEveryone)
+	joined, _ := pe.parties.Join(pe.ctx, pe.guest, created.InviteCode)
+	queued, _ := pe.parties.AddTracks(pe.ctx, pe.host, created.InviteCode, []uuid.UUID{pe.tracks[0].ID})
+	if created.Revision < 1 || joined.Revision <= created.Revision || queued.Revision <= joined.Revision {
+		t.Fatalf("revisions %d %d %d", created.Revision, joined.Revision, queued.Revision)
+	}
+	if _, err := pe.parties.AddTracks(pe.ctx, pe.host, created.InviteCode, []uuid.UUID{uuid.New()}); err == nil {
+		t.Fatal("expected error")
+	}
+	current, _ := pe.parties.State(pe.ctx, pe.host, created.InviteCode)
+	if current.Revision != queued.Revision {
+		t.Fatalf("failed mutation must not bump revision: %d vs %d", current.Revision, queued.Revision)
+	}
+}
+
 func TestEveryonePolicyLetsGuestsControl(t *testing.T) {
 	pe := newPartyEnv(t)
 	st := pe.create(t, model.PolicyEveryone)
@@ -261,14 +307,14 @@ func TestQueueAndPlayback(t *testing.T) {
 	if st.Playback.AnchorPositionSec != 0 || st.Playback.Playing {
 		t.Fatalf("seek clamps and keeps paused: %+v", st.Playback)
 	}
-	st, _ = pe.parties.Play(pe.ctx, pe.host, code, c, 10)
+	st, _ = pe.parties.Play(pe.ctx, pe.host, code, c, nil, 10)
 	if st.Playback.Track.ID != c || !st.Playback.Playing || st.Playback.AnchorPositionSec != 10 {
 		t.Fatalf("play %+v", st.Playback)
 	}
-	_, err = pe.parties.Play(pe.ctx, pe.host, code, missing, 0)
+	_, err = pe.parties.Play(pe.ctx, pe.host, code, missing, nil, 0)
 	wantAppErr(t, err, 404, "")
 
-	st, _ = pe.parties.Next(pe.ctx, pe.host, code)
+	st, _ = pe.parties.Next(pe.ctx, pe.host, code, nil)
 	if !slices.Equal(queueTracks(st), []uuid.UUID{a, b}) || st.Playback.Track.ID != a {
 		t.Fatalf("next removes current (c) and plays head: %v %+v", queueTracks(st), st.Playback)
 	}
@@ -299,7 +345,7 @@ func TestQueueAndPlayback(t *testing.T) {
 	_, err = pe.parties.RemoveItem(pe.ctx, pe.host, code, aItem)
 	wantAppErr(t, err, 404, "Queue item not found")
 
-	st, _ = pe.parties.Next(pe.ctx, pe.host, code)
+	st, _ = pe.parties.Next(pe.ctx, pe.host, code, nil)
 	if len(st.Queue) != 0 || st.Playback.Track != nil || st.Playback.Playing {
 		t.Fatalf("next on last stops: %+v", st)
 	}
@@ -307,7 +353,7 @@ func TestQueueAndPlayback(t *testing.T) {
 	if st.Playback.Track != nil {
 		t.Fatal("prev with nothing playing is no-op")
 	}
-	st, _ = pe.parties.Next(pe.ctx, pe.host, code)
+	st, _ = pe.parties.Next(pe.ctx, pe.host, code, nil)
 	if st.Playback.Track != nil || st.Playback.Playing {
 		t.Fatal("next on empty queue stops")
 	}
@@ -336,8 +382,8 @@ func TestLeaveAndEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	ev := pe.pub.take()
-	if len(ev) != 1 || ev[0].name != "state" || len(ev[0].state.Members) != 1 {
-		t.Fatalf("guest leave publishes state: %+v", ev)
+	if len(ev) != 2 || ev[0].name != "removed" || ev[0].user != pe.guest.ID || ev[1].name != "state" || len(ev[1].state.Members) != 1 {
+		t.Fatalf("guest leave removes guest stream then publishes state: %+v", ev)
 	}
 	wantAppErr(t, pe.parties.Leave(pe.ctx, pe.guest, code), 403, "User is not in party")
 
@@ -425,5 +471,112 @@ func TestGenerateInviteCode(t *testing.T) {
 	}
 	if len(seen) < 199 {
 		t.Fatalf("codes not random enough: %d unique", len(seen))
+	}
+}
+
+func TestCloseIdleClosesAbandonedPlayingParty(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyEveryone).InviteCode
+	pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{pe.tracks[0].ID})
+	pe.parties.Seek(pe.ctx, pe.host, code, 40)
+
+	pe.clock = pe.clock.Add(60*time.Second + partyIdleWindow - time.Second)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 0 {
+		t.Fatal("party closed before track end + idle window")
+	}
+	pe.clock = pe.clock.Add(2 * time.Second)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 1 {
+		t.Fatal("playing party whose track ended long ago must close")
+	}
+
+	unknown := untimedTrack(t, pe, 0)
+	code = pe.create(t, model.PolicyEveryone).InviteCode
+	pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{unknown.ID})
+	pe.clock = pe.clock.Add(time.Hour)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 0 {
+		t.Fatal("unknown-duration track must get the fallback cap")
+	}
+	pe.clock = pe.clock.Add(time.Hour + partyIdleWindow + time.Second)
+	if n, _ := pe.parties.CloseIdle(pe.ctx); n != 1 {
+		t.Fatal("unknown-duration party must close after fallback cap")
+	}
+}
+
+func untimedTrack(t *testing.T, pe *partyEnv, duration int) *model.Track {
+	t.Helper()
+	tr := pe.track(t, &model.Album{Base: model.Base{ID: pe.tracks[0].AlbumID}, ArtistID: pe.tracks[0].ArtistID}, "untimed", 9)
+	if err := pe.db.Model(tr).Update("duration_seconds", duration).Error; err != nil {
+		t.Fatal(err)
+	}
+	return tr
+}
+
+func TestDuplicateTracksInQueueTrackPlayingItem(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyEveryone).InviteCode
+	a, b := pe.tracks[0].ID, pe.tracks[1].ID
+	st, _ := pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{a, b, a})
+	before := st.Playback
+	pe.clock = pe.clock.Add(time.Minute)
+
+	st, err := pe.parties.RemoveItem(pe.ctx, pe.host, code, st.Queue[2].ID)
+	if err != nil || st.Playback.AnchorEpochMs != before.AnchorEpochMs || !slices.Equal(queueTracks(st), []uuid.UUID{a, b}) {
+		t.Fatalf("removing a later duplicate must not restart playback: %+v %v", st.Playback, err)
+	}
+
+	st, _ = pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{a})
+	playing, second, dup := st.Queue[0].ID, st.Queue[1].ID, st.Queue[2].ID
+	pe.parties.Reorder(pe.ctx, pe.host, code, []uuid.UUID{second, dup, playing})
+	st, _ = pe.parties.Next(pe.ctx, pe.host, code, nil)
+	itemIDs := ids(st.Queue, func(q dto.PartyQueueItem) uuid.UUID { return q.ID })
+	if !slices.Equal(itemIDs, []uuid.UUID{second, dup}) || st.Playback.Track.ID != b {
+		t.Fatalf("next must drop the playing item, not an earlier duplicate: %v %+v", itemIDs, st.Playback)
+	}
+}
+
+func TestPlayTargetsQueueItem(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyDJOnly).InviteCode
+	a, b := pe.tracks[0].ID, pe.tracks[1].ID
+	st, _ := pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{a, b, a})
+	first, dup := st.Queue[0].ID, st.Queue[2].ID
+	if st.Playback.QueueItemID == nil || *st.Playback.QueueItemID != first {
+		t.Fatalf("auto-play must expose the playing item: %+v", st.Playback)
+	}
+
+	st, err := pe.parties.Play(pe.ctx, pe.host, code, a, &dup, 5)
+	if err != nil || st.Playback.QueueItemID == nil || *st.Playback.QueueItemID != dup {
+		t.Fatalf("play by item must select the duplicate: %+v %v", st.Playback, err)
+	}
+	pe.parties.Pause(pe.ctx, pe.host, code, 7)
+	st, _ = pe.parties.Play(pe.ctx, pe.host, code, a, nil, 7)
+	if *st.Playback.QueueItemID != dup {
+		t.Fatalf("resuming the same track must keep the playing item: %+v", st.Playback)
+	}
+
+	_, err = pe.parties.Play(pe.ctx, pe.host, code, b, &dup, 0)
+	wantAppErr(t, err, 400, "Queue item does not match track")
+	missing := uuid.New()
+	_, err = pe.parties.Play(pe.ctx, pe.host, code, a, &missing, 0)
+	wantAppErr(t, err, 404, "Queue item not found")
+}
+
+func TestNextWithStaleExpectedItemIsNoop(t *testing.T) {
+	pe := newPartyEnv(t)
+	code := pe.create(t, model.PolicyEveryone).InviteCode
+	if _, err := pe.parties.Join(pe.ctx, pe.guest, code); err != nil {
+		t.Fatal(err)
+	}
+	a, b, c := pe.tracks[0].ID, pe.tracks[1].ID, pe.tracks[2].ID
+	st, _ := pe.parties.AddTracks(pe.ctx, pe.host, code, []uuid.UUID{a, b, c})
+	ended := *st.Playback.QueueItemID
+
+	st, err := pe.parties.Next(pe.ctx, pe.host, code, &ended)
+	if err != nil || st.Playback.Track.ID != b {
+		t.Fatalf("first advance plays b: %+v %v", st.Playback, err)
+	}
+	st, err = pe.parties.Next(pe.ctx, pe.guest, code, &ended)
+	if err != nil || st.Playback.Track.ID != b || !slices.Equal(queueTracks(st), []uuid.UUID{b, c}) {
+		t.Fatalf("second advance for the same ended item must not skip b: %v %+v %v", queueTracks(st), st.Playback, err)
 	}
 }

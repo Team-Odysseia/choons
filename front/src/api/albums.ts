@@ -22,6 +22,20 @@ export const searchAlbums = (
     })
     .then((r) => r.data)
 
+export interface AlbumPageParams {
+  page: number
+  size: number
+  query?: string
+  sort?: 'recent'
+}
+
+export const getAlbumsPage = ({ page, size, query, sort }: AlbumPageParams) =>
+  client
+    .get<AlbumResponse[]>('/music/albums', { params: { page, size, query: query || undefined, sort } })
+    .then((r) => r.data)
+
+export const getRecentAlbums = (limit: number) => getAlbumsPage({ page: 0, size: limit, sort: 'recent' })
+
 export const getAlbum = (id: string) =>
   client.get<AlbumResponse>(`/music/albums/${id}`).then((r) => r.data)
 
@@ -35,6 +49,9 @@ export const createAlbum = (title: string, artistId: string, releaseYear: number
     .post<AlbumResponse>('/admin/albums', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     .then((r) => r.data)
 }
+
+export const getAdminAlbums = () =>
+  client.get<AlbumResponse[]>('/admin/albums').then((r) => r.data)
 
 export const getAdminAlbum = (id: string) =>
   client.get<AlbumResponse>(`/admin/albums/${id}`).then((r) => r.data)

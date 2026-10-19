@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { httpError } from '@/test-utils/http'
 import AdminAlbumEditView from '../AdminAlbumEditView.vue'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -24,7 +25,7 @@ vi.mock('@/api/albums', () => ({
 
 const mockGetArtists = vi.hoisted(() => vi.fn())
 vi.mock('@/api/artists', () => ({
-  getArtists: mockGetArtists,
+  getAdminArtists: mockGetArtists,
   artistImageUrl: (id: string) => `http://test/media/images/artists/${id}`,
 }))
 
@@ -33,7 +34,7 @@ const mockUpdateAlbumTracks = vi.hoisted(() => vi.fn())
 const mockDeleteTrack = vi.hoisted(() => vi.fn())
 const mockUploadTrack = vi.hoisted(() => vi.fn())
 vi.mock('@/api/tracks', () => ({
-  getTracks: mockGetTracks,
+  getAdminTracks: mockGetTracks,
   updateAlbumTracks: mockUpdateAlbumTracks,
   deleteTrack: mockDeleteTrack,
   uploadTrack: mockUploadTrack,
@@ -234,7 +235,7 @@ describe('save', () => {
   })
 
   it('shows error toast on save failure', async () => {
-    mockUpdateAlbum.mockRejectedValue({ response: { data: { error: 'Save failed' } } })
+    mockUpdateAlbum.mockRejectedValue(httpError(400, 'Save failed'))
     const { wrapper } = await mountView()
 
     await wrapper.find('form').trigger('submit')

@@ -24,6 +24,8 @@ import (
 const (
 	maxFileBytes    = 200 << 20
 	maxRequestBytes = 1 << 30
+	maxJSONBytes    = 1 << 20
+	maxBatchItems   = 2000
 	multipartMemory = 16 << 20
 	authCookieAge   = int(auth.TokenTTL / time.Second)
 )
@@ -43,6 +45,7 @@ type Handler struct {
 	ImageTTL   time.Duration
 	SSETimeout time.Duration
 	Heartbeat  time.Duration
+	Closing    <-chan struct{}
 }
 
 func user(c *gin.Context) *model.User { return auth.CurrentUser(c) }
@@ -83,8 +86,21 @@ func page(c *gin.Context) (*service.Page, error) {
 	return &service.Page{Page: p, Size: s}, nil
 }
 
+var uploadRoutes = map[string]bool{
+	"POST /admin/artists":      true,
+	"PUT /admin/artists/:id":   true,
+	"POST /admin/albums":       true,
+	"PUT /admin/albums/:id":    true,
+	"POST /admin/tracks":       true,
+	"POST /admin/tracks/batch": true,
+}
+
 func limitBody(c *gin.Context) {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRequestBytes)
+	limit := int64(maxJSONBytes)
+	if uploadRoutes[c.Request.Method+" "+c.FullPath()] {
+		limit = maxRequestBytes
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 	c.Next()
 }
 

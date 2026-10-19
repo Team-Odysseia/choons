@@ -102,8 +102,8 @@ func openDB(ctx context.Context) (*service.Users, error) {
 }
 
 func createAdmin(ctx context.Context, username, password string) error {
-	if len(password) < 6 {
-		return errors.New("password must be at least 6 characters")
+	if err := auth.ValidatePassword(password); err != nil {
+		return err
 	}
 	users, err := openDB(ctx)
 	if err != nil {
@@ -153,6 +153,7 @@ func serve(ctx context.Context) error {
 	}
 
 	hub := party.NewHub()
+	closing := make(chan struct{})
 	parties := service.NewParties(gdb, hub)
 	h := &handler.Handler{
 		DB:         gdb,
@@ -169,6 +170,7 @@ func serve(ctx context.Context) error {
 		ImageTTL:   cfg.ImageURLTTL,
 		SSETimeout: 5 * time.Minute,
 		Heartbeat:  15 * time.Second,
+		Closing:    closing,
 	}
 
 	gin.SetMode(gin.ReleaseMode)
@@ -194,6 +196,7 @@ func serve(ctx context.Context) error {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 	}
+	srv.RegisterOnShutdown(func() { close(closing) })
 	errCh := make(chan error, 1)
 	go func() {
 		slog.Info("listening", "addr", srv.Addr)

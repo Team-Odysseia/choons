@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { usePlayerStore } from './player'
 import { fetchLyricsByLrclibId, searchLyrics } from '@/api/lyrics'
+import { isAbortError } from '@/lib/errors'
 import type { TrackResponse } from '@/api/types'
 
 export interface ParsedLine {
@@ -82,8 +83,8 @@ export const useLyricsStore = defineStore('lyrics', () => {
         lines.value = parseLrc(data.syncedLyrics)
       }
       plainLyrics.value = data.plainLyrics
-    } catch (e: any) {
-      if (e.name === 'AbortError') return
+    } catch (e) {
+      if (isAbortError(e)) return
       error.value = true
     } finally {
       loading.value = false

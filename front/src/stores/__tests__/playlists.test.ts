@@ -107,4 +107,39 @@ describe('usePlaylistsStore', () => {
       expect(store.playlists[0]!.isPublic).toBe(false)
     })
   })
+
+  describe('summary ordering', () => {
+    it('moves an edited playlist to the top like the server does', async () => {
+      const store = usePlaylistsStore()
+      store.playlists = [makeSummary({ id: 'pl-0', name: 'Top' }), makeSummary({ trackCount: 0 })]
+      mockAddTrackToPlaylist.mockResolvedValue(
+        makePlaylist({ tracks: [{ id: 't-1' }], updatedAt: '2024-02-01T00:00:00' }),
+      )
+
+      await store.addTrack('pl-1', 't-1')
+
+      expect(store.playlists.map((p) => p.id)).toEqual(['pl-1', 'pl-0'])
+      expect(store.playlists[0]).toMatchObject({ trackCount: 1, updatedAt: '2024-02-01T00:00:00' })
+    })
+
+    it('syncs the summary after a reorder', async () => {
+      const store = usePlaylistsStore()
+      store.playlists = [makeSummary({ id: 'pl-0' }), makeSummary()]
+      mockReorderPlaylist.mockResolvedValue(makePlaylist({ updatedAt: '2024-03-01T00:00:00' }))
+
+      await store.reorder('pl-1', ['t-2', 't-1'])
+
+      expect(store.playlists[0]).toMatchObject({ id: 'pl-1', updatedAt: '2024-03-01T00:00:00' })
+    })
+
+    it('ignores playlists that are not in the summary list', async () => {
+      const store = usePlaylistsStore()
+      store.playlists = [makeSummary({ id: 'pl-0' })]
+      mockRemoveTrackFromPlaylist.mockResolvedValue(makePlaylist({ id: 'someone-elses' }))
+
+      await store.removeTrack('someone-elses', 't-1')
+
+      expect(store.playlists.map((p) => p.id)).toEqual(['pl-0'])
+    })
+  })
 })

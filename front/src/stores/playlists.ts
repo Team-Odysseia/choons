@@ -55,6 +55,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   async function reorder(playlistId: string, orderedTrackIds: string[]) {
     current.value = await api.reorderPlaylist(playlistId, orderedTrackIds)
+    syncSummary(current.value)
   }
 
   async function setVisibility(playlistId: string, isPublic: boolean) {
@@ -63,16 +64,15 @@ export const usePlaylistsStore = defineStore('playlists', () => {
   }
 
   function syncSummary(playlist: PlaylistResponse) {
-    const idx = playlists.value.findIndex((p) => p.id === playlist.id)
-    if (idx !== -1) {
-      playlists.value[idx] = {
-        id: playlist.id,
-        name: playlist.name,
-        trackCount: playlist.tracks.length,
-        isPublic: playlist.isPublic,
-        updatedAt: playlist.updatedAt,
-      }
+    if (!playlists.value.some((p) => p.id === playlist.id)) return
+    const summary: PlaylistSummaryResponse = {
+      id: playlist.id,
+      name: playlist.name,
+      trackCount: playlist.tracks.length,
+      isPublic: playlist.isPublic,
+      updatedAt: playlist.updatedAt,
     }
+    playlists.value = [summary, ...playlists.value.filter((p) => p.id !== playlist.id)]
   }
 
   return {

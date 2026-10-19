@@ -35,11 +35,12 @@ func TestMain(m *testing.M) {
 }
 
 type server struct {
-	t      *testing.T
-	h      *Handler
-	router *gin.Engine
-	store  *storage.Fake
-	ctx    context.Context
+	t       *testing.T
+	closing chan struct{}
+	h       *Handler
+	router  *gin.Engine
+	store   *storage.Fake
+	ctx     context.Context
 }
 
 type opts struct {
@@ -62,13 +63,14 @@ func newServer(t *testing.T, o ...opts) *server {
 		t.Fatal(err)
 	}
 	hub := party.NewHub()
+	closing := make(chan struct{})
 	catalog := service.NewCatalog(gdb, store, nil)
 	catalog.SetAsync(func(f func()) { f() })
 	h := &Handler{
 		DB: gdb, Users: service.NewUsers(gdb), Catalog: catalog, Library: service.NewLibrary(gdb),
 		Playlists: service.NewPlaylists(gdb), Parties: service.NewParties(gdb, hub), Hub: hub, Store: store,
 		Tokens: tokens, Cookie: auth.Cookie{Name: "CHOONS_AUTH"},
-		StreamTTL: 6 * time.Hour, ImageTTL: time.Hour, SSETimeout: cfg.sseTimeout, Heartbeat: cfg.heartbeat,
+		StreamTTL: 6 * time.Hour, ImageTTL: time.Hour, SSETimeout: cfg.sseTimeout, Heartbeat: cfg.heartbeat, Closing: closing,
 	}
 	r, err := h.Router(RouterConfig{
 		CORSOrigins:   []string{testOrigin},
@@ -78,8 +80,10 @@ func newServer(t *testing.T, o ...opts) *server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &server{t: t, h: h, router: r, store: store, ctx: context.Background()}
+	return &server{t: t, closing: closing, h: h, router: r, store: store, ctx: context.Background()}
 }
+
+func (s *server) close() { close(s.closing) }
 
 type session struct {
 	s      *server

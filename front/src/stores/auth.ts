@@ -7,6 +7,7 @@ import type { UserResponse } from '@/api/types'
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserResponse | null>(null)
   const loading = ref(false)
+  let restoring: Promise<void> | null = null
 
   const isAuthenticated = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'ADMIN')
@@ -28,8 +29,13 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       user.value = await apiMe()
     } catch {
-      logout()
+      user.value = null
     }
+  }
+
+  function restoreSession() {
+    restoring ??= fetchMe()
+    return restoring
   }
 
   async function logout() {
@@ -42,5 +48,5 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, loading, isAuthenticated, isAdmin, login, logout, fetchMe }
+  return { user, loading, isAuthenticated, isAdmin, login, logout, fetchMe, restoreSession }
 })

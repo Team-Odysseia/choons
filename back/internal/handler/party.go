@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -89,7 +90,7 @@ func (h *Handler) queueTrack(c *gin.Context) {
 
 func (h *Handler) queueTracks(c *gin.Context) {
 	var req struct {
-		TrackIDs []uuid.UUID `json:"trackIds" binding:"required,notempty"`
+		TrackIDs []uuid.UUID `json:"trackIds" binding:"required,notempty,max=2000"`
 	}
 	if !httpx.BindJSON(c, &req) {
 		return
@@ -109,7 +110,7 @@ func (h *Handler) removeQueueItem(c *gin.Context) {
 
 func (h *Handler) reorderQueue(c *gin.Context) {
 	var req struct {
-		OrderedItemIDs []uuid.UUID `json:"orderedItemIds" binding:"required"`
+		OrderedItemIDs []uuid.UUID `json:"orderedItemIds" binding:"required,max=2000"`
 	}
 	if !httpx.BindJSON(c, &req) {
 		return
@@ -125,12 +126,13 @@ type positionRequest struct {
 func (h *Handler) play(c *gin.Context) {
 	var req struct {
 		TrackID     *uuid.UUID `json:"trackId" binding:"required"`
+		QueueItemID *uuid.UUID `json:"queueItemId"`
 		PositionSec float64    `json:"positionSec" binding:"gte=0"`
 	}
 	if !httpx.BindJSON(c, &req) {
 		return
 	}
-	out, err := h.Parties.Play(c.Request.Context(), user(c), c.Param("code"), *req.TrackID, req.PositionSec)
+	out, err := h.Parties.Play(c.Request.Context(), user(c), c.Param("code"), *req.TrackID, req.QueueItemID, req.PositionSec)
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 
@@ -153,7 +155,14 @@ func (h *Handler) seek(c *gin.Context) {
 }
 
 func (h *Handler) next(c *gin.Context) {
-	out, err := h.Parties.Next(c.Request.Context(), user(c), c.Param("code"))
+	var req struct {
+		ExpectedQueueItemID *uuid.UUID `json:"expectedQueueItemId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		httpx.Fail(c, httpx.ValidationError(err))
+		return
+	}
+	out, err := h.Parties.Next(c.Request.Context(), user(c), c.Param("code"), req.ExpectedQueueItemID)
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 
@@ -169,7 +178,7 @@ func writeEvent(w io.Writer, name string, data []byte) error {
 
 func (h *Handler) partyEvents(c *gin.Context) {
 	code := c.Param("code")
-	sub := h.Hub.Subscribe(code)
+	sub := h.Hub.Subscribe(code, user(c).ID)
 	defer h.Hub.Unsubscribe(sub)
 
 	state, err := h.Parties.State(c.Request.Context(), user(c), code)
@@ -203,6 +212,8 @@ func (h *Handler) partyEvents(c *gin.Context) {
 		case <-c.Request.Context().Done():
 			return
 		case <-timeout.C:
+			return
+		case <-h.Closing:
 			return
 		case <-heartbeat.C:
 			if writeEvent(w, "heartbeat", []byte("ok")) != nil {

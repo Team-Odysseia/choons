@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { usePlaylistsStore } from '@/stores/playlists'
 import type { TrackResponse } from '@/api/types'
+import { apiErrorMessage, apiStatus } from '@/lib/errors'
 
 const props = defineProps<{
   open: boolean
@@ -27,15 +28,36 @@ const subtitle = computed(() => {
   return `${props.tracks.length} tracks from "${firstTrack.album.title}"`
 })
 
+async function addTracks(playlistId: string, playlistName: string) {
+  let added = 0
+  let duplicates = 0
+  for (const track of props.tracks) {
+    try {
+      await playlists.addTrack(playlistId, track.id)
+      added++
+    } catch (e) {
+      if (apiStatus(e) !== 409) {
+        toast.error(apiErrorMessage(e, 'Failed to add to playlist'))
+        return false
+      }
+      duplicates++
+    }
+  }
+  if (added === 0) {
+    toast.info(`Already in "${playlistName}"`)
+  } else if (duplicates > 0) {
+    toast.success(`Added ${added} to "${playlistName}", ${duplicates} already there`)
+  } else {
+    toast.success(`Added to "${playlistName}"`)
+  }
+  return true
+}
+
 async function addToPlaylist(playlistId: string) {
   addingTo.value = playlistId
   try {
-    for (const track of props.tracks) {
-      await playlists.addTrack(playlistId, track.id)
-    }
     const pl = playlists.playlists.find((p) => p.id === playlistId)
-    toast.success(`Added to "${pl?.name ?? 'playlist'}"`)
-    emit('close')
+    if (await addTracks(playlistId, pl?.name ?? 'playlist')) emit('close')
   } finally {
     addingTo.value = null
   }
@@ -47,12 +69,10 @@ async function createAndAdd() {
   creating.value = true
   try {
     const created = await playlists.createPlaylist(name)
-    for (const track of props.tracks) {
-      await playlists.addTrack(created.id, track.id)
-    }
-    toast.success(`Added to "${created.name}"`)
     newPlaylistName.value = ''
-    emit('close')
+    if (await addTracks(created.id, created.name)) emit('close')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to create playlist'))
   } finally {
     creating.value = false
   }

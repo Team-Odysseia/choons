@@ -23,11 +23,11 @@ func TestPartyEndpoints(t *testing.T) {
 	host.json(http.MethodPost, "/parties", map[string]string{"name": "x"}).errorIs(400, "queuePolicy must not be null")
 	host.json(http.MethodPost, "/parties", map[string]string{"name": "x", "queuePolicy": "ANYONE"}).errorIs(400, "queuePolicy must be one of [DJ_ONLY, EVERYONE]")
 	st := host.json(http.MethodPost, "/parties", map[string]string{"name": "Friday", "queuePolicy": "DJ_ONLY"}).status(http.StatusCreated).keys()
-	if sortedKeys(st) != "hostUserId,id,inviteCode,members,name,playback,queue,queuePolicy" {
+	if sortedKeys(st) != "hostUserId,id,inviteCode,members,name,playback,queue,queuePolicy,revision" {
 		t.Fatalf("state keys %s", sortedKeys(st))
 	}
 	pb := st["playback"].(map[string]any)
-	if sortedKeys(pb) != "anchorEpochMs,anchorPositionSec,playing,track" || pb["track"] != nil {
+	if sortedKeys(pb) != "anchorEpochMs,anchorPositionSec,playing,queueItemId,track" || pb["track"] != nil || pb["queueItemId"] != nil {
 		t.Fatalf("playback %v", pb)
 	}
 	member := st["members"].([]any)[0].(map[string]any)
@@ -48,7 +48,22 @@ func TestPartyEndpoints(t *testing.T) {
 		t.Fatalf("queue item %v", item)
 	}
 	host.json(http.MethodPost, "/parties/"+code+"/queue/batch", map[string]any{"trackIds": []string{}}).errorIs(400, "trackIds must not be empty")
-	host.json(http.MethodPost, "/parties/"+code+"/queue/batch", map[string]any{"trackIds": []string{ids.track}}).status(200)
+	st = host.json(http.MethodPost, "/parties/"+code+"/queue/batch", map[string]any{"trackIds": []string{ids.track}}).status(200).keys()
+	firstItem := item["id"].(string)
+	dupItem := st["queue"].([]any)[1].(map[string]any)["id"].(string)
+	if st["playback"].(map[string]any)["queueItemId"] != firstItem {
+		t.Fatalf("playback must expose the playing item: %v", st["playback"])
+	}
+	st = host.json(http.MethodPost, "/parties/"+code+"/playback/play", map[string]any{"trackId": ids.track, "queueItemId": dupItem, "positionSec": 0}).status(200).keys()
+	if st["playback"].(map[string]any)["queueItemId"] != dupItem {
+		t.Fatalf("play by item: %v", st["playback"])
+	}
+	host.json(http.MethodPost, "/parties/"+code+"/playback/play", map[string]any{"trackId": ids.track, "queueItemId": "nope", "positionSec": 0}).status(400)
+	st = host.json(http.MethodPost, "/parties/"+code+"/playback/next", map[string]string{"expectedQueueItemId": firstItem}).status(200).keys()
+	if len(st["queue"].([]any)) != 2 {
+		t.Fatalf("stale expected item must not advance: %v", st["queue"])
+	}
+	host.json(http.MethodPost, "/parties/"+code+"/playback/play", map[string]any{"trackId": ids.track, "queueItemId": firstItem, "positionSec": 0}).status(200)
 	host.json(http.MethodPost, "/parties/"+code+"/playback/pause", map[string]float64{"positionSec": -1}).errorIs(400, "positionSec must be greater than or equal to 0")
 	host.json(http.MethodPost, "/parties/"+code+"/playback/pause", map[string]float64{"positionSec": 12}).status(200)
 	host.json(http.MethodPost, "/parties/"+code+"/playback/seek", map[string]float64{"positionSec": 30}).status(200)
@@ -228,5 +243,62 @@ func TestPartySSETimeout(t *testing.T) {
 	}
 	if _, ok := next(t, events); ok {
 		t.Fatal("expected stream to close at timeout")
+	}
+}
+
+func openSSE(t *testing.T, srv *httptest.Server, sess *session, code string) <-chan sseEvent {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/parties/"+code+"/events", nil)
+	req.AddCookie(sess.cookie)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("sse status %d", resp.StatusCode)
+	}
+	events := make(chan sseEvent, 16)
+	go readEvents(t, bufio.NewScanner(resp.Body), events)
+	if ev, _ := next(t, events); ev.name != "state" {
+		t.Fatalf("initial %+v", ev)
+	}
+	return events
+}
+
+func TestPartySSEClosesOnShutdown(t *testing.T) {
+	s := newServer(t)
+	host := s.login("host", model.RoleListener)
+	code := host.json(http.MethodPost, "/parties", map[string]string{"name": "T", "queuePolicy": "EVERYONE"}).status(201).keys()["inviteCode"].(string)
+	srv := httptest.NewServer(s.router)
+	t.Cleanup(srv.Close)
+	events := openSSE(t, srv, host, code)
+
+	s.close()
+	if _, ok := next(t, events); ok {
+		t.Fatal("expected stream to close on shutdown")
+	}
+}
+
+func TestKickedMemberStreamEnds(t *testing.T) {
+	s := newServer(t)
+	host := s.login("host", model.RoleListener)
+	guest := s.login("guest", model.RoleListener)
+	code := host.json(http.MethodPost, "/parties", map[string]string{"name": "T", "queuePolicy": "EVERYONE"}).status(201).keys()["inviteCode"].(string)
+	guest.json(http.MethodPost, "/parties/join", map[string]string{"inviteCode": code}).status(200)
+	srv := httptest.NewServer(s.router)
+	t.Cleanup(srv.Close)
+	hostEvents := openSSE(t, srv, host, code)
+	guestEvents := openSSE(t, srv, guest, code)
+
+	host.json(http.MethodPost, "/parties/"+code+"/members/"+guest.user.ID.String()+"/kick", nil).status(200)
+	if ev, ok := next(t, guestEvents); !ok || ev.name != "ended" {
+		t.Fatalf("kicked guest should get ended: %+v %v", ev, ok)
+	}
+	if _, ok := next(t, guestEvents); ok {
+		t.Fatal("kicked guest stream should close")
+	}
+	if ev, ok := next(t, hostEvents); !ok || ev.name != "state" {
+		t.Fatalf("host keeps streaming: %+v %v", ev, ok)
 	}
 }

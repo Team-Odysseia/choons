@@ -1,16 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
+import { httpError } from '@/test-utils/http'
 import AddToPlaylistDialog from '../AddToPlaylistDialog.vue'
 import { usePlaylistsStore } from '@/stores/playlists'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockToastSuccess = vi.hoisted(() => vi.fn())
+const mockToastError = vi.hoisted(() => vi.fn())
+const mockToastInfo = vi.hoisted(() => vi.fn())
 vi.mock('vue-sonner', () => ({
   Toaster: { template: '<div />' },
-  toast: { success: mockToastSuccess, error: vi.fn() },
+  toast: { success: mockToastSuccess, error: mockToastError, info: mockToastInfo },
 }))
+
 
 vi.mock('@/api/playlists', () => ({
   getPlaylists: vi.fn().mockResolvedValue([]),
@@ -251,5 +255,69 @@ describe('close', () => {
     const closeBtn = wrapper.find('[aria-label="Close dialog"]')
     await closeBtn.trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
+  })
+})
+
+describe('duplicates and failures', () => {
+  beforeEach(() => {
+    mockToastSuccess.mockReset()
+    mockToastError.mockReset()
+    mockToastInfo.mockReset()
+  })
+
+  it('skips tracks already in the playlist and reports it', async () => {
+    const { wrapper, store } = mountDialog([track1, track2, track3])
+    store.$patch({ playlists: [pl1] })
+    store.addTrack = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(httpError(409, 'Track already in playlist'))
+      .mockResolvedValueOnce(undefined)
+    await flushPromises()
+
+    await wrapper.findAll('button').find((b) => b.text().includes('My Favourites'))!.trigger('click')
+    await flushPromises()
+
+    expect(store.addTrack).toHaveBeenCalledTimes(3)
+    expect(mockToastSuccess).toHaveBeenCalledWith('Added 2 to "My Favourites", 1 already there')
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('tells the user when every track was already there', async () => {
+    const { wrapper, store } = mountDialog([track1])
+    store.$patch({ playlists: [pl1] })
+    store.addTrack = vi.fn().mockRejectedValue(httpError(409, 'Track already in playlist'))
+    await flushPromises()
+
+    await wrapper.findAll('button').find((b) => b.text().includes('My Favourites'))!.trigger('click')
+    await flushPromises()
+
+    expect(mockToastInfo).toHaveBeenCalledWith('Already in "My Favourites"')
+  })
+
+  it('stops and keeps the dialog open on other errors', async () => {
+    const { wrapper, store } = mountDialog([track1, track2])
+    store.$patch({ playlists: [pl1] })
+    store.addTrack = vi.fn().mockRejectedValue(httpError(403, 'Access denied'))
+    await flushPromises()
+
+    await wrapper.findAll('button').find((b) => b.text().includes('My Favourites'))!.trigger('click')
+    await flushPromises()
+
+    expect(store.addTrack).toHaveBeenCalledTimes(1)
+    expect(mockToastError).toHaveBeenCalledWith('Access denied')
+    expect(wrapper.emitted('close')).toBeFalsy()
+  })
+
+  it('reports a failed playlist creation', async () => {
+    const { wrapper, store } = mountDialog([track1])
+    store.createPlaylist = vi.fn().mockRejectedValue(httpError(400, 'name size must be between 0 and 120'))
+
+    await wrapper.find('input').setValue('x')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(mockToastError).toHaveBeenCalledWith('name size must be between 0 and 120')
+    expect(wrapper.emitted('close')).toBeFalsy()
   })
 })

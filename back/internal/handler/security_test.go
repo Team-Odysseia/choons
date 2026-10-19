@@ -86,3 +86,62 @@ func TestStreamRateLimitCoversPlayed(t *testing.T) {
 	admin.get("/stream/"+ids.track).errorIs(http.StatusTooManyRequests, "Too many requests")
 	admin.get("/music/tracks/" + ids.track).status(http.StatusOK)
 }
+
+func TestCrossOriginWritesRejected(t *testing.T) {
+	s := newServer(t)
+	listener := s.login("bob", model.RoleListener)
+	send := func(method, path string, headers map[string]string) *response {
+		req := httptest.NewRequest(method, path, strings.NewReader(`{"name":"pwned"}`))
+		req.Header.Set("Content-Type", "text/plain")
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		return listener.do(req)
+	}
+
+	send(http.MethodPost, "/playlists", map[string]string{"Origin": "https://evil.example"}).errorIs(http.StatusForbidden, "Forbidden")
+	send(http.MethodPost, "/playlists", map[string]string{"Sec-Fetch-Site": "cross-site"}).errorIs(http.StatusForbidden, "Forbidden")
+	if mine := listener.get("/playlists"); mine.Body.String() != "[]" {
+		t.Fatalf("cross-site write persisted: %s", mine.Body.String())
+	}
+
+	send(http.MethodPost, "/playlists", map[string]string{"Origin": testOrigin, "Sec-Fetch-Site": "cross-site"}).status(http.StatusCreated)
+	send(http.MethodPost, "/playlists", nil).status(http.StatusCreated)
+
+	req := httptest.NewRequest(http.MethodGet, "/playlists", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	listener.do(req).status(http.StatusOK)
+}
+
+func TestRequestSizeLimits(t *testing.T) {
+	s := newServer(t)
+	admin := s.login("root", model.RoleAdmin)
+	ids := s.seedCatalog(admin)
+	host := s.login("host", model.RoleListener)
+
+	huge := `{"name":"` + strings.Repeat("x", 2<<20) + `"}`
+	host.raw(http.MethodPost, "/playlists", "application/json", strings.NewReader(huge)).errorIs(http.StatusRequestEntityTooLarge, "Request body too large")
+
+	code := host.json(http.MethodPost, "/parties", map[string]string{"name": "P", "queuePolicy": "EVERYONE"}).status(http.StatusCreated).keys()["inviteCode"].(string)
+	tooMany := make([]string, 2001)
+	for i := range tooMany {
+		tooMany[i] = ids.track
+	}
+	host.json(http.MethodPost, "/parties/"+code+"/queue/batch", map[string]any{"trackIds": tooMany}).
+		errorIs(http.StatusBadRequest, "trackIds must contain at most 2000 elements")
+	host.json(http.MethodPut, "/parties/"+code+"/queue/reorder", map[string]any{"orderedItemIds": tooMany}).
+		errorIs(http.StatusBadRequest, "orderedItemIds must contain at most 2000 elements")
+	host.json(http.MethodPut, "/playlists/"+ids.track+"/tracks/order", map[string]any{"orderedTrackIds": tooMany}).
+		errorIs(http.StatusBadRequest, "orderedTrackIds must contain at most 2000 elements")
+	updates := make([]map[string]any, 2001)
+	for i := range updates {
+		updates[i] = map[string]any{"id": ids.track, "title": "t", "trackNumber": 1}
+	}
+	admin.json(http.MethodPut, "/admin/albums/"+ids.album+"/tracks", updates).
+		errorIs(http.StatusBadRequest, "At most 2000 tracks can be updated at once")
+
+	big := append(append([]byte{}, flac...), make([]byte, 2<<20)...)
+	admin.multipart(http.MethodPost, "/admin/tracks", field("title", "Big"), field("albumId", ids.album),
+		field("artistId", ids.artist), field("trackNumber", "3"), filePart("audioFile", "audio/flac", big)).status(http.StatusCreated)
+}

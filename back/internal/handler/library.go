@@ -247,7 +247,7 @@ func (h *Handler) reorderPlaylist(c *gin.Context) {
 		return
 	}
 	var req struct {
-		OrderedTrackIDs []uuid.UUID `json:"orderedTrackIds" binding:"required,notempty"`
+		OrderedTrackIDs []uuid.UUID `json:"orderedTrackIds" binding:"required,notempty,max=2000"`
 	}
 	if !httpx.BindJSON(c, &req) {
 		return
