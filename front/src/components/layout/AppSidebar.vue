@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed } from 'vue'
 import { Disc3, Heart, Inbox, Library, ListMusic, LogOut, MicVocal, PartyPopper, Search, Send, Users, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import { IconKey } from '@/components/vfd'
+import { BrandPlate, IconKey } from '@/components/vfd'
 import SourceButton from './SourceButton.vue'
 import { listAllAlbumRequests } from '@/api/albumRequests'
 import { Input } from '@/components/ui/input'
@@ -196,12 +196,7 @@ onBeforeUnmount(() => {
     />
 
     <div class="flex-1 overflow-y-auto px-[18px] py-[22px]">
-      <div class="chrome-plate flex flex-col gap-1 rounded px-3.5 py-3">
-        <span class="font-label text-[22px] leading-none tracking-[0.22em] [text-shadow:0_1px_0_#ffffff80]">CHOONS</span>
-        <span class="flex items-center gap-2 font-label text-[7px] tracking-[0.2em] text-[#2B3339]" aria-hidden="true">
-          VFD-1440<span class="h-px flex-1 bg-[#2B333966]" />DIGITAL AUDIO
-        </span>
-      </div>
+      <BrandPlate />
 
       <div class="px-3.5 pb-1.5 pt-[18px] font-label text-[8px] uppercase tracking-[0.3em] text-faint" aria-hidden="true">Source</div>
       <ul class="flex list-none flex-col gap-1">
