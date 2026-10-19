@@ -135,14 +135,14 @@ describe('fetchMe', () => {
     expect(mockMe).toHaveBeenCalled()
   })
 
-  it('em erro da API, chama logout', async () => {
-    mockMe.mockRejectedValueOnce(new Error('401'))
+  it('em erro da API, limpa o user sem apagar o cookie de sessão', async () => {
+    mockMe.mockRejectedValueOnce(new Error('network'))
 
     const store = useAuthStore()
     await store.fetchMe()
 
     expect(store.user).toBeNull()
-    expect(mockLogout).toHaveBeenCalledOnce()
+    expect(mockLogout).not.toHaveBeenCalled()
   })
 })
 

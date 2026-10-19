@@ -28,7 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       user.value = await apiMe()
     } catch {
-      logout()
+      user.value = null
     }
   }
 
