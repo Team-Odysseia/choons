@@ -65,7 +65,7 @@ describe('AdminAlbumsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Album')!.trigger('click')
-    const form = wrapper.find('form.create-layout')
+    const form = wrapper.find('[data-testid="create-album-form"]')
     await form.find('input').setValue('Kindred')
     await form.find('select').setValue('ar-1')
     await form.trigger('submit')
@@ -80,7 +80,7 @@ describe('AdminAlbumsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Album')!.trigger('click')
-    const form = wrapper.find('form.create-layout')
+    const form = wrapper.find('[data-testid="create-album-form"]')
     await form.find('input').setValue('Kindred')
     await form.find('select').setValue('ar-1')
     await form.trigger('submit')
@@ -105,5 +105,12 @@ describe('AdminAlbumsView', () => {
     albumsApi.getAdminAlbums.mockRejectedValue(httpError(500))
     await mountView()
     expect(toastMock.error).toHaveBeenCalledWith('Failed to load albums')
+  })
+
+  it('shows a no match plate when no albums match', async () => {
+    albumsApi.getAdminAlbums.mockResolvedValue([])
+    const { wrapper } = await mountView()
+    expect(wrapper.text()).toContain('No albums found.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO MATCH')
   })
 })
