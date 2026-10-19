@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useArtistQuery, useAlbumsQuery } from '@/composables/queries'
 import { artistImageUrl } from '@/api/artists'
@@ -11,7 +11,11 @@ const id = computed(() => route.params.id as string)
 
 const { data: artist, isPending, isError } = useArtistQuery(id)
 const { data: albums } = useAlbumsQuery(id)
-const avatar = computed(() => (artist.value?.avatarUrl ? artistImageUrl(artist.value.id) : null))
+const avatarFailed = ref(false)
+const avatar = computed(() => (artist.value?.avatarUrl && !avatarFailed.value ? artistImageUrl(artist.value.id) : null))
+watch(id, () => {
+  avatarFailed.value = false
+})
 
 function isNew(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
@@ -22,9 +26,16 @@ function isNew(createdAt: string) {
   <div v-if="!isPending && artist" class="flex flex-col gap-9">
     <section class="vfd-well vfd-scanlines flex flex-col gap-6 rounded-lg p-6 md:flex-row md:items-center md:gap-8 md:p-7">
       <div class="size-[140px] shrink-0 rounded-full bg-[linear-gradient(to_top,#0D1114,#DCE3E8)] p-[5px] shadow-[0_10px_24px_#000,0_0_24px_#5CF6E833] md:size-[200px]">
-        <img v-if="avatar" :src="avatar" :alt="artist.name + ' avatar'" class="size-full rounded-full object-cover" />
+        <img
+          v-if="avatar"
+          :src="avatar"
+          :alt="artist.name + ' avatar'"
+          class="size-full rounded-full object-cover"
+          @error="avatarFailed = true"
+        />
         <div
           v-else
+          data-placeholder
           aria-hidden="true"
           class="flex size-full items-center justify-center rounded-full bg-[linear-gradient(200deg,#123B3A,#0A1114)] font-display text-6xl font-extrabold text-cyan glow-lg"
         >{{ artist.name[0]?.toUpperCase() }}</div>

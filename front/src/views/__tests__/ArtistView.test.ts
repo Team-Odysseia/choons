@@ -62,4 +62,12 @@ describe('ArtistView', () => {
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/library/albums/al-1')
   })
+
+  it('falls back to the initial when the avatar fails to load', async () => {
+    getArtist.mockResolvedValue(makeArtist({ avatarUrl: 'x.jpg' }))
+    const { wrapper } = await mountView()
+    await wrapper.find('section img').trigger('error')
+    expect(wrapper.find('section img').exists()).toBe(false)
+    expect(wrapper.find('[data-placeholder]').text()).toBe('B')
+  })
 })

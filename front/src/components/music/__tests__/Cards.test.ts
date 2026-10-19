@@ -74,6 +74,18 @@ describe('ArtistCard', () => {
   })
 })
 
+describe('ArtistCard fallback', () => {
+  it('falls back to the initial when the avatar fails to load', async () => {
+    const wrapper = mount(ArtistCard, {
+      props: { artist: makeArtist({ name: 'Haldor', avatarUrl: 'x.jpg' }) },
+      ...(await routerPlugin()),
+    })
+    await wrapper.find('img').trigger('error')
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('[data-placeholder]').text()).toBe('H')
+  })
+})
+
 describe('SongCard', () => {
   it('emits play when clicked', async () => {
     const wrapper = mount(SongCard, { props: { track: makeTrack() } })

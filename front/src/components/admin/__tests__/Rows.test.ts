@@ -21,6 +21,13 @@ describe('AdminRow', () => {
     expect(wrapper.find('[aria-label="Delete"]').attributes('disabled')).toBeDefined()
   })
 
+  it('replaces a broken thumbnail with a placeholder', async () => {
+    const wrapper = mount(AdminRow, { props: { primary: 'x', thumb: '/missing.jpg' } })
+    await wrapper.find('img').trigger('error')
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('[data-placeholder]').exists()).toBe(true)
+  })
+
   it('shows Blocked badge when blocked', () => {
     expect(mount(AdminRow, { props: { primary: 'x' } }).text()).not.toContain('Blocked')
     expect(mount(AdminRow, { props: { primary: 'x', blocked: true } }).text()).toContain('Blocked')
