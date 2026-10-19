@@ -101,7 +101,7 @@ function goToSearch() {
         @next="scrollSwiper('right')"
       />
       <div ref="swiperRef" data-testid="recent-albums" class="swiper-track flex gap-6 overflow-x-auto pb-2">
-        <AlbumCard v-for="album in recentAlbums" :key="album.id" :album="album" :is-new="isNew(album.createdAt)" />
+        <AlbumCard v-for="album in recentAlbums" :key="album.id" :album="album" :is-new="isNew(album.createdAt)" push />
       </div>
     </section>
 

@@ -174,3 +174,21 @@ describe('navigation', () => {
     expect(router.currentRoute.value.path).toBe('/library/albums/al-99')
   })
 })
+
+describe('grid hover', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('squeezes the following cards in the row instead of pushing them out', async () => {
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'One', 30), makeAlbum('al-2', 'Two', 30), makeAlbum('al-3', 'Three', 30)])
+    const { wrapper } = mountView()
+    await flushPromises()
+    const cards = wrapper.findAll('[data-album-card]')
+    expect(cards[0]!.classes()).not.toContain('album-card--push')
+    await cards[0]!.trigger('mouseover')
+    expect((cards[1]!.element as HTMLElement).style.transform).toBe('translateX(56px)')
+    expect((cards[2]!.element as HTMLElement).style.transform).toBe('')
+  })
+})

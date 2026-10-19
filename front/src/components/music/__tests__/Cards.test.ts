@@ -57,6 +57,18 @@ describe('AlbumCard', () => {
     expect(classes).toContain('focus-visible:z-10')
   })
 
+  it('is marked as an album card for grid squeezing', async () => {
+    const wrapper = mount(AlbumCard, { props: { album: makeAlbum() }, ...(await routerPlugin()) })
+    expect(wrapper.find('a').attributes('data-album-card')).toBeDefined()
+  })
+
+  it('widens on hover in carousels when push is set', async () => {
+    const plain = mount(AlbumCard, { props: { album: makeAlbum() }, ...(await routerPlugin()) })
+    expect(plain.find('a').classes()).not.toContain('album-card--push')
+    const pushing = mount(AlbumCard, { props: { album: makeAlbum(), push: true }, ...(await routerPlugin()) })
+    expect(pushing.find('a').classes()).toContain('album-card--push')
+  })
+
   it('uses meta when given, otherwise artist name', async () => {
     const def = mount(AlbumCard, { props: { album: makeAlbum() }, ...(await routerPlugin()) })
     expect(def.text()).toContain('Burial')

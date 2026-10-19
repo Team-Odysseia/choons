@@ -70,4 +70,12 @@ describe('ArtistView', () => {
     expect(wrapper.find('section img').exists()).toBe(false)
     expect(wrapper.find('[data-placeholder]').text()).toBe('B')
   })
+
+  it('squeezes neighbouring albums on hover', async () => {
+    getAlbums.mockResolvedValue([makeAlbum({ id: 'a1' }), makeAlbum({ id: 'a2' }), makeAlbum({ id: 'a3' })])
+    const { wrapper } = await mountView()
+    const cards = wrapper.findAll('[data-album-card]')
+    await cards[0]!.trigger('mouseover')
+    expect((cards[1]!.element as HTMLElement).style.transform).toBe('translateX(56px)')
+  })
 })

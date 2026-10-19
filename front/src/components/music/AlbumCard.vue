@@ -5,7 +5,7 @@ import type { AlbumResponse } from '@/api/types'
 import { albumImageUrl } from '@/api/albums'
 import { CoverArt, IconKey, VfdBadge } from '@/components/vfd'
 
-const props = defineProps<{ album: AlbumResponse; meta?: string; isNew?: boolean; playable?: boolean }>()
+const props = defineProps<{ album: AlbumResponse; meta?: string; isNew?: boolean; playable?: boolean; push?: boolean }>()
 const emit = defineEmits<{ play: [album: AlbumResponse] }>()
 
 const cover = computed(() => (props.album.coverUrl ? albumImageUrl(props.album.id) : null))
@@ -15,7 +15,11 @@ const subtitle = computed(() => props.meta ?? props.album.artist.name)
 <template>
   <RouterLink
     :to="`/library/albums/${album.id}`"
-    class="album-card group relative flex w-[184px] shrink-0 flex-col gap-2.5 hover:z-10 focus-visible:z-10 focus-visible:outline-none"
+    data-album-card
+    :class="[
+      'album-card group relative flex w-[184px] shrink-0 flex-col gap-2.5 hover:z-10 focus-visible:z-10 focus-visible:outline-none',
+      push && 'album-card--push',
+    ]"
   >
     <div class="relative size-[184px]">
       <span aria-hidden="true" class="album-card__disc" />
@@ -36,12 +40,21 @@ const subtitle = computed(() => props.meta ?? props.album.artist.name)
         @click.prevent.stop="emit('play', album)"
       />
     </div>
-    <span class="truncate text-[15px] text-fg transition-colors group-hover:text-cyan group-hover:glow-sm">{{ album.title }}</span>
-    <span class="-mt-1 truncate text-[13px] text-soft">{{ subtitle }}</span>
+    <span class="max-w-[184px] truncate text-[15px] text-fg transition-colors group-hover:text-cyan group-hover:glow-sm">{{ album.title }}</span>
+    <span class="-mt-1 max-w-[184px] truncate text-[13px] text-soft">{{ subtitle }}</span>
   </RouterLink>
 </template>
 
 <style scoped>
+.album-card {
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.album-card--push:hover,
+.album-card--push:focus-visible {
+  width: 240px;
+}
+
 .album-card__disc {
   position: absolute;
   top: 6px;
@@ -73,6 +86,9 @@ const subtitle = computed(() => props.meta ?? props.album.artist.name)
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .album-card {
+    transition: none;
+  }
   .album-card__disc {
     transition: none;
   }

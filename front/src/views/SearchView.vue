@@ -14,6 +14,7 @@ import ArtistCard from '@/components/music/ArtistCard.vue'
 import PlaylistTile from '@/components/music/PlaylistTile.vue'
 import SongCard from '@/components/music/SongCard.vue'
 import { PageHeader, Readout, SectionHeader, StatePlate } from '@/components/vfd'
+import { useRowSqueeze } from '@/composables/useRowSqueeze'
 import type {
   PlaylistSummaryResponse,
   TrackResponse,
@@ -41,6 +42,8 @@ const playlistsRef = ref<HTMLElement | null>(null)
 const tracksRef = ref<HTMLElement | null>(null)
 const albumsRef = ref<HTMLElement | null>(null)
 const artistsRef = ref<HTMLElement | null>(null)
+const albumsSqueezeRef = computed(() => albumsRef.value ?? undefined)
+useRowSqueeze(albumsSqueezeRef, 56, () => showAllAlbums.value)
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 let abortController: AbortController | null = null
@@ -236,7 +239,7 @@ async function runSearch(rawQuery: string) {
         ref="albumsRef"
         :class="showAllAlbums ? 'flex flex-wrap gap-x-6 gap-y-8' : 'swiper-track flex gap-6 overflow-x-auto pb-2'"
       >
-        <AlbumCard v-for="album in albumsPreview" :key="album.id" :album="album" />
+        <AlbumCard v-for="album in albumsPreview" :key="album.id" :album="album" :push="!showAllAlbums" />
       </div>
     </section>
 

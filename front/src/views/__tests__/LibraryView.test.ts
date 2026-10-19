@@ -165,6 +165,13 @@ describe('recently added albums swiper', () => {
     expect(router.currentRoute.value.path).toBe('/library/albums/al-42')
   })
 
+  it('recently added cards push their neighbours aside on hover', async () => {
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album', 3)])
+    const { wrapper } = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="recent-albums"] a').classes()).toContain('album-card--push')
+  })
+
   it('renders scroll buttons', async () => {
     mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'Album', 3)])
     const { wrapper } = mountView()

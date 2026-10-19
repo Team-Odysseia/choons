@@ -5,6 +5,7 @@ import { useArtistQuery, useAlbumsQuery } from '@/composables/queries'
 import { artistImageUrl } from '@/api/artists'
 import AlbumCard from '@/components/music/AlbumCard.vue'
 import { Readout, SectionHeader, StatePlate } from '@/components/vfd'
+import { useRowSqueeze } from '@/composables/useRowSqueeze'
 
 const route = useRoute()
 const id = computed(() => route.params.id as string)
@@ -12,6 +13,8 @@ const id = computed(() => route.params.id as string)
 const { data: artist, isPending, isError } = useArtistQuery(id)
 const { data: albums } = useAlbumsQuery(id)
 const avatarFailed = ref(false)
+const albumRow = ref<HTMLElement>()
+useRowSqueeze(albumRow)
 const avatar = computed(() => (artist.value?.avatarUrl && !avatarFailed.value ? artistImageUrl(artist.value.id) : null))
 watch(id, () => {
   avatarFailed.value = false
@@ -53,7 +56,7 @@ function isNew(createdAt: string) {
     <section class="flex flex-col gap-[18px]">
       <SectionHeader title="Albums" :count="albums?.length" />
       <StatePlate v-if="!albums?.length" code="NO DISC" message="No albums yet." />
-      <div v-else data-testid="artist-albums" class="flex flex-wrap gap-x-[46px] gap-y-8">
+      <div v-else ref="albumRow" data-testid="artist-albums" class="flex flex-wrap gap-x-[46px] gap-y-8">
         <AlbumCard
           v-for="album in albums"
           :key="album.id"

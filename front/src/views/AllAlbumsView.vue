@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import AlbumCard from '@/components/music/AlbumCard.vue'
 import { PageHeader, StatePlate } from '@/components/vfd'
+import { useRowSqueeze } from '@/composables/useRowSqueeze'
 
 const search = ref('')
 const debouncedSearch = ref('')
@@ -29,6 +30,8 @@ const {
   fetchNextPage,
 } = useAllAlbumsInfiniteQuery(debouncedSearch)
 const albums = computed(() => albumPages.value?.pages.flat() ?? [])
+const grid = ref<HTMLElement>()
+useRowSqueeze(grid)
 
 function isNew(createdAt: string) {
   return Date.now() - new Date(createdAt).getTime() < 14 * 24 * 60 * 60 * 1000
@@ -46,6 +49,7 @@ function isNew(createdAt: string) {
     <StatePlate v-else-if="!albums.length" code="NO ALBUMS" message="No albums yet. Ask an admin to add some music." />
     <div
       v-else
+      ref="grid"
       data-testid="album-grid"
       class="grid grid-cols-[repeat(auto-fill,minmax(184px,1fr))] justify-items-center gap-x-6 gap-y-8 md:justify-items-start"
     >
