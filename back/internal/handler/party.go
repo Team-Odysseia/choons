@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -125,12 +126,13 @@ type positionRequest struct {
 func (h *Handler) play(c *gin.Context) {
 	var req struct {
 		TrackID     *uuid.UUID `json:"trackId" binding:"required"`
+		QueueItemID *uuid.UUID `json:"queueItemId"`
 		PositionSec float64    `json:"positionSec" binding:"gte=0"`
 	}
 	if !httpx.BindJSON(c, &req) {
 		return
 	}
-	out, err := h.Parties.Play(c.Request.Context(), user(c), c.Param("code"), *req.TrackID, req.PositionSec)
+	out, err := h.Parties.Play(c.Request.Context(), user(c), c.Param("code"), *req.TrackID, req.QueueItemID, req.PositionSec)
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 
@@ -153,7 +155,14 @@ func (h *Handler) seek(c *gin.Context) {
 }
 
 func (h *Handler) next(c *gin.Context) {
-	out, err := h.Parties.Next(c.Request.Context(), user(c), c.Param("code"))
+	var req struct {
+		ExpectedQueueItemID *uuid.UUID `json:"expectedQueueItemId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		httpx.Fail(c, httpx.ValidationError(err))
+		return
+	}
+	out, err := h.Parties.Next(c.Request.Context(), user(c), c.Param("code"), req.ExpectedQueueItemID)
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 

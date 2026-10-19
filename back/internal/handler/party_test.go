@@ -27,7 +27,7 @@ func TestPartyEndpoints(t *testing.T) {
 		t.Fatalf("state keys %s", sortedKeys(st))
 	}
 	pb := st["playback"].(map[string]any)
-	if sortedKeys(pb) != "anchorEpochMs,anchorPositionSec,playing,track" || pb["track"] != nil {
+	if sortedKeys(pb) != "anchorEpochMs,anchorPositionSec,playing,queueItemId,track" || pb["track"] != nil || pb["queueItemId"] != nil {
 		t.Fatalf("playback %v", pb)
 	}
 	member := st["members"].([]any)[0].(map[string]any)
@@ -48,7 +48,22 @@ func TestPartyEndpoints(t *testing.T) {
 		t.Fatalf("queue item %v", item)
 	}
 	host.json(http.MethodPost, "/parties/"+code+"/queue/batch", map[string]any{"trackIds": []string{}}).errorIs(400, "trackIds must not be empty")
-	host.json(http.MethodPost, "/parties/"+code+"/queue/batch", map[string]any{"trackIds": []string{ids.track}}).status(200)
+	st = host.json(http.MethodPost, "/parties/"+code+"/queue/batch", map[string]any{"trackIds": []string{ids.track}}).status(200).keys()
+	firstItem := item["id"].(string)
+	dupItem := st["queue"].([]any)[1].(map[string]any)["id"].(string)
+	if st["playback"].(map[string]any)["queueItemId"] != firstItem {
+		t.Fatalf("playback must expose the playing item: %v", st["playback"])
+	}
+	st = host.json(http.MethodPost, "/parties/"+code+"/playback/play", map[string]any{"trackId": ids.track, "queueItemId": dupItem, "positionSec": 0}).status(200).keys()
+	if st["playback"].(map[string]any)["queueItemId"] != dupItem {
+		t.Fatalf("play by item: %v", st["playback"])
+	}
+	host.json(http.MethodPost, "/parties/"+code+"/playback/play", map[string]any{"trackId": ids.track, "queueItemId": "nope", "positionSec": 0}).status(400)
+	st = host.json(http.MethodPost, "/parties/"+code+"/playback/next", map[string]string{"expectedQueueItemId": firstItem}).status(200).keys()
+	if len(st["queue"].([]any)) != 2 {
+		t.Fatalf("stale expected item must not advance: %v", st["queue"])
+	}
+	host.json(http.MethodPost, "/parties/"+code+"/playback/play", map[string]any{"trackId": ids.track, "queueItemId": firstItem, "positionSec": 0}).status(200)
 	host.json(http.MethodPost, "/parties/"+code+"/playback/pause", map[string]float64{"positionSec": -1}).errorIs(400, "positionSec must be greater than or equal to 0")
 	host.json(http.MethodPost, "/parties/"+code+"/playback/pause", map[string]float64{"positionSec": 12}).status(200)
 	host.json(http.MethodPost, "/parties/"+code+"/playback/seek", map[string]float64{"positionSec": 30}).status(200)

@@ -23,10 +23,11 @@ type PartyQueueItem struct {
 }
 
 type PartyPlayback struct {
-	Track             *Track  `json:"track"`
-	Playing           bool    `json:"playing"`
-	AnchorPositionSec float64 `json:"anchorPositionSec"`
-	AnchorEpochMs     int64   `json:"anchorEpochMs"`
+	Track             *Track     `json:"track"`
+	QueueItemID       *uuid.UUID `json:"queueItemId"`
+	Playing           bool       `json:"playing"`
+	AnchorPositionSec float64    `json:"anchorPositionSec"`
+	AnchorEpochMs     int64      `json:"anchorEpochMs"`
 }
 
 type PartyState struct {

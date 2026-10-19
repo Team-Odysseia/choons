@@ -213,7 +213,7 @@ func (s *Parties) assemble(tx *gorm.DB, p *model.Party) (dto.PartyState, error) 
 	if err != nil {
 		return dto.PartyState{}, err
 	}
-	pb := dto.PartyPlayback{Playing: st.Playing, AnchorPositionSec: st.AnchorPositionSec, AnchorEpochMs: st.AnchorEpochMs}
+	pb := dto.PartyPlayback{QueueItemID: st.QueueItemID, Playing: st.Playing, AnchorPositionSec: st.AnchorPositionSec, AnchorEpochMs: st.AnchorEpochMs}
 	if st.TrackID != nil {
 		t, err := first[model.Track](tracksQuery(tx), "Track", *st.TrackID)
 		if err != nil {
@@ -602,7 +602,7 @@ func (s *Parties) Reorder(ctx context.Context, user *model.User, code string, it
 	})
 }
 
-func (s *Parties) Play(ctx context.Context, user *model.User, code string, trackID uuid.UUID, pos float64) (dto.PartyState, error) {
+func (s *Parties) Play(ctx context.Context, user *model.User, code string, trackID uuid.UUID, queueItemID *uuid.UUID, pos float64) (dto.PartyState, error) {
 	return s.mutate(ctx, user, code, s.requireControl, func(tx *gorm.DB, p *model.Party) error {
 		if _, err := first[model.Track](tx.Select("id"), "Track", trackID); err != nil {
 			return err
@@ -611,17 +611,44 @@ func (s *Parties) Play(ctx context.Context, user *model.User, code string, track
 		if err != nil {
 			return err
 		}
-		var item *uuid.UUID
-		var match []uuid.UUID
-		if err := tx.Model(&model.PartyQueueItem{}).Where("party_id = ? AND track_id = ?", p.ID, trackID).
-			Order("position ASC").Order("created_at ASC").Order("id ASC").Limit(1).Pluck("id", &match).Error; err != nil {
+		item, err := s.resolvePlayItem(tx, p.ID, st, trackID, queueItemID)
+		if err != nil {
 			return err
-		}
-		if len(match) == 1 {
-			item = &match[0]
 		}
 		return s.savePlayback(tx, st, item, &trackID, true, pos)
 	})
+}
+
+func (s *Parties) resolvePlayItem(tx *gorm.DB, partyID uuid.UUID, st *model.PartyPlaybackState, trackID uuid.UUID, queueItemID *uuid.UUID) (*uuid.UUID, error) {
+	if queueItemID != nil {
+		var item model.PartyQueueItem
+		err := tx.Where("id = ? AND party_id = ?", *queueItemID, partyID).First(&item).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperr.NotFound("Queue item not found")
+		}
+		if err != nil {
+			return nil, err
+		}
+		if item.TrackID != trackID {
+			return nil, apperr.BadRequest("Queue item does not match track")
+		}
+		return &item.ID, nil
+	}
+	items, err := s.queue(tx, partyID)
+	if err != nil {
+		return nil, err
+	}
+	if st.TrackID != nil && *st.TrackID == trackID {
+		if current := playingItem(st, items); current != nil {
+			return &current.ID, nil
+		}
+	}
+	for i := range items {
+		if items[i].TrackID == trackID {
+			return &items[i].ID, nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *Parties) Pause(ctx context.Context, user *model.User, code string, pos float64) (dto.PartyState, error) {
@@ -644,7 +671,7 @@ func (s *Parties) Seek(ctx context.Context, user *model.User, code string, pos f
 	})
 }
 
-func (s *Parties) Next(ctx context.Context, user *model.User, code string) (dto.PartyState, error) {
+func (s *Parties) Next(ctx context.Context, user *model.User, code string, expectedItemID *uuid.UUID) (dto.PartyState, error) {
 	return s.mutate(ctx, user, code, s.requireControl, func(tx *gorm.DB, p *model.Party) error {
 		st, err := s.playback(tx, p.ID)
 		if err != nil {
@@ -654,7 +681,11 @@ func (s *Parties) Next(ctx context.Context, user *model.User, code string) (dto.
 		if err != nil {
 			return err
 		}
-		if current := playingItem(st, items); current != nil {
+		current := playingItem(st, items)
+		if expectedItemID != nil && (current == nil || current.ID != *expectedItemID) {
+			return nil
+		}
+		if current != nil {
 			if err := tx.Delete(&model.PartyQueueItem{}, "id = ?", current.ID).Error; err != nil {
 				return err
 			}
