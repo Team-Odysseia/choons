@@ -37,6 +37,7 @@ describe('AdminListenersView', () => {
   it('lists listeners with their block state', async () => {
     const wrapper = await mountView()
     expect(wrapper.find('h1').text()).toBe('Listeners (2)')
+    expect(wrapper.find('[data-testid="total-readout"]').text()).toContain('002')
     expect(wrapper.text()).toContain('bob')
     expect(wrapper.text()).toContain('Blocked')
   })
@@ -111,5 +112,12 @@ describe('AdminListenersView', () => {
     api.getListeners.mockRejectedValue(httpError(500))
     await mountView()
     expect(toastMock.error).toHaveBeenCalledWith('Failed to load listeners')
+  })
+
+  it('shows a no match plate when the list is empty', async () => {
+    api.getListeners.mockResolvedValue([])
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain('No listeners found.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO MATCH')
   })
 })

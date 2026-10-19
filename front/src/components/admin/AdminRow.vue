@@ -3,8 +3,17 @@ import { Pencil, Trash2 } from 'lucide-vue-next'
 import { IconKey, VfdBadge } from '@/components/vfd'
 
 withDefaults(
-  defineProps<{ primary: string; secondary?: string; thumb?: string | null; round?: boolean; blocked?: boolean; editable?: boolean }>(),
-  { editable: true },
+  defineProps<{
+    primary: string
+    secondary?: string
+    thumb?: string | null
+    round?: boolean
+    blocked?: boolean
+    editable?: boolean
+    editLabel?: string
+    deleteLabel?: string
+  }>(),
+  { editable: true, editLabel: 'Edit', deleteLabel: 'Delete' },
 )
 defineEmits<{ edit: []; delete: [] }>()
 </script>
@@ -24,7 +33,7 @@ defineEmits<{ edit: []; delete: [] }>()
     </div>
     <VfdBadge v-if="blocked" tone="red" label="Blocked" />
     <slot name="actions" />
-    <IconKey v-if="editable" :icon="Pencil" label="Edit" :size="32" @click="$emit('edit')" />
-    <IconKey :icon="Trash2" label="Delete" :size="32" class="text-red!" @click="$emit('delete')" />
+    <IconKey v-if="editable" :icon="Pencil" :label="editLabel" :size="32" @click="$emit('edit')" />
+    <IconKey :icon="Trash2" :label="deleteLabel" :size="32" class="text-red!" @click="$emit('delete')" />
   </div>
 </template>
