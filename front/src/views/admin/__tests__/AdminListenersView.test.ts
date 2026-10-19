@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { httpError } from '@/test-utils/http'
@@ -18,7 +19,7 @@ const bob = { id: 'u-bob', username: 'bob', requestsBlocked: false }
 const amy = { id: 'u-amy', username: 'amy', requestsBlocked: true }
 
 async function mountView() {
-  const wrapper = mount(AdminListenersView, { global: { stubs: { Teleport: true, Transition: true } } })
+  const wrapper = mount(AdminListenersView, { global: { stubs: dialogStubs } })
   await flushPromises()
   return wrapper
 }

@@ -1,48 +1,82 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useFocusTrap } from '@/composables/useFocusTrap'
+import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle, DialogDescription } from 'reka-ui'
+import { X } from 'lucide-vue-next'
+import { IconKey } from '@/components/vfd'
+import { cn } from '@/lib/utils'
 
-const props = withDefaults(defineProps<{ open: boolean; title: string; maxWidthClass?: string }>(), {
+withDefaults(defineProps<{ open: boolean; title: string; maxWidthClass?: string; tone?: 'cyan' | 'red' }>(), {
   maxWidthClass: 'max-w-md',
+  tone: 'cyan',
 })
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [] }>()
 
-const dialogRef = ref<HTMLElement | null>(null)
-useFocusTrap(dialogRef, () => props.open)
+function onOpenChange(value: boolean) {
+  if (!value) emit('close')
+}
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition-opacity duration-150"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition-opacity duration-150"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/60" @click="$emit('close')" />
-        <div
-          ref="dialogRef"
-          class="relative bg-card border border-border rounded-xl shadow-2xl w-full mx-4 z-10 overflow-hidden"
-          :class="maxWidthClass"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="title"
-          tabindex="-1"
-        >
-          <div class="flex items-center justify-between px-5 pt-5 pb-3">
-            <h2 class="text-base font-bold">{{ title }}</h2>
-            <button
-              class="size-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              aria-label="Close dialog"
-              @click="$emit('close')"
-            >✕</button>
-          </div>
+  <DialogRoot :open="open" @update:open="onOpenChange">
+    <DialogPortal>
+      <DialogOverlay class="vfd-dialog-overlay fixed inset-0 z-50 bg-black/65 backdrop-blur-[6px]" />
+      <DialogContent
+        :aria-describedby="undefined"
+        :class="
+          cn(
+            'vfd-dialog fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-chrome-lo/50 bg-[linear-gradient(to_top,#0A0F12,#161E23)] shadow-[0_24px_60px_#000000f0,0_0_30px_#5CF6E81F] focus:outline-none',
+            maxWidthClass,
+          )
+        "
+      >
+        <div class="flex shrink-0 items-center gap-3 border-b border-line py-4 pl-5 pr-4">
+          <span aria-hidden="true" :class="['led size-[7px]!', tone === 'red' ? 'led-red' : 'led-on']" />
+          <DialogTitle
+            :class="[
+              'min-w-0 flex-1 truncate font-display text-[22px] font-extrabold uppercase leading-none',
+              tone === 'red' ? 'text-red glow-red' : 'text-cyan glow-sm',
+            ]"
+          >{{ title }}</DialogTitle>
+          <IconKey :icon="X" label="Close dialog" :size="30" @click="emit('close')" />
+        </div>
+        <DialogDescription class="sr-only">{{ title }}</DialogDescription>
+        <div class="min-h-0 overflow-y-auto pt-4">
           <slot />
         </div>
-      </div>
-    </Transition>
-  </Teleport>
+      </DialogContent>
+    </DialogPortal>
+  </DialogRoot>
 </template>
+
+<style>
+.vfd-dialog[data-state='open'] {
+  animation: vfd-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.vfd-dialog-overlay[data-state='open'] {
+  animation: vfd-fade-in 180ms ease-out;
+}
+
+@keyframes vfd-dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes vfd-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vfd-dialog[data-state='open'],
+  .vfd-dialog-overlay[data-state='open'] {
+    animation: none;
+  }
+}
+</style>

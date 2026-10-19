@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { httpError } from '@/test-utils/http'
@@ -50,7 +51,7 @@ function mountDialog(tracks = [track1], open = true) {
     props: { open, tracks },
     global: {
       plugins: [pinia],
-      stubs: { Teleport: true, Transition: true },
+      stubs: dialogStubs,
     },
   })
 

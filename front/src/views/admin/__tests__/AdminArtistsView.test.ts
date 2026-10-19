@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -28,7 +29,7 @@ async function mountView() {
   })
   await router.push('/admin/artists')
   const wrapper = mount(AdminArtistsView, {
-    global: { plugins: [router], stubs: { Teleport: true, Transition: true, ImageUpload: ImageUploadStub } },
+    global: { plugins: [router], stubs: { ...dialogStubs, ImageUpload: ImageUploadStub } },
   })
   await flushPromises()
   return { wrapper, router }

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -33,7 +34,7 @@ async function mountView() {
   })
   await router.push('/playlists')
   const wrapper = mount(PlaylistsView, {
-    global: { plugins: [router], stubs: { Teleport: true, Transition: true } },
+    global: { plugins: [router], stubs: dialogStubs },
   })
   await flushPromises()
   return { wrapper, router }
