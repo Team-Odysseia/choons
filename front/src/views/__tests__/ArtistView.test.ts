@@ -46,17 +46,19 @@ describe('ArtistView', () => {
     getAlbums.mockResolvedValue([])
     const { wrapper } = await mountView()
     expect(wrapper.text()).toContain('No albums yet.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO DISC')
   })
 
   it('shows a message when the artist does not exist', async () => {
     getArtist.mockRejectedValue(httpError(404, 'Artist not found: ar-1'))
     const { wrapper } = await mountView()
     expect(wrapper.text()).toContain('This artist is not available.')
+    expect(wrapper.find('[data-code]').text()).toBe('ERR 404')
   })
 
   it('opens an album', async () => {
     const { wrapper, router } = await mountView()
-    await wrapper.findAll('[class*="bg-card"]')[0]!.trigger('click')
+    await wrapper.findAll('[data-testid="artist-albums"] a')[0]!.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/library/albums/al-1')
   })
