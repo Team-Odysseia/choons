@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ImageUpload from '@/components/admin/ImageUpload.vue'
-import { ArrowLeft } from 'lucide-vue-next'
+import { PageHeader, StatePlate, VfdTextarea } from '@/components/vfd'
+import { ArrowLeft, Save } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -68,33 +69,35 @@ async function save() {
 </script>
 
 <template>
-  <div v-if="artist">
-    <button
-      class="flex items-center gap-1.5 text-[13px] text-dimmed hover:text-foreground transition-colors mb-6"
-      @click="router.push('/admin/artists')"
-    >
-      <ArrowLeft :size="14" />
+  <div v-if="artist" class="flex flex-col gap-6">
+    <Button variant="ghost" size="sm" class="self-start px-0" @click="router.push('/admin/artists')">
+      <template #icon><ArrowLeft :size="13" aria-hidden="true" /></template>
       Back to artists
-    </button>
+    </Button>
 
-    <h1 class="text-[28px] font-extrabold mb-6">Edit Artist</h1>
+    <PageHeader kicker="Admin · Artists · Edit" title="Edit Artist" />
 
-    <form class="admin-form" @submit.prevent="save">
-      <div class="form-group">
-        <Label>Name</Label>
-        <Input v-model="name" required />
+    <form
+      class="flex flex-col gap-7 rounded-lg border border-chrome-lo/40 bg-[linear-gradient(to_top,#0A0F12,#141B20)] p-6 shadow-[0_10px_24px_#000000cc] md:flex-row md:p-7"
+      @submit.prevent="save"
+    >
+      <div class="flex flex-1 flex-col gap-[18px]">
+        <div class="flex flex-col gap-2">
+          <Label for="edit-artist-name">Name</Label>
+          <Input id="edit-artist-name" v-model="name" required />
+        </div>
+        <div class="flex flex-col gap-2">
+          <Label for="edit-artist-bio">Bio</Label>
+          <VfdTextarea id="edit-artist-bio" v-model="bio" class="min-h-[150px]" />
+        </div>
+        <div class="flex justify-end">
+          <Button type="submit" :disabled="loading">
+            <template #icon><Save :size="13" aria-hidden="true" /></template>
+            {{ loading ? 'Saving…' : 'Save changes' }}
+          </Button>
+        </div>
       </div>
-
-      <div class="form-group">
-        <Label>Bio</Label>
-        <textarea
-          v-model="bio"
-          class="flex w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary resize-y"
-          rows="3"
-        />
-      </div>
-
-      <div class="form-group">
+      <div class="md:w-[240px]">
         <ImageUpload
           ref="imageUploadRef"
           :current-url="currentAvatarUrl"
@@ -103,25 +106,7 @@ async function save() {
           @remove="pendingAvatar = null; removeAvatar = true"
         />
       </div>
-
-      <Button type="submit" :disabled="loading">
-        {{ loading ? 'Saving…' : 'Save changes' }}
-      </Button>
     </form>
   </div>
-  <div v-else class="text-[13px] text-dimmed">Loading…</div>
+  <StatePlate v-else kind="loading" code="READING…" message="Loading…" />
 </template>
-
-<style scoped>
-.admin-form {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-</style>
