@@ -1,9 +1,15 @@
+import '@fontsource/doto/latin-700.css'
+import '@fontsource/doto/latin-800.css'
+import '@fontsource/doto/latin-900.css'
+import '@fontsource/michroma/latin-400.css'
+import '@fontsource/share-tech-mono/latin-400.css'
 import './assets/main.css'
 import 'vue-sonner/style.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
+import { MotionPlugin } from '@vueuse/motion'
 
 import App from './App.vue'
 import router from './router'
@@ -28,6 +34,7 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(VueQueryPlugin)
+app.use(MotionPlugin)
 
 const auth = useAuthStore()
 bindIdentity(() => auth.user)
