@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { httpError } from '@/test-utils/http'
@@ -18,7 +19,7 @@ const bob = { id: 'u-bob', username: 'bob', requestsBlocked: false }
 const amy = { id: 'u-amy', username: 'amy', requestsBlocked: true }
 
 async function mountView() {
-  const wrapper = mount(AdminListenersView, { global: { stubs: { Teleport: true, Transition: true } } })
+  const wrapper = mount(AdminListenersView, { global: { stubs: dialogStubs } })
   await flushPromises()
   return wrapper
 }
@@ -36,6 +37,7 @@ describe('AdminListenersView', () => {
   it('lists listeners with their block state', async () => {
     const wrapper = await mountView()
     expect(wrapper.find('h1').text()).toBe('Listeners (2)')
+    expect(wrapper.find('[data-testid="total-readout"]').text()).toContain('002')
     expect(wrapper.text()).toContain('bob')
     expect(wrapper.text()).toContain('Blocked')
   })
@@ -110,5 +112,12 @@ describe('AdminListenersView', () => {
     api.getListeners.mockRejectedValue(httpError(500))
     await mountView()
     expect(toastMock.error).toHaveBeenCalledWith('Failed to load listeners')
+  })
+
+  it('shows a no match plate when the list is empty', async () => {
+    api.getListeners.mockResolvedValue([])
+    const wrapper = await mountView()
+    expect(wrapper.text()).toContain('No listeners found.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO MATCH')
   })
 })

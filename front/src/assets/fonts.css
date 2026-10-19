@@ -1,0 +1,7 @@
+@font-face {
+  font-family: "DSEG7 Classic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../node_modules/dseg/fonts/DSEG7-Classic/DSEG7Classic-Bold.woff2") format("woff2");
+}

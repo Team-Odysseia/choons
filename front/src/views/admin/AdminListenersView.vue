@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { BaseDialog } from '@/components/ui/dialog'
 import type { ListenerRequestBanResponse } from '@/api/types'
-import { Pencil, Trash2 } from 'lucide-vue-next'
+import AdminRow from '@/components/admin/AdminRow.vue'
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
+import { StatePlate } from '@/components/vfd'
 
 const username = ref('')
 const password = ref('')
@@ -102,140 +104,82 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <div>
-    <div class="flex items-center justify-between gap-3 mb-6">
-      <h1 class="text-[28px] font-extrabold">{{ pageTitle }}</h1>
-      <Button @click="addDialogOpen = true">Add Listener</Button>
-    </div>
+  <div class="flex flex-col gap-6">
+    <AdminPageHeader
+      kicker="Admin · Listeners"
+      :title="pageTitle"
+      :total="listeners.length"
+      add-label="Add Listener"
+      @add="addDialogOpen = true"
+    />
 
-    <form class="search-row" @submit.prevent="submitSearch">
-      <Input v-model="search" placeholder="Search listener by username" />
+    <form class="flex flex-wrap items-center gap-2.5 sm:flex-nowrap" @submit.prevent="submitSearch">
+      <Input v-model="search" class="w-full sm:flex-1" placeholder="Search listener by username" />
       <Button type="submit" variant="outline">Search</Button>
       <Button type="button" variant="ghost" @click="clearSearch">Clear</Button>
     </form>
 
-    <div v-if="listenersLoading" class="text-[13px] text-dimmed mt-6">Loading listeners…</div>
-    <div v-else-if="listeners.length === 0" class="text-[13px] text-dimmed mt-6">No listeners found.</div>
+    <StatePlate v-if="listenersLoading" kind="loading" code="READING…" message="Loading listeners…" />
+    <StatePlate v-else-if="listeners.length === 0" code="NO MATCH" message="No listeners found." />
 
-    <div v-else class="list mt-4">
-      <div v-for="listener in listeners" :key="listener.id" class="list-item">
-        <div class="flex items-center justify-between gap-4">
-          <div class="min-w-0 flex flex-col gap-1">
-            <span class="font-semibold truncate">{{ listener.username }}</span>
-            <span class="text-[12px] text-dimmed">{{ listener.id }}</span>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <span
-              v-if="listener.requestsBlocked"
-              class="text-[11px] font-semibold text-red-300 border border-red-500/30 rounded-full px-2 py-1"
-            >Blocked</span>
-            <button
-              class="size-8 rounded-full flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
-              title="Edit listener"
-              @click="openEdit(listener)"
-            >
-              <Pencil :size="14" />
-            </button>
-            <button
-              class="size-8 rounded-full flex items-center justify-center text-dimmed hover:text-destructive hover:bg-muted transition-colors"
-              title="Delete listener"
-              @click="deleteTarget = listener"
-            >
-              <Trash2 :size="14" />
-            </button>
-          </div>
-        </div>
-      </div>
+    <div v-else class="flex flex-col gap-2">
+      <AdminRow
+        v-for="listener in listeners"
+        :key="listener.id"
+        :primary="listener.username"
+        :secondary="listener.id"
+        :blocked="listener.requestsBlocked"
+        edit-label="Edit listener"
+        delete-label="Delete listener"
+        @edit="openEdit(listener)"
+        @delete="deleteTarget = listener"
+      />
     </div>
   </div>
 
   <BaseDialog :open="addDialogOpen" title="Add Listener" @close="addDialogOpen = false">
-    <form class="dialog-form" @submit.prevent="submit">
-      <div class="form-group">
+    <form class="flex flex-col gap-4 px-5 pb-5" @submit.prevent="submit">
+      <div class="flex flex-col gap-2">
         <Label for="username">Username</Label>
         <Input id="username" v-model="username" required />
       </div>
-      <div class="form-group">
+      <div class="flex flex-col gap-2">
         <Label for="password">Password</Label>
         <Input id="password" v-model="password" type="password" required />
       </div>
-      <div class="flex justify-end gap-2 mt-1">
-        <Button type="button" variant="outline" @click="addDialogOpen = false">Cancel</Button>
+      <div class="mt-1 flex justify-end gap-2">
+        <Button type="button" variant="ghost" @click="addDialogOpen = false">Cancel</Button>
         <Button type="submit" :disabled="loading">{{ loading ? 'Creating…' : 'Create listener' }}</Button>
       </div>
     </form>
   </BaseDialog>
 
   <BaseDialog :open="!!editTarget" title="Edit Listener" @close="editTarget = null">
-    <form class="dialog-form" @submit.prevent="saveEdit">
-      <div class="form-group">
+    <form class="flex flex-col gap-4 px-5 pb-5" @submit.prevent="saveEdit">
+      <div class="flex flex-col gap-2">
         <Label for="edit-username">Username</Label>
         <Input id="edit-username" v-model="editUsername" required />
       </div>
-      <div class="form-group">
+      <div class="flex flex-col gap-2">
         <Label for="edit-password">New password (optional)</Label>
-        <Input id="edit-password" v-model="editPassword" type="password" />
+        <Input id="edit-password" v-model="editPassword" type="password" placeholder="Leave blank to keep current" />
       </div>
-      <div class="flex justify-end gap-2 mt-1">
-        <Button type="button" variant="outline" @click="editTarget = null">Cancel</Button>
+      <div class="mt-1 flex justify-end gap-2">
+        <Button type="button" variant="ghost" @click="editTarget = null">Cancel</Button>
         <Button type="submit">Save changes</Button>
       </div>
     </form>
   </BaseDialog>
 
-  <BaseDialog :open="!!deleteTarget" title="Delete Listener" @close="deleteTarget = null">
+  <BaseDialog :open="!!deleteTarget" title="Delete Listener" tone="red" @close="deleteTarget = null">
     <div class="px-5 pb-5">
-      <p class="text-sm text-muted-foreground mb-5">
-        Delete <span class="font-semibold text-foreground">{{ deleteTarget?.username }}</span>?
+      <p class="mb-5 text-sm text-soft">
+        Delete <span class="text-fg">{{ deleteTarget?.username }}</span>?
       </p>
       <div class="flex justify-end gap-2">
-        <Button variant="outline" @click="deleteTarget = null">Cancel</Button>
+        <Button variant="ghost" @click="deleteTarget = null">Cancel</Button>
         <Button variant="destructive" @click="confirmDelete">Delete</Button>
       </div>
     </div>
   </BaseDialog>
 </template>
-
-<style scoped>
-.search-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.list-item {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  padding: 12px 14px;
-}
-
-.dialog-form {
-  padding: 0 20px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-@media (max-width: 640px) {
-  .search-row {
-    flex-wrap: wrap;
-  }
-
-  .search-row > :first-child {
-    width: 100%;
-  }
-}
-</style>

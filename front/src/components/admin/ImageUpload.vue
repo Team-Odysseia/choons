@@ -51,7 +51,6 @@ function onRemove() {
   emit('remove')
 }
 
-// expose so parent can reset preview after save
 function reset() {
   if (preview.value) URL.revokeObjectURL(preview.value)
   preview.value = null
@@ -65,40 +64,46 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
-    <span v-if="label" class="text-sm font-medium text-foreground">{{ label }}</span>
+  <div class="flex flex-col gap-2.5">
+    <span v-if="label" data-label class="font-label text-[10px] uppercase tracking-[0.2em] text-soft">{{ label }}</span>
 
-    <!-- Image preview -->
-    <div v-if="shownUrl" class="relative w-fit">
+    <div v-if="shownUrl" class="relative w-fit pr-2 pt-2">
       <img
         :src="shownUrl"
-        class="w-32 h-32 object-cover rounded-lg border border-border"
+        class="size-32 rounded-[3px] border border-bezel-mid object-cover"
         alt="Preview"
       />
       <button
         type="button"
-        class="absolute -top-2 -right-2 size-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow transition-opacity hover:opacity-90"
+        class="absolute right-0 top-0 flex size-6 items-center justify-center rounded-full bg-red text-[#1A0505] shadow-[0_0_8px_#FF4A4A88] transition-opacity hover:opacity-90"
         aria-label="Remove image"
         @click="onRemove"
       >
-        <X :size="12" />
+        <X :size="14" />
       </button>
     </div>
 
-    <!-- Drop zone / upload trigger -->
     <div
-      class="flex flex-col items-center justify-center gap-1.5 rounded border-2 border-dashed px-4 py-5 text-center cursor-pointer transition-colors w-full"
-      :class="isDragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'"
+      data-dropzone
+      :data-active="isDragOver ? '' : undefined"
+      role="button"
+      tabindex="0"
+      :class="[
+        'vfd-well vfd-scanlines flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-md px-5 py-7 text-center transition-shadow',
+        isDragOver ? 'border-cyan! shadow-[inset_0_3px_10px_#000000ee,0_0_18px_#5CF6E840]' : '',
+      ]"
       @click="fileInput?.click()"
+      @keydown.enter.prevent="fileInput?.click()"
+      @keydown.space.prevent="fileInput?.click()"
       @dragover.prevent="isDragOver = true"
       @dragleave.prevent="isDragOver = false"
       @drop.prevent="onDrop"
     >
-      <ImagePlus :size="22" class="text-dimmed" />
-      <span class="text-[13px] text-muted-foreground">
+      <ImagePlus :size="28" :class="isDragOver ? 'text-cyan' : 'text-cyan-dim'" aria-hidden="true" />
+      <span class="font-display text-lg font-extrabold text-cyan glow-sm">
         {{ shownUrl ? 'Replace image' : 'Upload image' }}
       </span>
-      <span class="text-[11px] text-dimmed">JPG, PNG, WebP, GIF</span>
+      <span class="text-xs text-soft">JPG, PNG, WebP, GIF</span>
     </div>
 
     <input

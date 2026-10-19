@@ -133,6 +133,7 @@ describe('rendering', () => {
       global: { plugins: [pinia, router], stubs: { ImageUpload: ImageUploadStub } },
     })
     expect(wrapper.text()).toContain('Loading')
+    expect(wrapper.find('[data-code]').text()).toBe('READING…')
   })
 
   it('renders Edit Album heading after load', async () => {
@@ -271,10 +272,7 @@ describe('track deletion', () => {
     mockDeleteTrack.mockResolvedValue(undefined)
     const { wrapper } = await mountView()
 
-    // Delete buttons have type="button" and text-dimmed class
-    const deleteButtons = wrapper
-      .findAll('button[type="button"]')
-      .filter((b) => b.attributes('class')?.includes('text-dimmed') && !b.text().includes('Back'))
+    const deleteButtons = wrapper.findAll('[aria-label="Remove track"]')
 
     expect(deleteButtons.length).toBeGreaterThan(0)
     await deleteButtons[0]!.trigger('click')
@@ -289,9 +287,7 @@ describe('track deletion', () => {
     mockDeleteTrack.mockRejectedValue(new Error('fail'))
     const { wrapper } = await mountView()
 
-    const deleteButtons = wrapper
-      .findAll('button[type="button"]')
-      .filter((b) => b.attributes('class')?.includes('text-dimmed') && !b.text().includes('Back'))
+    const deleteButtons = wrapper.findAll('[aria-label="Remove track"]')
 
     await deleteButtons[0]!.trigger('click')
     await flushPromises()

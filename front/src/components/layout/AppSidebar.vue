@@ -3,7 +3,11 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDrawerStore } from '@/stores/drawer'
 import { useRoute, useRouter } from 'vue-router'
-import { Heart, Library, ListMusic, LogOut, PartyPopper, Search, Send, X } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { Disc3, Heart, Inbox, Library, ListMusic, LogOut, MicVocal, PartyPopper, Search, Send, Users, X } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { BrandPlate, IconKey, Marquee } from '@/components/vfd'
+import SourceButton from './SourceButton.vue'
 import { listAllAlbumRequests } from '@/api/albumRequests'
 import { Input } from '@/components/ui/input'
 import BaseDialog from '@/components/ui/dialog/BaseDialog.vue'
@@ -91,6 +95,31 @@ async function logout() {
   router.push('/login')
 }
 
+const path = computed(() => route.path)
+
+function isActive(key: string) {
+  const p = path.value
+  switch (key) {
+    case 'library':
+      return p.startsWith('/library') && route.name !== 'search'
+    case 'search':
+      return route.name === 'search'
+    case 'playlists':
+      return p.startsWith('/playlists') && !p.startsWith('/playlists/requests')
+    case 'requests':
+      return p.startsWith('/playlists/requests')
+    default:
+      return p.startsWith(key)
+  }
+}
+
+const adminSources = [
+  { to: '/admin/listeners', label: 'Listeners', icon: Users },
+  { to: '/admin/artists', label: 'Artists', icon: MicVocal },
+  { to: '/admin/albums', label: 'Albums', icon: Disc3 },
+  { to: '/admin/album-requests', label: 'Album Requests', icon: Inbox },
+]
+
 function openSearchDialog() {
   const q = route.name === 'search' && typeof route.query.q === 'string' ? route.query.q : ''
   searchQuery.value = q
@@ -153,147 +182,91 @@ onBeforeUnmount(() => {
 
 <template>
   <nav
-    class="col-start-1 row-start-1 bg-black flex flex-col overflow-hidden border-r border-border
-           fixed inset-y-0 left-0 w-[var(--sidebar-w)] z-50 transition-transform duration-200
-           md:static md:z-auto md:translate-x-0"
+    class="fixed inset-y-0 left-0 z-50 col-start-1 row-start-1 flex w-[var(--sidebar-w)] flex-col overflow-hidden border-r border-bezel-lo bg-[linear-gradient(to_right,#0E1418,#080C0E)] transition-transform duration-200 md:static md:z-auto md:translate-x-0"
     :class="drawer.sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     style="padding-top: var(--safe-area-top); padding-left: var(--safe-area-left)"
   >
-    <!-- Mobile close button -->
-    <button
-      class="md:hidden absolute top-3 right-3 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+    <IconKey
+      :icon="X"
+      label="Close menu"
+      bare
+      :size="32"
+      class="absolute right-2 top-2 z-10 md:hidden"
       @click="drawer.closeSidebar()"
-    >
-      <X :size="18" />
-    </button>
+    />
 
-    <div class="flex-1 overflow-y-auto px-2 py-4">
-      <div class="text-[22px] font-black tracking-tight text-primary px-3 pb-5">choons</div>
+    <div class="flex-1 overflow-y-auto px-[18px] py-[22px]">
+      <BrandPlate />
 
-      <ul class="list-none mb-2">
+      <div class="px-3.5 pb-1.5 pt-[18px] font-label text-[8px] uppercase tracking-[0.3em] text-faint" aria-hidden="true">Source</div>
+      <ul class="flex list-none flex-col gap-1">
         <li>
-          <RouterLink
-            to="/library"
-            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
-            @click="drawer.closeSidebar()"
-          >
-            <Library :size="20" />
-            Library
-          </RouterLink>
+          <SourceButton to="/library" :icon="Library" label="Library" :active="isActive('library')" @click="drawer.closeSidebar()" />
         </li>
         <li>
-          <button
-            class="w-full flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all"
-            @click="openSearchDialog"
-          >
-            <Search :size="20" />
-            Search
-          </button>
+          <SourceButton :icon="Search" label="Search" :active="isActive('search')" @click="openSearchDialog" />
         </li>
         <li>
-          <RouterLink
-            to="/favorites"
-            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
-            @click="drawer.closeSidebar()"
-          >
-            <Heart :size="20" />
-            Favorites
-          </RouterLink>
+          <SourceButton to="/favorites" :icon="Heart" label="Favorites" :active="isActive('/favorites')" @click="drawer.closeSidebar()" />
         </li>
         <li>
-          <RouterLink
-            to="/playlists"
-            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
-            @click="drawer.closeSidebar()"
-          >
-            <ListMusic :size="20" />
-            Playlists
-          </RouterLink>
+          <SourceButton to="/playlists" :icon="ListMusic" label="Playlists" :active="isActive('playlists')" @click="drawer.closeSidebar()" />
         </li>
         <li>
-          <RouterLink
-            to="/parties"
-            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
-            @click="drawer.closeSidebar()"
-          >
-            <PartyPopper :size="20" />
-            Parties
-          </RouterLink>
+          <SourceButton to="/parties" :icon="PartyPopper" label="Parties" :active="isActive('/parties')" @click="drawer.closeSidebar()" />
         </li>
         <li v-if="!auth.isAdmin">
-          <RouterLink
-            to="/playlists/requests"
-            class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
-            @click="drawer.closeSidebar()"
-          >
-            <Send :size="20" />
-            Requests
-          </RouterLink>
+          <SourceButton to="/playlists/requests" :icon="Send" label="Requests" :active="isActive('requests')" @click="drawer.closeSidebar()" />
         </li>
       </ul>
 
       <template v-if="auth.isAdmin">
-        <div
-          class="text-[11px] font-bold uppercase tracking-widest text-dimmed px-3 pt-4 pb-2"
-        >
-          Admin
-        </div>
-        <ul class="list-none">
-          <li v-for="{ to, label } in [
-            { to: '/admin/listeners', label: 'Listeners' },
-            { to: '/admin/artists', label: 'Artists' },
-            { to: '/admin/albums', label: 'Albums' },
-            { to: '/admin/album-requests', label: 'Album Requests' },
-          ]" :key="to">
-            <RouterLink
-              :to="to"
-              class="flex items-center justify-between px-3 py-2.5 rounded text-[13px] font-semibold text-muted-foreground hover:text-foreground hover:bg-popover transition-all [&.router-link-active]:text-foreground"
+        <div class="px-3.5 pb-1.5 pt-[18px] font-label text-[8px] uppercase tracking-[0.3em] text-amber">Admin</div>
+        <ul class="flex list-none flex-col gap-1">
+          <li v-for="source in adminSources" :key="source.to">
+            <SourceButton
+              :to="source.to"
+              :icon="source.icon"
+              :label="source.label"
+              :active="isActive(source.to)"
+              :count="source.to === '/admin/album-requests' ? unseenRequests : undefined"
               @click="drawer.closeSidebar()"
-            >
-              <span>{{ label }}</span>
-              <span
-                v-if="to === '/admin/album-requests' && unseenRequests > 0"
-                class="ml-2 text-[10px] leading-none font-bold text-primary-foreground bg-primary rounded-full px-2 py-1"
-              >
-                {{ unseenRequests }}
-              </span>
-            </RouterLink>
+            />
           </li>
         </ul>
       </template>
     </div>
 
-    <div class="flex items-center justify-between px-4 py-3 border-t border-border">
-      <span class="text-[13px] font-semibold text-muted-foreground truncate">
-        {{ auth.user?.username }}
-      </span>
-      <button
-        class="flex items-center gap-1.5 text-[12px] font-semibold text-dimmed hover:text-destructive transition-colors shrink-0"
-        @click="logout"
-      >
-        <LogOut :size="15" />
-        Log out
-      </button>
-    </div>
-
-    <div class="px-4 py-3 border-t border-border flex flex-col gap-1 items-center">
-      <span class="text-[11px] text-dimmed">{{ appVersion }}</span>
-      <a
-        href="https://www.odysseia.dev/"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-[11px] text-dimmed hover:text-muted-foreground transition-colors"
-      >Made by Odysseia</a>
+    <div class="flex flex-col gap-3 border-t border-line px-[18px] pb-4 pt-3.5">
+      <div class="flex items-center gap-2.5 px-1">
+        <span aria-hidden="true" class="led led-on" />
+        <Marquee data-testid="sidebar-user" :text="auth.user?.username ?? ''" mode="bounce" class="min-w-0 flex-1 text-sm text-fg" />
+        <Button variant="ghost" size="sm" class="px-1 hover:text-red" @click="logout">
+          <template #icon><LogOut :size="13" aria-hidden="true" /></template>
+          Log out
+        </Button>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-2 font-label text-[7px] uppercase tracking-[0.18em] text-faint">
+        <span>FW {{ appVersion }}</span>
+        <span aria-hidden="true">·</span>
+        <a
+          href="https://www.odysseia.dev/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="transition-colors hover:text-soft"
+        >Made by Odysseia</a>
+      </div>
     </div>
   </nav>
 
-  <BaseDialog :open="searchDialogOpen" title="Search" @close="searchDialogOpen = false">
-    <div class="px-5 pb-5">
+  <BaseDialog :open="searchDialogOpen" title="Search" max-width-class="max-w-[560px]" @close="searchDialogOpen = false">
+    <div class="flex flex-col gap-3.5 px-5 pb-5">
       <Input
         v-model="searchQuery"
         placeholder="Search public playlists, songs, albums, artists"
-        @keydown.enter="submitSearch"
+        @keydown.enter.prevent="submitSearch"
       />
+      <p class="text-xs text-faint">Press Enter to search songs, albums, artists and playlists.</p>
     </div>
   </BaseDialog>
 </template>

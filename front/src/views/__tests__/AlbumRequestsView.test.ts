@@ -134,4 +134,11 @@ describe('AlbumRequestsView', () => {
     expect(mockToastError).toHaveBeenCalledWith('Only pending requests can be deleted')
     expect(mockListMine).toHaveBeenCalledTimes(2)
   })
+
+  it('shows a state plate when there are no requests', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('No requests yet.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO REQUESTS')
+  })
 })

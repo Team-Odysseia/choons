@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 import SearchView from '../SearchView.vue'
 
@@ -36,6 +36,8 @@ vi.mock('@/api/artists', () => ({
   artistImageUrl: (id: string) => `/img/artist/${id}`,
 }))
 
+const stubs = { RouterLink: { props: ['to'], template: '<a :href="String(to)"><slot /></a>' } }
+
 describe('SearchView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -69,5 +71,31 @@ describe('SearchView', () => {
     expect(signals.length).toBe(2)
     expect(signals[0]!.aborted).toBe(true)
     expect(signals[1]!.aborted).toBe(false)
+  })
+
+  it('shows the standby plate before typing', async () => {
+    const wrapper = mount(SearchView, { global: { stubs } })
+    await nextTick()
+    expect(wrapper.text()).toContain('Start typing to search across playlists, songs, albums, and artists.')
+    expect(wrapper.find('[data-code]').text()).toBe('STANDBY')
+  })
+
+  it('shows the no signal plate when nothing matches', async () => {
+    routeQuery.value = { q: 'zzz' }
+    const wrapper = mount(SearchView, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('No results found.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO SIGNAL')
+  })
+
+  it('shows a hits readout summing all sections', async () => {
+    routeQuery.value = { q: 'night' }
+    mockSearchAlbums.mockResolvedValue([
+      { id: 'al-1', title: 'Night', artist: { id: 'a', name: 'A', bio: null, createdAt: '', avatarUrl: null }, releaseYear: 2000, createdAt: '', coverUrl: null },
+    ])
+    mockSearchArtists.mockResolvedValue([{ id: 'a', name: 'Night Owl', bio: null, createdAt: '', avatarUrl: null }])
+    const wrapper = mount(SearchView, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="hits-readout"]').text()).toContain('2')
   })
 })

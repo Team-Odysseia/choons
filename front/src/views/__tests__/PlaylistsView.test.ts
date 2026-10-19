@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -33,7 +34,7 @@ async function mountView() {
   })
   await router.push('/playlists')
   const wrapper = mount(PlaylistsView, {
-    global: { plugins: [router], stubs: { Teleport: true, Transition: true } },
+    global: { plugins: [router], stubs: dialogStubs },
   })
   await flushPromises()
   return { wrapper, router }
@@ -51,7 +52,8 @@ beforeEach(() => {
 describe('PlaylistsView', () => {
   it('shows the empty state', async () => {
     const { wrapper } = await mountView()
-    expect(wrapper.text()).toContain('No playlists yet')
+    expect(wrapper.text()).toContain('No playlists yet. Create one!')
+    expect(wrapper.find('[data-code]').text()).toBe('NO TAPES')
   })
 
   it('lists playlists with track counts', async () => {
@@ -59,6 +61,7 @@ describe('PlaylistsView', () => {
     const { wrapper } = await mountView()
     expect(wrapper.text()).toContain('Night bus')
     expect(wrapper.text()).toContain('1 track')
+    expect(wrapper.text()).not.toContain('1 tracks')
     expect(wrapper.text()).toContain('12 tracks')
   })
 
@@ -92,7 +95,7 @@ describe('PlaylistsView', () => {
     api.deletePlaylist.mockResolvedValue(undefined)
     const { wrapper } = await mountView()
 
-    await wrapper.find('button[title="Delete"]').trigger('click')
+    await wrapper.find('[aria-label="Delete playlist"]').trigger('click')
     await button(wrapper, 'Delete')!.trigger('click')
     await flushPromises()
 

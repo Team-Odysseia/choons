@@ -133,4 +133,15 @@ describe('submit', () => {
 
     expect(router.currentRoute.value.path).not.toBe('/library')
   })
+
+  it('shows the brand plate and a Sign in heading', () => {
+    const { wrapper } = mountLogin()
+    expect(wrapper.find('h1').text()).toBe('Sign in')
+    expect(wrapper.find('[data-testid="brand-plate"]').text()).toContain('CHOONS')
+  })
+
+  it('marks the decorative display hint as aria-hidden', () => {
+    const { wrapper } = mountLogin()
+    expect(wrapper.find('[data-testid="power-hint"]').attributes('aria-hidden')).toBe('true')
+  })
 })

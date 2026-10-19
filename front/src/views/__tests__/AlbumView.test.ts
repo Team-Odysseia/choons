@@ -65,6 +65,19 @@ describe('AlbumView', () => {
     getAlbum.mockRejectedValue(httpError(404, 'Album not found: al-1'))
     const { wrapper } = await mountView()
     expect(wrapper.text()).toContain('This album is not available.')
+    expect(wrapper.find('[data-code]').text()).toBe('ERR 404')
+  })
+
+  it('shows a state plate when the album has no tracks', async () => {
+    getTracks.mockResolvedValue([])
+    const { wrapper } = await mountView()
+    expect(wrapper.text()).toContain('No tracks in this album yet.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO TRACKS')
+  })
+
+  it('shows the total running time', async () => {
+    const { wrapper } = await mountView()
+    expect(wrapper.text()).toContain('8 min')
   })
 
   it('plays the album', async () => {

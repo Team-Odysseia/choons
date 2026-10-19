@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -34,7 +35,7 @@ async function mountView() {
   })
   await router.push('/admin/albums')
   const wrapper = mount(AdminAlbumsView, {
-    global: { plugins: [router], stubs: { Teleport: true, Transition: true, ImageUpload: ImageUploadStub } },
+    global: { plugins: [router], stubs: { ...dialogStubs, ImageUpload: ImageUploadStub } },
   })
   await flushPromises()
   return { wrapper, router }
@@ -64,7 +65,7 @@ describe('AdminAlbumsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Album')!.trigger('click')
-    const form = wrapper.find('form.create-layout')
+    const form = wrapper.find('[data-testid="create-album-form"]')
     await form.find('input').setValue('Kindred')
     await form.find('select').setValue('ar-1')
     await form.trigger('submit')
@@ -79,7 +80,7 @@ describe('AdminAlbumsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Album')!.trigger('click')
-    const form = wrapper.find('form.create-layout')
+    const form = wrapper.find('[data-testid="create-album-form"]')
     await form.find('input').setValue('Kindred')
     await form.find('select').setValue('ar-1')
     await form.trigger('submit')
@@ -104,5 +105,12 @@ describe('AdminAlbumsView', () => {
     albumsApi.getAdminAlbums.mockRejectedValue(httpError(500))
     await mountView()
     expect(toastMock.error).toHaveBeenCalledWith('Failed to load albums')
+  })
+
+  it('shows a no match plate when no albums match', async () => {
+    albumsApi.getAdminAlbums.mockResolvedValue([])
+    const { wrapper } = await mountView()
+    expect(wrapper.text()).toContain('No albums found.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO MATCH')
   })
 })

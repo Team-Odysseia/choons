@@ -59,3 +59,17 @@ class AudioMock {
 }
 
 vi.stubGlobal('Audio', AudioMock)
+
+// ─── Canvas mock ──────────────────────────────────────────────────────────────
+// jsdom não implementa canvas — getContext devolve null sem logar erros
+HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as typeof HTMLCanvasElement.prototype.getContext
+
+// ─── ResizeObserver mock ──────────────────────────────────────────────────────
+// jsdom não implementa ResizeObserver (usado por Reka UI e pelo Marquee)
+class ResizeObserverMock {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+}
+
+vi.stubGlobal('ResizeObserver', ResizeObserverMock)

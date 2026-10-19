@@ -15,7 +15,7 @@ const props = defineProps<Props>()
     :for="props.for"
     :class="
       cn(
-        'text-xs font-semibold uppercase tracking-wider text-muted-foreground',
+        'font-label text-[10px] uppercase tracking-[0.2em] text-soft transition-colors',
         props.class,
       )
     "
@@ -23,3 +23,12 @@ const props = defineProps<Props>()
     <slot />
   </label>
 </template>
+
+<style scoped>
+label:has(+ input:focus),
+label:has(+ select:focus),
+label:has(+ textarea:focus),
+label:has(+ * :focus) {
+  color: #5CF6E8;
+}
+</style>

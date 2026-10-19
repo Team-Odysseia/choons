@@ -12,6 +12,10 @@ import AddToPlaylistDialog from '@/components/music/AddToPlaylistDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Play, Shuffle, ListPlus, Plus } from 'lucide-vue-next'
 import { albumImageUrl } from '@/api/albums'
+import TrackListHeader from '@/components/music/TrackListHeader.vue'
+import { CoverArt, StatePlate } from '@/components/vfd'
+import { totalMinutes } from '@/lib/format'
+import { prefersReducedMotion } from '@/lib/motion'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +33,8 @@ const focusedTrackId = ref<string | null>(null)
 let focusTimer: ReturnType<typeof setTimeout> | null = null
 
 const trackList = computed(() => tracks.value ?? [])
+const cover = computed(() => (album.value?.coverUrl ? albumImageUrl(album.value.id) : null))
+const minutes = computed(() => totalMinutes(trackList.value))
 
 function addAllToQueue() {
   if (party.inParty) {
@@ -56,7 +62,7 @@ async function focusTrackFromRoute() {
   const target = document.getElementById(`track-${trackId}`)
   if (!target) return
 
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  target.scrollIntoView({ behavior: prefersReducedMotion.value ? 'auto' : 'smooth', block: 'center' })
   focusedTrackId.value = trackId
   clearFocusTimer()
   focusTimer = setTimeout(() => {
@@ -75,66 +81,53 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="!isPending && album">
-    <div class="flex flex-col md:flex-row md:items-end gap-4 md:gap-6 mb-8">
-      <img
-        v-if="album.coverUrl"
-        :src="albumImageUrl(album.id)"
-        :alt="album.title + ' cover'"
-        class="size-[120px] md:size-[160px] rounded-lg object-cover shrink-0"
-      />
-      <div
-        v-else
-        class="size-[120px] md:size-[160px] bg-muted rounded-lg flex items-center justify-center text-[64px] shrink-0"
-      >
-        ♪
+  <div v-if="!isPending && album" class="flex flex-col gap-8">
+    <section class="flex flex-col gap-6 md:flex-row md:items-end md:gap-10">
+      <div class="relative h-[180px] w-[250px] shrink-0 md:h-[240px] md:w-[330px]">
+        <span aria-hidden="true" class="album-disc" />
+        <CoverArt
+          :src="cover"
+          :alt="album.title + ' cover'"
+          class="absolute left-0 top-0 size-[180px] shadow-[0_12px_28px_#000] md:size-[240px]"
+        />
       </div>
-      <div class="min-w-0">
-        <div class="text-xs font-bold uppercase tracking-widest text-dimmed mb-1">Album</div>
-        <h1 class="text-[24px] md:text-[28px] font-extrabold mb-1">{{ album.title }}</h1>
-        <div class="text-sm mt-2">
+      <div class="flex min-w-0 flex-col gap-2.5">
+        <span class="font-label text-[10px] uppercase tracking-[0.3em] text-amber glow-amber">Album</span>
+        <h1 class="break-words font-display text-[40px] font-extrabold uppercase leading-none text-cyan glow-lg md:text-[60px]">{{ album.title }}</h1>
+        <div class="flex flex-wrap items-center gap-x-2.5 text-[15px] text-soft">
           <button
             type="button"
-            class="font-semibold hover:underline"
+            class="text-cyan underline-offset-4 hover:underline"
             @click="router.push(`/library/artists/${album.artist.id}`)"
           >{{ album.artist.name }}</button>
-          <span class="text-[13px] text-dimmed"> · {{ album.releaseYear }}</span>
-          <span class="text-[13px] text-dimmed"> · {{ trackList.length }} tracks</span>
+          <span>· {{ album.releaseYear }}</span>
+          <span>· {{ trackList.length }} tracks</span>
+          <span v-if="trackList.length">· {{ minutes }} min</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5 pt-2.5">
+          <Button v-if="!party.inParty" @click="player.playQueue(trackList)">
+            <template #icon><Play :size="14" aria-hidden="true" /></template>
+            Play all
+          </Button>
+          <Button v-if="!party.inParty" variant="outline" @click="player.playQueueShuffled(trackList)">
+            <template #icon><Shuffle :size="14" aria-hidden="true" /></template>
+            Shuffle
+          </Button>
+          <Button variant="outline" :disabled="trackList.length === 0" @click="addAllToQueue">
+            <template #icon><ListPlus :size="14" aria-hidden="true" /></template>
+            {{ party.inParty ? 'Add to party queue' : 'Add to queue' }}
+          </Button>
+          <Button variant="outline" :disabled="trackList.length === 0" @click="albumDialogOpen = true">
+            <template #icon><Plus :size="14" aria-hidden="true" /></template>
+            Add to playlist
+          </Button>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="flex flex-wrap items-center gap-2 mb-6">
-      <Button v-if="!party.inParty" @click="player.playQueue(trackList)">
-        <Play :size="16" />
-        Play all
-      </Button>
-      <Button v-if="!party.inParty" variant="outline" @click="player.playQueueShuffled(trackList)">
-        <Shuffle :size="16" />
-        Shuffle
-      </Button>
-      <Button
-        variant="outline"
-        :disabled="trackList.length === 0"
-        @click="addAllToQueue"
-      >
-        <ListPlus :size="16" />
-        {{ party.inParty ? 'Add to party queue' : 'Add to queue' }}
-      </Button>
-      <Button
-        variant="outline"
-        :disabled="trackList.length === 0"
-        @click="albumDialogOpen = true"
-      >
-        <Plus :size="16" />
-        Add to playlist
-      </Button>
-    </div>
-
-    <div v-if="trackList.length === 0" class="text-[13px] text-dimmed mt-6">
-      No tracks in this album yet.
-    </div>
-    <div v-else class="mt-2">
+    <StatePlate v-if="trackList.length === 0" code="NO TRACKS" message="No tracks in this album yet." />
+    <section v-else class="flex flex-col gap-1">
+      <TrackListHeader />
       <div
         v-for="(track, i) in trackList"
         :id="`track-${track.id}`"
@@ -150,10 +143,10 @@ onBeforeUnmount(() => {
           :show-add-to-playlist="true"
         />
       </div>
-    </div>
+    </section>
   </div>
-  <div v-else-if="isError" class="text-[13px] text-dimmed">This album is not available.</div>
-  <div v-else class="text-[13px] text-dimmed">Loading…</div>
+  <StatePlate v-else-if="isError" kind="error" code="ERR 404" message="This album is not available." />
+  <StatePlate v-else kind="loading" code="READING…" message="Loading…" />
 
   <AddToPlaylistDialog
     :open="albumDialogOpen"
@@ -163,8 +156,28 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.album-disc {
+  position: absolute;
+  top: 6px;
+  right: 0;
+  width: 168px;
+  height: 168px;
+  border-radius: 9999px;
+  background: conic-gradient(#c9d3d9, #5cf6e8 15%, #e9eef2 30%, #ff4fd8 48%, #b8c2c9 62%, #ffb23f 80%, #c9d3d9);
+  -webkit-mask: radial-gradient(circle, transparent 14px, #000 15px);
+  mask: radial-gradient(circle, transparent 14px, #000 15px);
+  box-shadow: 0 6px 14px #000000aa;
+}
+
+@media (min-width: 768px) {
+  .album-disc {
+    width: 228px;
+    height: 228px;
+  }
+}
+
 .track-anchor {
-  border-radius: 10px;
+  border-radius: 6px;
 }
 
 .track-anchor--focused {
@@ -173,18 +186,22 @@ onBeforeUnmount(() => {
 
 @keyframes track-shine {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
-    outline: 1px solid transparent;
+    box-shadow: 0 0 0 0 transparent;
   }
   35% {
-    box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 45%, transparent);
-    outline: 1px solid color-mix(in oklab, var(--primary) 70%, white 10%);
-    background: color-mix(in oklab, var(--primary) 12%, transparent);
+    box-shadow: 0 0 0 1px #5cf6e8, 0 0 18px #5cf6e866;
+    background: #5cf6e81a;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
-    outline: 1px solid transparent;
+    box-shadow: 0 0 0 0 transparent;
     background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track-anchor--focused {
+    animation: none;
+    box-shadow: 0 0 0 1px #5cf6e8;
   }
 }
 </style>

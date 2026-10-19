@@ -86,6 +86,7 @@ describe('rendering', () => {
       global: { plugins: [pinia, router], stubs: { ImageUpload: ImageUploadStub } },
     })
     expect(wrapper.text()).toContain('Loading')
+    expect(wrapper.find('[data-code]').text()).toBe('READING…')
   })
 
   it('renders the Edit Artist heading after load', async () => {

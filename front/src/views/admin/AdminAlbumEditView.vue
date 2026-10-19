@@ -12,7 +12,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ImageUpload from '@/components/admin/ImageUpload.vue'
 import draggable from 'vuedraggable'
-import { ArrowLeft, GripVertical, X, Music } from 'lucide-vue-next'
+import { ArrowLeft, Save } from 'lucide-vue-next'
+import AudioDropZone from '@/components/admin/AudioDropZone.vue'
+import EditTrackRow from '@/components/admin/EditTrackRow.vue'
+import { LedBar, PageHeader, StatePlate, VfdSelect } from '@/components/vfd'
 
 interface EditableTrack {
   id: string
@@ -45,7 +48,6 @@ const releaseYear = ref(new Date().getFullYear())
 const loading = ref(false)
 const uploadProgress = ref(0)
 const uploadStatus = ref('')
-const isDragOver = ref(false)
 
 const pendingCover = ref<File | null>(null)
 const removeCover = ref(false)
@@ -78,12 +80,6 @@ onMounted(async () => {
   }
 })
 
-function formatDuration(secs: number) {
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
 function stripExtension(name: string) {
   return name.replace(/\.[^/.]+$/, '')
 }
@@ -106,14 +102,8 @@ async function addFiles(files: FileList | File[]) {
   }
 }
 
-function onDropZoneChange(e: Event) {
-  const files = (e.target as HTMLInputElement).files
-  if (files) addFiles(files)
-}
-
-function onDrop(e: DragEvent) {
-  isDragOver.value = false
-  if (e.dataTransfer?.files) addFiles(e.dataTransfer.files)
+function onFiles(files: File[]) {
+  void addFiles(files)
 }
 
 function removeExistingTrack(id: string) {
@@ -223,240 +213,102 @@ async function save() {
 </script>
 
 <template>
-  <div v-if="album">
-    <button
-      class="flex items-center gap-1.5 text-[13px] text-dimmed hover:text-foreground transition-colors mb-6"
-      @click="router.push('/admin/albums')"
-    >
-      <ArrowLeft :size="14" />
+  <div v-if="album" class="flex flex-col gap-5">
+    <Button variant="ghost" size="sm" class="self-start px-0" @click="router.push('/admin/albums')">
+      <template #icon><ArrowLeft :size="13" aria-hidden="true" /></template>
       Back to albums
-    </button>
+    </Button>
 
-    <h1 class="text-[28px] font-extrabold mb-6">Edit Album</h1>
+    <PageHeader kicker="Admin · Albums · Edit" title="Edit Album" />
 
-    <form class="edit-layout" @submit.prevent="save">
-
-      <!-- Left column: metadata -->
-      <div class="admin-form">
-        <div class="form-group">
-          <Label>Title</Label>
-          <Input v-model="title" required />
+    <form class="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]" @submit.prevent="save">
+      <div
+        class="flex flex-col gap-4 rounded-lg border border-chrome-lo/40 bg-[linear-gradient(to_top,#0A0F12,#141B20)] p-[22px] shadow-[0_10px_24px_#000000cc]"
+      >
+        <div class="flex flex-col gap-2">
+          <Label for="edit-album-title">Title</Label>
+          <Input id="edit-album-title" v-model="title" required />
         </div>
-
-        <div class="form-group">
-          <Label>Artist</Label>
-          <select
-            v-model="artistId"
-            class="flex h-10 w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary"
-            required
-          >
+        <div class="flex flex-col gap-2">
+          <Label for="edit-album-artist">Artist</Label>
+          <VfdSelect id="edit-album-artist" v-model="artistId" required>
             <option v-for="a in artists" :key="a.id" :value="a.id">{{ a.name }}</option>
-          </select>
+          </VfdSelect>
         </div>
-
-        <div class="form-group">
-          <Label>Release Year</Label>
-          <Input v-model="releaseYear" type="number" min="1900" :max="new Date().getFullYear() + 2" required />
+        <div class="flex flex-col gap-2">
+          <Label for="edit-album-year">Release Year</Label>
+          <Input id="edit-album-year" v-model="releaseYear" type="number" min="1900" :max="new Date().getFullYear() + 2" required />
         </div>
-
-        <div class="form-group">
-          <ImageUpload
-            ref="imageUploadRef"
-            :current-url="currentCoverUrl"
-            label="Cover"
-            @select="pendingCover = $event; removeCover = false"
-            @remove="pendingCover = null; removeCover = true"
-          />
-        </div>
-
-        <!-- Upload progress -->
-        <div v-if="loading && uploadStatus" class="flex flex-col gap-1.5">
-          <span class="text-[13px] text-dimmed">{{ uploadStatus }}</span>
-          <div class="flex items-center gap-2">
-            <div class="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
-              <div class="h-full bg-primary transition-all duration-200" :style="{ width: uploadProgress + '%' }" />
-            </div>
-            <span class="text-[12px] text-dimmed shrink-0">{{ uploadProgress }}%</span>
+        <ImageUpload
+          ref="imageUploadRef"
+          :current-url="currentCoverUrl"
+          label="Cover"
+          @select="pendingCover = $event; removeCover = false"
+          @remove="pendingCover = null; removeCover = true"
+        />
+        <div v-if="loading && uploadStatus" class="flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <span class="font-label text-[9px] uppercase tracking-[0.2em] text-amber">{{ uploadStatus }}</span>
+            <span class="font-display text-base font-extrabold text-amber glow-amber">{{ uploadProgress }}%</span>
           </div>
+          <LedBar :value="uploadProgress" :max="100" :segments="40" tone="amber" />
         </div>
-
-        <Button type="submit" :disabled="loading">
+        <Button type="submit" :disabled="loading" class="w-full">
+          <template #icon><Save :size="13" aria-hidden="true" /></template>
           {{ loading ? (uploadProgress > 0 ? 'Uploading…' : 'Saving…') : 'Save changes' }}
         </Button>
       </div>
 
-      <!-- Separator -->
-      <div class="separator" />
-
-      <!-- Right column: tracks -->
-      <div class="tracks-column">
-
-        <!-- Existing tracks -->
-        <div v-if="tracks.length > 0" class="form-group">
-          <Label>Tracks</Label>
-          <div class="flex flex-col gap-1 mt-1">
-            <div class="grid [grid-template-columns:24px_24px_1fr_80px_52px_28px] items-center gap-2 px-2 pb-1 border-b border-border">
-              <span class="text-[11px] text-dimmed text-right">#</span>
-              <span></span>
-              <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed">Title</span>
-              <a
-                href="https://lrclib.net/search"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-[11px] font-semibold uppercase tracking-wider text-dimmed hover:text-primary transition-colors"
-                title="Search on lrclib.net"
-              >Lyrics ID ↗</a>
-              <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed text-right">Time</span>
-              <span></span>
-            </div>
+      <div class="flex min-w-0 flex-col gap-3.5">
+        <template v-if="tracks.length > 0">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="font-display text-[22px] font-extrabold uppercase text-cyan glow-sm">Tracks · {{ String(tracks.length).padStart(2, '0') }}</span>
+            <a
+              href="https://lrclib.net/search"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-xs text-faint transition-colors hover:text-cyan"
+              title="Search on lrclib.net"
+            >drag to reorder · lyrics id from lrclib.net ↗</a>
+          </div>
+          <div class="rounded-md border border-line bg-panel py-1">
             <draggable v-model="tracks" item-key="id" handle=".drag-handle">
               <template #item="{ element, index }">
-                <div class="grid [grid-template-columns:24px_24px_1fr_80px_52px_28px] items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 group">
-                  <span class="text-[12px] text-dimmed text-right">{{ index + 1 }}</span>
-                  <GripVertical :size="14" class="drag-handle text-dimmed cursor-grab active:cursor-grabbing" />
-                  <input
-                    v-model="element.title"
-                    class="bg-transparent border-none outline-none text-[13px] font-medium text-foreground w-full focus:bg-muted rounded px-1 -mx-1"
-                  />
-                  <input
-                    v-model.number="element.lrclibId"
-                    type="number"
-                    class="no-spinner bg-transparent border-none outline-none text-[12px] text-dimmed w-full focus:bg-muted rounded px-1 -mx-1"
-                    placeholder="—"
-                  />
-                  <span class="text-[12px] text-dimmed text-right">{{ formatDuration(element.durationSeconds) }}</span>
-                  <button
-                    type="button"
-                    class="flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                    @click="deleteExistingTrack(element.id)"
-                  >
-                    <X :size="14" />
-                  </button>
-                </div>
+                <EditTrackRow
+                  :index="index"
+                  :title="element.title"
+                  :lyrics-id="element.lrclibId"
+                  :duration="element.durationSeconds"
+                  show-lyrics
+                  @update:title="element.title = $event"
+                  @update:lyrics-id="element.lrclibId = $event"
+                  @remove="deleteExistingTrack(element.id)"
+                />
               </template>
             </draggable>
           </div>
-        </div>
+        </template>
 
-        <!-- Add new tracks drop zone -->
-        <div class="form-group">
-          <Label>Add more tracks</Label>
-          <div
-            class="relative flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed px-4 py-6 text-center transition-colors cursor-pointer"
-            :class="isDragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground'"
-            @dragover.prevent="isDragOver = true"
-            @dragleave.prevent="isDragOver = false"
-            @drop.prevent="onDrop"
-            @click="($refs.fileInput as HTMLInputElement).click()"
-          >
-            <Music :size="24" class="text-dimmed" />
-            <span class="text-[13px] text-muted-foreground">Drop audio files here, or click to browse</span>
-            <span class="text-[11px] text-dimmed">MP3, FLAC, OGG, WAV, AAC</span>
-            <input
-              ref="fileInput"
-              type="file"
-              accept="audio/mpeg,audio/ogg,audio/flac,audio/wav,audio/aac"
-              multiple
-              class="hidden"
-              @change="onDropZoneChange"
-            />
-          </div>
-        </div>
+        <AudioDropZone title="Add more tracks" @files="onFiles" />
 
-        <!-- Pending new tracks -->
-        <div v-if="pendingTracks.length > 0" class="flex flex-col gap-1">
-          <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 pb-1 border-b border-border">
-            <span class="text-[11px] text-dimmed text-right">#</span>
-            <span></span>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed">Title</span>
-            <span class="text-[11px] font-semibold uppercase tracking-wider text-dimmed text-right">Time</span>
-            <span></span>
-          </div>
-          <draggable v-model="pendingTracks" item-key="uid" handle=".drag-handle">
-            <template #item="{ element, index }">
-              <div class="grid [grid-template-columns:24px_24px_1fr_52px_28px] items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 group">
-                <span class="text-[12px] text-dimmed text-right">{{ tracks.length + index + 1 }}</span>
-                <GripVertical :size="14" class="drag-handle text-dimmed cursor-grab active:cursor-grabbing" />
-                <input
-                  v-model="element.title"
-                  class="bg-transparent border-none outline-none text-[13px] font-medium text-foreground w-full focus:bg-muted rounded px-1 -mx-1"
+        <template v-if="pendingTracks.length > 0">
+          <span class="font-label text-[10px] uppercase tracking-[0.2em] text-amber">Pending tracks · {{ pendingTracks.length }}</span>
+          <div class="rounded-md border border-amber-ghost bg-panel py-1">
+            <draggable v-model="pendingTracks" item-key="uid" handle=".drag-handle">
+              <template #item="{ element, index }">
+                <EditTrackRow
+                  :index="tracks.length + index"
+                  :title="element.title"
+                  :duration="element.durationSeconds"
+                  @update:title="element.title = $event"
+                  @remove="removePendingTrack(element.uid)"
                 />
-                <span class="text-[12px] text-dimmed text-right">{{ formatDuration(element.durationSeconds) }}</span>
-                <button
-                  type="button"
-                  class="flex items-center justify-center text-dimmed opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"
-                  @click="removePendingTrack(element.uid)"
-                >
-                  <X :size="14" />
-                </button>
-              </div>
-            </template>
-          </draggable>
-        </div>
-
+              </template>
+            </draggable>
+          </div>
+        </template>
       </div>
     </form>
   </div>
-  <div v-else class="text-[13px] text-dimmed">Loading…</div>
+  <StatePlate v-else kind="loading" code="READING…" message="Loading…" />
 </template>
-
-<style scoped>
-.edit-layout {
-  display: grid;
-  grid-template-columns: minmax(320px, 500px) minmax(0, 1fr);
-  align-items: start;
-  gap: 24px;
-}
-
-.admin-form {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.separator {
-  display: none;
-  width: 1px;
-  align-self: stretch;
-  background: var(--border);
-}
-
-.tracks-column {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-select option { background: var(--muted); }
-
-.no-spinner::-webkit-outer-spin-button,
-.no-spinner::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.no-spinner { -moz-appearance: textfield; }
-
-@media (max-width: 1023px) {
-  .edit-layout {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .edit-layout {
-    grid-template-columns: minmax(320px, 460px) 1px minmax(0, 1fr);
-    gap: 0;
-  }
-
-  .separator {
-    display: block;
-    margin: 0 24px;
-  }
-}
-</style>

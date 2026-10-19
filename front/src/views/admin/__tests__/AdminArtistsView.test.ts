@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { dialogStubs } from '@/test-utils/dialog'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
@@ -28,7 +29,7 @@ async function mountView() {
   })
   await router.push('/admin/artists')
   const wrapper = mount(AdminArtistsView, {
-    global: { plugins: [router], stubs: { Teleport: true, Transition: true, ImageUpload: ImageUploadStub } },
+    global: { plugins: [router], stubs: { ...dialogStubs, ImageUpload: ImageUploadStub } },
   })
   await flushPromises()
   return { wrapper, router }
@@ -81,7 +82,7 @@ describe('AdminArtistsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Artist')!.trigger('click')
-    const form = wrapper.find('form.admin-form')
+    const form = wrapper.find('[data-testid="admin-form"]')
     await form.find('input').setValue('Kode9')
     await form.trigger('submit')
     await flushPromises()
@@ -95,7 +96,7 @@ describe('AdminArtistsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Artist')!.trigger('click')
-    const form = wrapper.find('form.admin-form')
+    const form = wrapper.find('[data-testid="admin-form"]')
     await form.find('input').setValue('Burial')
     await form.trigger('submit')
     await flushPromises()
@@ -119,5 +120,12 @@ describe('AdminArtistsView', () => {
     api.getAdminArtists.mockRejectedValue(httpError(500))
     await mountView()
     expect(toastMock.error).toHaveBeenCalledWith('Failed to load artists')
+  })
+
+  it('shows a no match plate when no artists match', async () => {
+    api.getAdminArtists.mockResolvedValue([])
+    const { wrapper } = await mountView()
+    expect(wrapper.text()).toContain('No artists found.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO MATCH')
   })
 })

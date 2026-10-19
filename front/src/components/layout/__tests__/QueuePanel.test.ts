@@ -54,9 +54,9 @@ describe('QueuePanel', () => {
     player.currentIndex = 1
 
     const wrapper = mount(QueuePanel)
-    const rows = wrapper.findAll('.flex.items-center.gap-2')
-    expect(rows[1]!.classes()).toContain('bg-muted')
-    expect(rows[0]!.classes()).not.toContain('bg-muted')
+    const rows = wrapper.findAll('[data-testid="queue-item"]')
+    expect(rows[1]!.attributes('data-current')).toBeDefined()
+    expect(rows[0]!.attributes('data-current')).toBeUndefined()
   })
 
   it('calls removeFromQueue when remove button is clicked', async () => {
@@ -127,8 +127,8 @@ describe('QueuePanel in a party', () => {
   it('highlights the playing item, not the first duplicate', () => {
     const { wrapper } = mountInParty('u-host')
     const rows = wrapper.findAll('[data-testid="party-queue-item"]')
-    expect(rows[2]!.classes()).toContain('bg-muted')
-    expect(rows[0]!.classes()).not.toContain('bg-muted')
+    expect(rows[2]!.attributes('data-current')).toBeDefined()
+    expect(rows[0]!.attributes('data-current')).toBeUndefined()
   })
 
   it('sends the dragged order when reordering', async () => {
@@ -156,5 +156,16 @@ describe('QueuePanel in a party', () => {
     const { wrapper } = mountInParty('u-member')
     expect(wrapper.findAll('button[title="Remove"]')).toHaveLength(0)
     expect(wrapper.findComponent({ name: 'draggable' }).props('disabled')).toBe(true)
+  })
+
+  it('non-controller sees lock note and no remove buttons', () => {
+    const { wrapper } = mountInParty('u-member')
+    expect(wrapper.find('[data-testid="queue-lock-note"]').exists()).toBe(true)
+    expect(wrapper.findAll('button[title="Remove"]')).toHaveLength(0)
+  })
+
+  it('controller does not see the lock note', () => {
+    const { wrapper } = mountInParty('u-host')
+    expect(wrapper.find('[data-testid="queue-lock-note"]').exists()).toBe(false)
   })
 })

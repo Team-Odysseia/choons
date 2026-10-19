@@ -8,6 +8,10 @@ import type { TrackResponse } from '@/api/types'
 import { Play, Plus, ListPlus, Heart } from 'lucide-vue-next'
 import AddToPlaylistDialog from './AddToPlaylistDialog.vue'
 import { useFavoritesStore } from '@/stores/favorites'
+import { IconKey, Spectrum, VfdBadge } from '@/components/vfd'
+import { formatDuration } from '@/lib/format'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps<{
   track: TrackResponse
@@ -40,82 +44,87 @@ function addToQueue() {
   player.addToQueue(props.track)
 }
 
-function formatDuration(secs: number) {
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
 const isActive = computed(() => player.currentTrack?.id === props.track.id)
+const isFavorited = computed(() => favorites.isFavorited(props.track.id))
+const number = computed(() => String((props.index ?? 0) + 1).padStart(2, '0'))
 </script>
 
 <template>
   <div
-    class="grid [grid-template-columns:32px_minmax(0,1fr)_60px] md:[grid-template-columns:32px_minmax(0,1fr)_40px_minmax(0,1fr)_60px_80px] items-center gap-2 md:gap-3 px-3 py-2 rounded transition-colors hover:bg-muted group"
+    v-bind="$attrs"
+    :class="[
+      'group grid items-center gap-3 rounded px-3 py-2.5 transition-colors md:gap-4 md:px-4',
+      '[grid-template-columns:28px_minmax(0,1fr)_56px] md:[grid-template-columns:28px_minmax(0,1fr)_minmax(0,240px)_150px_56px]',
+      isActive ? 'border-l-2 border-cyan-dim bg-cyan-wash' : 'border-l-2 border-transparent hover:bg-panel-2',
+    ]"
   >
-    <span class="text-[13px] text-dimmed text-right">{{ (index ?? 0) + 1 }}</span>
-
-    <div
-      class="flex flex-col gap-0.5 min-w-0 cursor-pointer"
-      @click.stop="play"
-    >
-      <span class="text-sm font-medium truncate" :class="isActive ? 'text-primary' : 'text-foreground'">{{ track.title }}</span>
-      <span class="text-xs text-muted-foreground truncate">{{ track.artist.name }}</span>
+    <div class="flex h-[18px] items-center">
+      <div v-if="isActive" class="h-4 w-5">
+        <Spectrum mini :active="player.isPlaying" :bars="4" :segments="5" :seed="5" />
+      </div>
+      <span v-else data-testid="track-index" class="font-display text-[15px] font-extrabold text-faint">{{ number }}</span>
     </div>
 
-    <div class="hidden md:flex items-center">
-      <span v-if="track.hifi" class="text-[9px] font-bold tracking-widest px-1 py-px rounded border border-primary/50 text-primary/80 leading-none">HI-FI</span>
+    <div class="flex min-w-0 cursor-pointer flex-col gap-0.5" @click.stop="play">
+      <div class="flex min-w-0 items-center gap-2.5">
+        <span
+          data-testid="track-title"
+          :data-active="isActive ? '' : undefined"
+          :class="['truncate text-[15px]', isActive ? 'text-cyan glow-sm' : 'text-fg']"
+        >{{ track.title }}</span>
+        <VfdBadge v-if="track.hifi" tone="amber" label="HI-FI" class="hidden md:inline-flex" />
+      </div>
+      <span class="truncate text-[13px] text-soft">{{ track.artist.name }}</span>
     </div>
 
     <span
-      class="hidden md:block text-[13px] text-muted-foreground truncate cursor-pointer hover:underline hover:text-foreground transition-colors"
+      class="hidden cursor-pointer truncate text-[13px] text-soft transition-colors hover:text-cyan md:block"
       @click.stop="router.push(`/library/albums/${track.album.id}`)"
     >{{ track.album.title }}</span>
 
-    <span class="text-[13px] text-dimmed text-right">{{ formatDuration(track.durationSeconds) }}</span>
-
-    <div class="hidden md:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-      <button
+    <div class="hidden items-center justify-end gap-1 md:flex">
+      <IconKey
         v-if="!party.inParty"
-        class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-        title="Play"
+        bare
+        :size="30"
+        :icon="Play"
+        label="Play"
+        class="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
         @click.stop="play"
-      >
-        <Play :size="16" />
-      </button>
-
-      <button
-        class="size-8 rounded-full flex items-center justify-center transition-colors"
-        :class="favorites.isFavorited(track.id) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'"
-        :title="favorites.isFavorited(track.id) ? 'Remove from favorites' : 'Add to favorites'"
+      />
+      <IconKey
+        bare
+        :size="30"
+        :icon="Heart"
+        :lit="isFavorited"
+        :filled="isFavorited"
+        :label="isFavorited ? 'Remove from favorites' : 'Add to favorites'"
         @click.stop="favorites.toggle(track.id)"
-      >
-        <Heart :size="16" :fill="favorites.isFavorited(track.id) ? 'currentColor' : 'none'" />
-      </button>
-
-      <button
+      />
+      <IconKey
         v-if="showAddToQueue"
-        class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-        :title="party.inParty ? 'Add to party queue' : 'Add to queue'"
+        bare
+        :size="30"
+        :icon="ListPlus"
+        :label="party.inParty ? 'Add to party queue' : 'Add to queue'"
+        class="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
         @click.stop="addToQueue"
-      >
-        <ListPlus :size="16" />
-      </button>
-
-      <button
+      />
+      <IconKey
         v-if="showAddToPlaylist"
-        class="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-        title="Add to playlist"
+        bare
+        :size="30"
+        :icon="Plus"
+        label="Add to playlist"
+        class="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
         @click.stop="dialogOpen = true"
-      >
-        <Plus :size="16" />
-      </button>
+      />
     </div>
+
+    <span
+      :class="['text-right font-display text-[15px] font-extrabold', isActive ? 'text-cyan glow-sm' : 'text-soft']"
+    >{{ formatDuration(track.durationSeconds) }}</span>
   </div>
 
-  <AddToPlaylistDialog
-    :open="dialogOpen"
-    :tracks="[track]"
-    @close="dialogOpen = false"
-  />
+  <AddToPlaylistDialog :open="dialogOpen" :tracks="[track]" @close="dialogOpen = false" />
 </template>

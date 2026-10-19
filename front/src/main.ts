@@ -1,3 +1,8 @@
+import '@fontsource/doto/latin-700.css'
+import '@fontsource/doto/latin-800.css'
+import '@fontsource/doto/latin-900.css'
+import '@fontsource/michroma/latin-400.css'
+import '@fontsource/share-tech-mono/latin-400.css'
 import './assets/main.css'
 import 'vue-sonner/style.css'
 

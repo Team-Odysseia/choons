@@ -37,7 +37,18 @@ describe('FavoritesView', () => {
     getFavorites.mockResolvedValue([])
     const wrapper = mountView()
     await flushPromises()
-    expect(wrapper.text()).toContain('No favorites yet')
+    expect(wrapper.text()).toContain('No favorites yet. Heart a song to add it here.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO DISC')
+  })
+
+  it('shows a hearted count readout', async () => {
+    getFavorites.mockResolvedValue([
+      { track: makeTrack({ id: 't-1', title: 'Archangel' }), favoritedAt: '' },
+      { track: makeTrack({ id: 't-2', title: 'Near Dark' }), favoritedAt: '' },
+    ])
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="hearted-readout"]').text()).toContain('002')
   })
 
   it('lists favorite tracks', async () => {

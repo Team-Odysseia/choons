@@ -77,6 +77,10 @@ Purpose: fast orientation map for future tasks in this repo.
 
 ## 6) Frontend Feature Map
 
+- Look and feel: 90s VFD car head unit (design in `design/choons-vfd.pen`, read via the pencil MCP)
+  - Tokens/utilities in `assets/main.css` (`bg-panel`, `text-cyan`, `text-soft`, `glow-sm`, `vfd-well`, `vfd-scanlines`, `faceplate`, `led-on`…); fonts via `@fontsource/*` + `dseg`
+  - Kit in `components/vfd/` (IconKey, VfdBadge, Readout, Marquee, LedBar, Spectrum, VolumeKnob, StatePlate, SectionHeader, PageHeader, CoverArt, BrandPlate…); `Button`/`Input`/`BaseDialog` in `components/ui/` are VFD-styled (dialogs use Reka UI)
+  - Icons only from `lucide-vue-next`; spectrum is simulated (`lib/spectrum.ts`), never WebAudio; `lib/motion.ts` exposes `prefersReducedMotion`
 - Library/music:
   - Views: `LibraryView.vue`, `ArtistView.vue`, `AlbumView.vue`, `AllAlbumsView.vue`
   - Components: `MusicPlayer.vue`, `TrackRow.vue`

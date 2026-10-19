@@ -42,7 +42,7 @@ describe('rendering', () => {
   it('does not show label when not provided', () => {
     const wrapper = mountUpload()
     // The label <span> has class font-medium; other spans in the component don't
-    expect(wrapper.find('span.font-medium').exists()).toBe(false)
+    expect(wrapper.find('[data-label]').exists()).toBe(false)
   })
 
   it('shows current image when currentUrl is provided', () => {
@@ -182,7 +182,7 @@ describe('drag and drop', () => {
   it('emits select when an image file is dropped', async () => {
     const wrapper = mountUpload()
     const file = makeFile()
-    const dropZone = wrapper.find('[class*="border-dashed"]')
+    const dropZone = wrapper.find('[data-dropzone]')
     await dropZone.trigger('drop', {
       dataTransfer: { files: [file] },
     })
@@ -193,7 +193,7 @@ describe('drag and drop', () => {
   it('does not emit select when dropped file is not an image', async () => {
     const wrapper = mountUpload()
     const file = new File(['data'], 'song.mp3', { type: 'audio/mpeg' })
-    const dropZone = wrapper.find('[class*="border-dashed"]')
+    const dropZone = wrapper.find('[data-dropzone]')
     await dropZone.trigger('drop', {
       dataTransfer: { files: [file] },
     })
@@ -202,16 +202,16 @@ describe('drag and drop', () => {
 
   it('applies drag-over styling when file is dragged over', async () => {
     const wrapper = mountUpload()
-    const dropZone = wrapper.find('[class*="border-dashed"]')
+    const dropZone = wrapper.find('[data-dropzone]')
     await dropZone.trigger('dragover')
-    expect(dropZone.classes().join(' ')).toContain('border-primary')
+    expect(dropZone.attributes('data-active')).toBeDefined()
   })
 
   it('removes drag-over styling when file is dragged out', async () => {
     const wrapper = mountUpload()
-    const dropZone = wrapper.find('[class*="border-dashed"]')
+    const dropZone = wrapper.find('[data-dropzone]')
     await dropZone.trigger('dragover')
     await dropZone.trigger('dragleave')
-    expect(dropZone.classes().join(' ')).not.toContain('border-primary')
+    expect(dropZone.attributes('data-active')).toBeUndefined()
   })
 })

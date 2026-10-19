@@ -64,6 +64,7 @@ describe('rendering', () => {
     const { wrapper } = mountView()
     await flushPromises()
     expect(wrapper.text()).toContain('No albums yet')
+    expect(wrapper.find('[data-code]').text()).toBe('NO ALBUMS')
   })
 
   it('shows loading state while fetching', () => {
@@ -167,9 +168,27 @@ describe('navigation', () => {
     mockGetAlbums.mockResolvedValue([makeAlbum('al-99', 'Click Me', 5)])
     const { wrapper, router } = mountView()
     await flushPromises()
-    const card = wrapper.find('[class*="bg-card"]')
+    const card = wrapper.find('[data-testid="album-grid"] a')
     await card.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/library/albums/al-99')
+  })
+})
+
+describe('grid hover', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('squeezes the following cards in the row instead of pushing them out', async () => {
+    mockGetAlbums.mockResolvedValue([makeAlbum('al-1', 'One', 30), makeAlbum('al-2', 'Two', 30), makeAlbum('al-3', 'Three', 30)])
+    const { wrapper } = mountView()
+    await flushPromises()
+    const cards = wrapper.findAll('[data-album-card]')
+    expect(cards[0]!.classes()).not.toContain('album-card--push')
+    await cards[0]!.trigger('mouseover')
+    expect((cards[1]!.element as HTMLElement).style.transform).toBe('translateX(56px)')
+    expect((cards[2]!.element as HTMLElement).style.transform).toBe('')
   })
 })
