@@ -106,4 +106,28 @@ describe('LyricsPanel', () => {
     expect(paragraphs[1]!.attributes('aria-current')).toBe('true')
     expect(paragraphs[0]!.attributes('aria-current')).toBeUndefined()
   })
+
+  it('cross-fades from the previous line to the new one', async () => {
+    const { useLyricsStore } = await import('@/stores/lyrics')
+    const { usePlayerStore } = await import('@/stores/player')
+    const store = useLyricsStore()
+    const player = usePlayerStore()
+    store.loading = false
+    store.plainLyrics = null
+    store.lines = [
+      { timeMs: 0, text: 'First line' },
+      { timeMs: 5000, text: 'Second line' },
+    ]
+    player.$patch({ currentTime: 1 })
+
+    const { default: LyricsPanel } = await import('../LyricsPanel.vue')
+    const wrapper = mount(LyricsPanel)
+    player.$patch({ currentTime: 6 })
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    const paragraphs = wrapper.findAll('p')
+    expect(paragraphs[1]!.classes()).toContain('lyric-enter')
+    expect(paragraphs[0]!.classes()).toContain('lyric-leave')
+  })
 })

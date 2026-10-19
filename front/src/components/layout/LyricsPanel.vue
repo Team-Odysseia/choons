@@ -8,10 +8,12 @@ import { prefersReducedMotion } from '@/lib/motion'
 const lyrics = useLyricsStore()
 const player = usePlayerStore()
 const lineRefs = ref<HTMLElement[]>([])
+const leavingIndex = ref(-1)
 
 watch(
   () => lyrics.activeLineIndex,
-  async (idx) => {
+  async (idx, previous) => {
+    leavingIndex.value = previous ?? -1
     if (idx < 0) return
     await nextTick()
     lineRefs.value[idx]?.scrollIntoView({ behavior: prefersReducedMotion.value ? 'auto' : 'smooth', block: 'center' })
@@ -33,6 +35,8 @@ watch(
         :aria-current="i === lyrics.activeLineIndex ? 'true' : undefined"
         :class="[
           'lyric-line cursor-pointer transition-[color,opacity] duration-150 hover:text-fg',
+          i === lyrics.activeLineIndex && 'lyric-enter',
+          i === leavingIndex && i !== lyrics.activeLineIndex && 'lyric-leave',
           i === lyrics.activeLineIndex
             ? 'font-display text-[22px] font-extrabold leading-tight text-cyan glow-lg'
             : 'text-[15px] leading-snug text-faint',
@@ -49,3 +53,37 @@ watch(
     </div>
   </div>
 </template>
+
+<style scoped>
+.lyric-enter {
+  animation: lyric-enter 380ms ease-out;
+}
+
+.lyric-leave {
+  animation: lyric-leave 380ms ease-out;
+}
+
+@keyframes lyric-enter {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes lyric-leave {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lyric-enter,
+  .lyric-leave {
+    animation: none;
+  }
+}
+</style>
