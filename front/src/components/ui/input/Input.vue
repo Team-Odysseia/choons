@@ -21,9 +21,16 @@ const modelValue = defineModel<string | number>()
     v-model="modelValue"
     :class="
       cn(
-        'flex h-10 w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:cursor-not-allowed disabled:opacity-50',
+        'vfd-input flex h-[42px] w-full rounded border border-line bg-glass px-3.5 font-body text-[15px] text-fg shadow-[inset_0_2px_6px_#000000cc] outline-none transition-[border-color,box-shadow] placeholder:text-faint focus:border-cyan-dim focus:shadow-[inset_0_2px_6px_#000000cc,0_0_12px_#5CF6E833] disabled:cursor-not-allowed disabled:opacity-50',
         props.class,
       )
     "
   />
 </template>
+
+<style scoped>
+.vfd-input {
+  caret-color: #5CF6E8;
+  caret-shape: block;
+}
+</style>
