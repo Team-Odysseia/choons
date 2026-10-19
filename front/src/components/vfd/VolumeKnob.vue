@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { SliderRoot, SliderThumb, SliderTrack } from 'reka-ui'
 
 const props = defineProps<{ modelValue: number }>()
@@ -8,6 +8,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: number] }>()
 const clamped = computed(() => Math.min(1, Math.max(0, props.modelValue)))
 const sweep = computed(() => Math.round(270 * clamped.value))
 const percent = computed(() => Math.round(clamped.value * 100))
+const focused = ref(false)
 
 function setValue(value: number) {
   emit('update:modelValue', Math.round(Math.min(1, Math.max(0, value)) * 100) / 100)
@@ -27,9 +28,12 @@ function onWheel(event: WheelEvent) {
   <div class="flex flex-col items-center gap-1.5">
     <div
       data-knob
-      class="relative size-[76px] cursor-ns-resize"
+      :class="['relative size-[76px] cursor-ns-resize rounded-full', focused && 'knob-focus']"
+      :data-focused="focused ? '' : undefined"
       :style="{ '--sweep': `${sweep}deg` }"
       @wheel.prevent="onWheel"
+      @focusin="focused = true"
+      @focusout="focused = false"
     >
       <span aria-hidden="true" class="knob-ring knob-ring--ghost" />
       <span aria-hidden="true" class="knob-ring knob-ring--lit" />
@@ -55,6 +59,12 @@ function onWheel(event: WheelEvent) {
 </template>
 
 <style scoped>
+.knob-focus {
+  outline: 2px solid #5cf6e8;
+  outline-offset: 3px;
+  box-shadow: 0 0 14px #5cf6e866;
+}
+
 .knob-ring {
   position: absolute;
   inset: 0;

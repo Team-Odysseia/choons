@@ -29,4 +29,16 @@ describe('VolumeKnob', () => {
     await wrapper.find('[data-knob]').trigger('wheel', { deltaY: -100 })
     expect(wrapper.emitted('update:modelValue')?.slice(-1)[0]?.[0]).toBeCloseTo(0.55, 5)
   })
+
+  it('marks the knob as focused while its slider has keyboard focus', async () => {
+    const wrapper = mount(VolumeKnob, { props: { modelValue: 0.5 }, attachTo: document.body })
+    const knob = wrapper.find('[data-knob]')
+    expect(knob.attributes('data-focused')).toBeUndefined()
+    await wrapper.find('[role="slider"]').trigger('focusin')
+    expect(knob.attributes('data-focused')).toBeDefined()
+    expect(knob.classes()).toContain('knob-focus')
+    await wrapper.find('[role="slider"]').trigger('focusout')
+    expect(knob.attributes('data-focused')).toBeUndefined()
+    wrapper.unmount()
+  })
 })
