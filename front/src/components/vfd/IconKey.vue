@@ -6,10 +6,11 @@ interface Props {
   icon: Component
   label: string
   lit?: boolean
-  size?: 28 | 32 | 36 | 40 | 52 | 60
+  size?: number
   round?: boolean
   bare?: boolean
   disabled?: boolean
+  filled?: boolean
   type?: 'button' | 'submit'
 }
 
@@ -46,7 +47,7 @@ function onClick(event: MouseEvent) {
     :style="{ width: `${size}px`, height: `${size}px` }"
     @click="onClick"
   >
-    <component :is="icon" :size="iconSize" :stroke-width="1.75" aria-hidden="true" />
+    <component :is="icon" :size="iconSize" :stroke-width="1.75" :fill="filled ? 'currentColor' : 'none'" aria-hidden="true" />
   </button>
 </template>
 

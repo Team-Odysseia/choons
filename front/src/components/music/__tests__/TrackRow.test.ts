@@ -52,19 +52,44 @@ describe('TrackRow', () => {
     const { wrapper, player } = mountRow()
 
     // Initially no active track
-    expect(wrapper.find('.text-sm.font-medium').classes()).not.toContain('text-primary')
+    expect(wrapper.find('[data-testid="track-title"]').attributes('data-active')).toBeUndefined()
 
     // Set current track
     player.currentTrack = mockTrack
     await wrapper.vm.$nextTick()
 
     // Now should be active
-    expect(wrapper.find('.text-sm.font-medium').classes()).toContain('text-primary')
+    expect(wrapper.find('[data-testid="track-title"]').attributes('data-active')).toBeDefined()
 
     // Change to different track
     player.currentTrack = { ...mockTrack, id: 't-2' }
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('.text-sm.font-medium').classes()).not.toContain('text-primary')
+    expect(wrapper.find('[data-testid="track-title"]').attributes('data-active')).toBeUndefined()
+  })
+})
+
+describe('TrackRow VFD states', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('playing row renders Spectrum instead of index', async () => {
+    const { wrapper, player } = mountRow()
+    expect(wrapper.find('[data-testid="track-index"]').text()).toBe('01')
+    player.currentTrack = mockTrack
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="track-index"]').exists()).toBe(false)
+    expect(wrapper.find('canvas').exists()).toBe(true)
+  })
+
+  it('truncates long title', () => {
+    const { wrapper } = mountRow({ ...mockTrack, title: 'A'.repeat(300) })
+    expect(wrapper.find('[data-testid="track-title"]').classes()).toContain('truncate')
+  })
+
+  it('shows HI-FI badge only for hifi tracks', () => {
+    expect(mountRow().wrapper.text()).not.toContain('HI-FI')
+    expect(mountRow({ ...mockTrack, hifi: true }).wrapper.text()).toContain('HI-FI')
   })
 })

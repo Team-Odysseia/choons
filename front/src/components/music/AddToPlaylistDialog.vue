@@ -82,37 +82,37 @@ async function createAndAdd() {
 <template>
   <BaseDialog :open="open" title="Add to playlist" @close="emit('close')">
     <div class="px-5 pb-5">
-      <p class="text-[13px] text-muted-foreground mb-4">{{ subtitle }}</p>
+      <p class="mb-4 text-[13px] text-soft">{{ subtitle }}</p>
 
       <!-- Existing playlists -->
-      <div v-if="playlists.playlists.length > 0" class="flex flex-col gap-1 mb-4">
+      <div v-if="playlists.playlists.length > 0" class="mb-4 flex flex-col gap-1.5">
         <button
           v-for="pl in playlists.playlists"
           :key="pl.id"
-          class="flex items-center justify-between w-full px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-left group"
+          class="group flex w-full items-center justify-between rounded border border-line bg-panel px-3 py-2.5 text-left transition-colors hover:border-cyan-dim hover:bg-panel-2"
           :disabled="addingTo === pl.id"
           @click="addToPlaylist(pl.id)"
         >
           <div class="flex flex-col min-w-0">
-            <span class="text-sm font-medium truncate">{{ pl.name }}</span>
-            <span class="text-xs text-muted-foreground">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
+            <span class="truncate text-sm text-fg group-hover:text-cyan">{{ pl.name }}</span>
+            <span class="text-xs text-soft">{{ pl.trackCount }} track{{ pl.trackCount !== 1 ? 's' : '' }}</span>
           </div>
           <span
-            class="text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-3"
+            class="ml-3 shrink-0 font-label text-[9px] uppercase tracking-[0.18em] text-cyan opacity-0 transition-opacity glow-sm group-hover:opacity-100 group-focus-visible:opacity-100"
           >{{ addingTo === pl.id ? 'Adding…' : 'Add' }}</span>
         </button>
       </div>
-      <p v-else class="text-[13px] text-dimmed mb-4">No playlists yet.</p>
+      <p v-else class="mb-4 text-[13px] text-soft">No playlists yet.</p>
 
       <!-- Divider -->
       <div class="flex items-center gap-3 mb-4">
-        <div class="flex-1 h-px bg-border" />
-        <span class="text-[11px] text-dimmed font-medium uppercase tracking-wider">or create new</span>
-        <div class="flex-1 h-px bg-border" />
+        <div class="h-px flex-1 bg-line" />
+        <span class="font-label text-[8px] uppercase tracking-[0.2em] text-faint">or create new</span>
+        <div class="h-px flex-1 bg-line" />
       </div>
 
       <!-- Create new playlist -->
-      <form class="flex gap-2" @submit.prevent="createAndAdd">
+      <form class="flex items-center gap-2.5" @submit.prevent="createAndAdd">
         <Input
           v-model="newPlaylistName"
           placeholder="Playlist name"
@@ -121,7 +121,7 @@ async function createAndAdd() {
         />
         <Button
           type="submit"
-          size="sm"
+          variant="outline"
           :disabled="!newPlaylistName.trim() || creating"
         >{{ creating ? 'Creating…' : 'Create' }}</Button>
       </form>
