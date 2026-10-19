@@ -6,6 +6,7 @@ import { useDrawerStore } from '@/stores/drawer'
 import { usePartyStore } from '@/stores/party'
 import { Shuffle, SkipBack, Play, Pause, SkipForward, Repeat, Repeat1, Volume2, ListMusic, MicVocal, Menu, Users } from 'lucide-vue-next'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { useMediaQuery } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
 import { CoverArt, IconKey, LedBar, Marquee, Readout, Spectrum, VolumeKnob } from '@/components/vfd'
 import { albumImageUrl } from '@/api/albums'
@@ -20,6 +21,10 @@ const party = usePartyStore()
 
 const progressPercent = computed(() =>
   player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0,
+)
+const desktop = useMediaQuery('(min-width: 768px)')
+const keySize = computed(() =>
+  desktop.value ? { side: 34, skip: 40, play: 60, panel: 32 } : { side: 30, skip: 34, play: 48, panel: 28 },
 )
 const track = computed(() => player.currentTrack)
 const cover = computed(() => (track.value?.album.coverUrl ? albumImageUrl(track.value.album.id) : null))
@@ -141,44 +146,44 @@ function onTogglePlay() {
         @click="drawer.toggleSidebar()"
       />
 
-      <div class="order-3 flex w-full items-center gap-2 md:order-1 md:w-auto md:gap-2.5">
+      <div class="order-3 flex w-full items-center gap-1 md:order-1 md:w-auto md:gap-2.5">
         <IconKey
           data-testid="shuffle-btn"
           :icon="Shuffle"
           label="Shuffle"
           :lit="player.isShuffled"
-          :size="34"
+          :size="keySize.side"
           @click="player.toggleShuffle()"
         />
-        <IconKey data-testid="prev-btn" :icon="SkipBack" label="Previous track" :size="40" :disabled="prevDisabled" @click="onPrev" />
+        <IconKey data-testid="prev-btn" :icon="SkipBack" label="Previous track" :size="keySize.skip" :disabled="prevDisabled" @click="onPrev" />
         <IconKey
           data-testid="play-btn"
           :icon="player.isPlaying ? Pause : Play"
           :label="player.isPlaying ? 'Pause' : 'Play'"
           lit
           round
-          :size="60"
+          :size="keySize.play"
           class="play-key"
           :disabled="playDisabled"
           @click="onTogglePlay"
         />
-        <IconKey data-testid="next-btn" :icon="SkipForward" label="Next track" :size="40" :disabled="nextDisabled" @click="onNext" />
+        <IconKey data-testid="next-btn" :icon="SkipForward" label="Next track" :size="keySize.skip" :disabled="nextDisabled" @click="onNext" />
         <IconKey
           data-testid="loop-btn"
           :icon="player.loopMode === 'track' ? Repeat1 : Repeat"
           :label="loopLabel"
           :lit="player.loopMode !== 'none'"
-          :size="34"
+          :size="keySize.side"
           @click="player.cycleLoop()"
         />
 
-        <div class="ml-auto flex items-center gap-1.5 md:hidden">
-          <IconKey :icon="ListMusic" label="Queue" bare :size="32" :lit="drawer.activePanel === 'queue'" @click="openPanel('queue')" />
-          <IconKey :icon="MicVocal" label="Lyrics" bare :size="32" :lit="drawer.activePanel === 'lyrics'" @click="openPanel('lyrics')" />
-          <IconKey v-if="party.inParty" :icon="Users" label="Party" bare :size="32" :lit="drawer.activePanel === 'party'" @click="openPanel('party')" />
+        <div class="ml-auto flex items-center gap-1 md:hidden">
+          <IconKey :icon="ListMusic" label="Queue" bare :size="keySize.panel" :lit="drawer.activePanel === 'queue'" @click="openPanel('queue')" />
+          <IconKey :icon="MicVocal" label="Lyrics" bare :size="keySize.panel" :lit="drawer.activePanel === 'lyrics'" @click="openPanel('lyrics')" />
+          <IconKey v-if="party.inParty" :icon="Users" label="Party" bare :size="keySize.panel" :lit="drawer.activePanel === 'party'" @click="openPanel('party')" />
           <PopoverRoot>
             <PopoverTrigger as-child>
-              <IconKey :icon="Volume2" label="Volume" bare :size="32" />
+              <IconKey :icon="Volume2" label="Volume" bare :size="keySize.panel" />
             </PopoverTrigger>
             <PopoverPortal>
               <PopoverContent

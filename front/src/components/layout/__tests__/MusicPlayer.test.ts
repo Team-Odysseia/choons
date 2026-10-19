@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
+import { mockMatchMedia } from '@/test-utils/matchMedia'
 import MusicPlayer from '../MusicPlayer.vue'
 import { usePlayerStore } from '@/stores/player'
 import { usePartyStore } from '@/stores/party'
@@ -385,5 +386,24 @@ describe('head unit display', () => {
     player.$patch({ currentTrack: mockTrack })
     await wrapper.vm.$nextTick()
     expect(wrapper.text()).toContain('Test Song · Test Artist · Test Album')
+  })
+})
+
+describe('responsive transport', () => {
+  afterEach(() => mockMatchMedia(() => false))
+
+  it('uses compact transport keys on phones', () => {
+    mockMatchMedia(() => false)
+    const { wrapper } = mountPlayer()
+    expect(wrapper.find('[data-testid="play-btn"]').attributes('style')).toContain('width: 48px')
+    expect(wrapper.find('[data-testid="prev-btn"]').attributes('style')).toContain('width: 34px')
+  })
+
+  it('uses full-size transport keys on desktop', async () => {
+    mockMatchMedia((q) => q.includes('min-width: 768px'))
+    const { wrapper } = mountPlayer()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="play-btn"]').attributes('style')).toContain('width: 60px')
+    expect(wrapper.find('[data-testid="prev-btn"]').attributes('style')).toContain('width: 40px')
   })
 })

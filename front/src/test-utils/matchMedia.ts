@@ -1,10 +1,10 @@
 import { vi } from 'vitest'
 
-export function mockReducedMotion(reduce: boolean) {
+export function mockMatchMedia(matches: (query: string) => boolean) {
   vi.stubGlobal(
     'matchMedia',
     vi.fn().mockImplementation((query: string) => ({
-      matches: reduce && query.includes('prefers-reduced-motion: reduce'),
+      matches: matches(query),
       media: query,
       onchange: null,
       addEventListener: vi.fn(),
@@ -14,4 +14,8 @@ export function mockReducedMotion(reduce: boolean) {
       dispatchEvent: vi.fn(),
     })),
   )
+}
+
+export function mockReducedMotion(reduce: boolean) {
+  mockMatchMedia((query) => reduce && query.includes('prefers-reduced-motion: reduce'))
 }
