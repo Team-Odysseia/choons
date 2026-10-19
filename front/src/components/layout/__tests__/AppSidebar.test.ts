@@ -110,4 +110,11 @@ describe('AppSidebar sources', () => {
     const requests = wrapper.findAll('a').find((a) => a.text().includes('Album Requests'))
     expect(requests!.text()).toContain('2')
   })
+
+  it('shows the username in a bouncing marquee', () => {
+    const wrapper = mountSidebar('LISTENER')
+    const user = wrapper.find('[data-testid="sidebar-user"]')
+    expect(user.classes()).toContain('vfd-marquee')
+    expect(user.text()).toBe('paulo')
+  })
 })

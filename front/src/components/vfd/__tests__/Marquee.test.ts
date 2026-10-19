@@ -49,3 +49,41 @@ describe('Marquee', () => {
     expect(copies[1]!.attributes('aria-hidden')).toBe('true')
   })
 })
+
+describe('Marquee bounce mode', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  async function mountBounce(text: string) {
+    vi.resetModules()
+    const { default: Marquee } = await import('../Marquee.vue')
+    const wrapper = mount(Marquee, { props: { text, mode: 'bounce' } })
+    await flushPromises()
+    return wrapper
+  }
+
+  it('bounces with a single copy when overflowing', async () => {
+    stubSizes(260, 200)
+    const wrapper = await mountBounce('Album Requests and more')
+    expect(wrapper.classes()).toContain('is-bouncing')
+    expect(wrapper.classes()).not.toContain('is-scrolling')
+    expect(wrapper.findAll('[data-marquee-copy]')).toHaveLength(1)
+    expect(wrapper.find('.vfd-marquee__track').attributes('style')).toContain('--marquee-distance: 60px')
+  })
+
+  it('stays still when the text fits', async () => {
+    stubSizes(100, 200)
+    const wrapper = await mountBounce('Library')
+    expect(wrapper.classes()).not.toContain('is-bouncing')
+  })
+
+  it('truncates instead of moving under reduced motion', async () => {
+    mockReducedMotion(true)
+    stubSizes(260, 200)
+    const wrapper = await mountBounce('Album Requests and more')
+    expect(wrapper.classes()).not.toContain('is-bouncing')
+    expect(wrapper.find('[data-marquee-copy]').classes()).toContain('truncate')
+  })
+})

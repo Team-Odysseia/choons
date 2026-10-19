@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { computed } from 'vue'
 import { Disc3, Heart, Inbox, Library, ListMusic, LogOut, MicVocal, PartyPopper, Search, Send, Users, X } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import { BrandPlate, IconKey } from '@/components/vfd'
+import { BrandPlate, IconKey, Marquee } from '@/components/vfd'
 import SourceButton from './SourceButton.vue'
 import { listAllAlbumRequests } from '@/api/albumRequests'
 import { Input } from '@/components/ui/input'
@@ -240,7 +240,7 @@ onBeforeUnmount(() => {
     <div class="flex flex-col gap-3 border-t border-line px-[18px] pb-4 pt-3.5">
       <div class="flex items-center gap-2.5 px-1">
         <span aria-hidden="true" class="led led-on" />
-        <span class="min-w-0 flex-1 truncate text-sm text-fg">{{ auth.user?.username }}</span>
+        <Marquee data-testid="sidebar-user" :text="auth.user?.username ?? ''" mode="bounce" class="min-w-0 flex-1 text-sm text-fg" />
         <Button variant="ghost" size="sm" class="px-1 hover:text-red" @click="logout">
           <template #icon><LogOut :size="13" aria-hidden="true" /></template>
           Log out

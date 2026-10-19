@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { CountBadge } from '@/components/vfd'
+import { CountBadge, Marquee } from '@/components/vfd'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{
@@ -40,7 +40,11 @@ const classes = computed(() =>
       aria-hidden="true"
       :class="active ? 'drop-shadow-[0_0_6px_#5CF6E899]' : ''"
     />
-    <span :class="['min-w-0 flex-1 truncate font-label text-[10px] uppercase tracking-[0.2em]', active && 'glow-sm']">{{ label }}</span>
+    <Marquee
+      :text="label"
+      mode="bounce"
+      :class="['min-w-0 flex-1 font-label text-[10px] uppercase tracking-[0.2em]', active && 'glow-sm']"
+    />
     <CountBadge v-if="count" :count="count" />
   </component>
 </template>
