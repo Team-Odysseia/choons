@@ -1,4 +1,5 @@
 import { ref, onScopeDispose } from 'vue'
+import { trackEvent } from '@/lib/telemetry'
 
 let sharedAudio: HTMLAudioElement | undefined
 
@@ -17,7 +18,15 @@ export function useAudioEngine(audioElement?: HTMLAudioElement) {
   let recovering = false
 
   function onError() {
-    if (!requestedSrc || recovering) return
+    if (!requestedSrc) return
+    if (recovering) {
+      trackEvent('audio_playback_error', {
+        src: requestedSrc,
+        code: audio.error?.code,
+        message: audio.error?.message,
+      })
+      return
+    }
     recovering = true
     const resumeAt = audio.currentTime
     const resume = !audio.paused || isPlaying.value

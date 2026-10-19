@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { effectScope } from 'vue'
 import { audioMock } from '../../../vitest.setup'
 import { useAudioEngine } from '../useAudioEngine'
+
+const trackEvent = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/telemetry', () => ({ trackEvent }))
 
 function setup(paused: boolean) {
   const audio = new Audio()
@@ -54,6 +57,20 @@ describe('useAudioEngine', () => {
     mock._emit('playing')
     mock._emit('error')
     expect(mock.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('reporta o erro quando a recuperacao tambem falha', () => {
+    const { mock, engine } = setup(false)
+    engine.setSrc('http://api.test/stream/abc')
+
+    mock._emit('error')
+    expect(trackEvent).not.toHaveBeenCalled()
+
+    mock._emit('error')
+    expect(trackEvent).toHaveBeenCalledWith(
+      'audio_playback_error',
+      expect.objectContaining({ src: 'http://api.test/stream/abc' }),
+    )
   })
 
   it('aplica a posicao apenas uma vez por recuperacao', () => {

@@ -22,4 +22,18 @@ export default defineConfig(({ mode }) => ({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    proxy: {
+      '/ingest/static': {
+        target: 'https://us-assets.i.posthog.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ingest/, ''),
+      },
+      '/ingest': {
+        target: 'https://us.i.posthog.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ingest/, ''),
+      },
+    },
+  },
 }))

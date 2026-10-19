@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { captureException } from '@/lib/telemetry'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -171,6 +172,10 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresListener && auth.isAdmin) {
     return { path: '/admin/album-requests' }
   }
+})
+
+router.onError((error, to) => {
+  captureException(error, { kind: 'router', to: to.fullPath })
 })
 
 export default router
