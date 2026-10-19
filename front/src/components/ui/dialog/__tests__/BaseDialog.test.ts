@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import BaseDialog from '../BaseDialog.vue'
+import source from '../BaseDialog.vue?raw'
 
 let wrapper: VueWrapper | undefined
 
@@ -55,5 +56,12 @@ describe('BaseDialog', () => {
     mountDialog(false)
     await flushPromises()
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('entrance keyframes only scale, never re-translate (Tailwind centres via the translate property)', () => {
+    const keyframes = source.slice(source.indexOf('@keyframes vfd-dialog-in'))
+    const block = keyframes.slice(0, keyframes.indexOf('\n}\n') + 2)
+    expect(block).toContain('scale')
+    expect(block).not.toMatch(/translate/)
   })
 })
