@@ -229,3 +229,23 @@ func TestDeletingUserCascadesDependents(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenSurvivesDroppedPreparedStatements(t *testing.T) {
+	gdb := pgtest.NewDB(t)
+	err := gdb.Connection(func(conn *gorm.DB) error {
+		lookup := func() error {
+			var n int64
+			return conn.Raw("SELECT count(*) FROM users WHERE username = ?", "Nyffi").Scan(&n).Error
+		}
+		if err := lookup(); err != nil {
+			return err
+		}
+		if err := conn.Exec("DO $$ BEGIN EXECUTE 'DEALLOCATE ALL'; END $$").Error; err != nil {
+			return err
+		}
+		return lookup()
+	})
+	if err != nil {
+		t.Fatalf("query after pooler dropped prepared statements: %v", err)
+	}
+}

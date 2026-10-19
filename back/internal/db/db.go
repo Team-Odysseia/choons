@@ -19,7 +19,10 @@ import (
 var migrations embed.FS
 
 func Open(dsn string) (*gorm.DB, error) {
-	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	gdb, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{
 		Logger: logger.New(log.New(os.Stderr, "", log.LstdFlags), logger.Config{
 			SlowThreshold:             500 * time.Millisecond,
 			LogLevel:                  logger.Error,
