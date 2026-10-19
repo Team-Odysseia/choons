@@ -146,6 +146,22 @@ describe('fetchMe', () => {
   })
 })
 
+describe('restoreSession', () => {
+  it('asks the API once however many guards wait on it', async () => {
+    mockMe.mockResolvedValue(listenerUser)
+    const store = useAuthStore()
+
+    const first = store.restoreSession()
+    const second = store.restoreSession()
+    await first
+    await second
+    await store.restoreSession()
+
+    expect(mockMe).toHaveBeenCalledOnce()
+    expect(store.user).toEqual(listenerUser)
+  })
+})
+
 // ─── isAdmin ──────────────────────────────────────────────────────────────────
 
 describe('isAdmin', () => {

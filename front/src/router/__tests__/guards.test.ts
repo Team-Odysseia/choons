@@ -4,7 +4,8 @@ import { useAuthStore } from '@/stores/auth'
 import type { UserResponse } from '@/api/types'
 import router from '../index'
 
-vi.mock('@/api/auth', () => ({ login: vi.fn(), logout: vi.fn(), me: vi.fn() }))
+const me = vi.hoisted(() => vi.fn())
+vi.mock('@/api/auth', () => ({ login: vi.fn(), logout: vi.fn(), me }))
 
 const stubView = { template: '<div />' }
 for (const route of router.getRoutes()) {
@@ -12,7 +13,9 @@ for (const route of router.getRoutes()) {
 }
 
 function signIn(role: UserResponse['role'] | null) {
-  useAuthStore().user = role ? { id: 'u-1', username: 'u', role } : null
+  const user = role ? { id: 'u-1', username: 'u', role } : null
+  useAuthStore().user = user
+  me.mockResolvedValue(user)
 }
 
 beforeEach(async () => {
@@ -43,6 +46,13 @@ describe('router guards', () => {
     signIn('ADMIN')
     await router.push({ name: 'album-requests' })
     expect(router.currentRoute.value.path).toBe('/admin/album-requests')
+  })
+
+  it('waits for the session to be restored on a cold start', async () => {
+    setActivePinia(createPinia())
+    me.mockResolvedValue({ id: 'u-1', username: 'u', role: 'LISTENER' })
+    await router.push('/parties')
+    expect(router.currentRoute.value.path).toBe('/parties')
   })
 
   it('redirects signed-in users away from login', async () => {
