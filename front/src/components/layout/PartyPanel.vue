@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { usePartyStore } from '@/stores/party'
 import { Button } from '@/components/ui/button'
+import { apiErrorMessage } from '@/lib/errors'
 
 const party = usePartyStore()
 
@@ -10,21 +11,11 @@ const members = computed(() => party.state?.members ?? [])
 const everyoneCanPlay = computed(() => party.state?.queuePolicy === 'EVERYONE')
 
 async function onKick(userId: string) {
-  try {
-    await party.kick(userId)
-    toast.success('Member kicked')
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to kick member')
-  }
+  if (await party.kick(userId)) toast.success('Member kicked')
 }
 
 async function onToggleDj(userId: string, dj: boolean) {
-  try {
-    await party.setDj(userId, dj)
-    toast.success(dj ? 'DJ enabled' : 'DJ removed')
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to update DJ')
-  }
+  if (await party.setDj(userId, dj)) toast.success(dj ? 'DJ enabled' : 'DJ removed')
 }
 
 async function onLeaveOrEnd() {
@@ -36,8 +27,8 @@ async function onLeaveOrEnd() {
       await party.leave()
       toast.success('Left party')
     }
-  } catch (e: any) {
-    toast.error(e.response?.data?.error ?? 'Failed to update party state')
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to update party state'))
   }
 }
 </script>

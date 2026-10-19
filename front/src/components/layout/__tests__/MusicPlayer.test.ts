@@ -3,7 +3,11 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import MusicPlayer from '../MusicPlayer.vue'
 import { usePlayerStore } from '@/stores/player'
-import type { TrackResponse } from '@/api/types'
+import { usePartyStore } from '@/stores/party'
+import type { PartyStateResponse, TrackResponse } from '@/api/types'
+
+const toastError = vi.hoisted(() => vi.fn())
+vi.mock('vue-sonner', () => ({ toast: { error: toastError, success: vi.fn(), info: vi.fn() } }))
 
 vi.mock('@/api/tracks', () => ({
   streamUrl: vi.fn((id: string) => `http://test/stream/${id}`),
@@ -273,5 +277,77 @@ describe('formatTime (via template)', () => {
     const timeSpans = wrapper.findAll('span.text-\\[11px\\]')
     expect(timeSpans[0]?.text()).toBe('2:05')
     expect(timeSpans[1]?.text()).toBe('4:00')
+  })
+})
+
+// ─── Party mode ───────────────────────────────────────────────────────────────
+
+describe('party mode', () => {
+  function partyState(): PartyStateResponse {
+    return {
+      id: 'p-1',
+      revision: 1,
+      inviteCode: 'ABC123',
+      name: 'Party',
+      queuePolicy: 'DJ_ONLY',
+      hostUserId: 'u-host',
+      members: [
+        { userId: 'u-host', username: 'host', host: true, dj: true, connected: true },
+        { userId: 'u-member', username: 'member', host: false, dj: false, connected: true },
+      ],
+      queue: [{ id: 'item-1', position: 0, track: mockTrack, addedByUserId: 'u-host', addedByUsername: 'host' }],
+      playback: { track: mockTrack, queueItemId: 'item-1', playing: false, anchorPositionSec: 0, anchorEpochMs: 0 },
+    }
+  }
+
+  async function mountInParty(userId: string) {
+    const mounted = mountPlayer()
+    const party = usePartyStore()
+    party.setCurrentUserId(userId)
+    party.state = partyState()
+    mounted.player.$patch({ currentTrack: mockTrack, queue: [mockTrack], currentIndex: 0 })
+    await mounted.wrapper.vm.$nextTick()
+    return { ...mounted, party }
+  }
+
+  it('resumes the playing queue item through the party', async () => {
+    const { wrapper, party } = await mountInParty('u-host')
+    const play = vi.spyOn(party, 'play').mockResolvedValue(true)
+
+    await wrapper.find('[data-testid="play-btn"]').trigger('click')
+
+    expect(play).toHaveBeenCalledWith('track-1', 0, 'item-1')
+  })
+
+  it('keeps next and prev enabled on the last party item', async () => {
+    const { wrapper, party } = await mountInParty('u-host')
+    const next = vi.spyOn(party, 'next').mockResolvedValue(true)
+    const prev = vi.spyOn(party, 'prev').mockResolvedValue(true)
+
+    await wrapper.find('[data-testid="next-btn"]').trigger('click')
+    await wrapper.find('[data-testid="prev-btn"]').trigger('click')
+
+    expect(next).toHaveBeenCalled()
+    expect(prev).toHaveBeenCalled()
+  })
+
+  it('disables controls for members without DJ rights', async () => {
+    const { wrapper, party } = await mountInParty('u-member')
+    const play = vi.spyOn(party, 'play')
+
+    expect(wrapper.find('[data-testid="next-btn"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="play-btn"]').attributes('disabled')).toBeDefined()
+    expect(play).not.toHaveBeenCalled()
+  })
+
+  it('routes seeking through the party', async () => {
+    const { wrapper, party, player } = await mountInParty('u-host')
+    const seek = vi.spyOn(party, 'seek').mockResolvedValue(true)
+    player.$patch({ duration: 200 })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('[data-testid="progress-range"]').setValue('50')
+
+    expect(seek).toHaveBeenCalledWith(100)
   })
 })

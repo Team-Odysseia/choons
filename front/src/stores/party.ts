@@ -22,16 +22,17 @@ import {
 } from '@/api/parties'
 import type { PartyQueuePolicy, PartyStateResponse, TrackResponse } from '@/api/types'
 import { emitter } from '@/lib/emitter'
+import { apiErrorMessage, apiStatus } from '@/lib/errors'
 import { useDrawerStore } from './drawer'
 
 export const usePartyStore = defineStore('party', () => {
   const state = ref<PartyStateResponse | null>(null)
   const loading = ref(false)
   const syncing = ref(false)
-  const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
-  const eventSource = ref<EventSource | null>(null)
-  const reconnectTimer = ref<ReturnType<typeof setTimeout> | null>(null)
-  const reconnectDelayMs = ref(1000)
+  let pollTimer: ReturnType<typeof setInterval> | null = null
+  let eventSource: EventSource | null = null
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let reconnectDelayMs = 1000
   const currentUserId = ref<string | null>(null)
 
   const POLL_INTERVAL_MS = 12000
@@ -49,6 +50,9 @@ export const usePartyStore = defineStore('party', () => {
     return member.dj
   })
 
+  let epoch = 0
+  let leaving = false
+
   emitter.on('auth:login', (payload) => {
     setCurrentUserId(payload.userId)
     void fetchMyParty()
@@ -56,16 +60,25 @@ export const usePartyStore = defineStore('party', () => {
 
   emitter.on('auth:logout', () => {
     setCurrentUserId(null)
+    applyState(null)
     stopPolling()
   })
 
+  function isOutdated(next: PartyStateResponse) {
+    const current = state.value
+    return !!current && current.id === next.id && next.revision < current.revision
+  }
+
   function applyState(next: PartyStateResponse | null) {
+    if (next && isOutdated(next)) return
     const wasInParty = !!state.value
+    if (!next || state.value?.id !== next.id) epoch++
     state.value = next
 
-    if (!next && wasInParty) {
-      stopRealtime()
+    if (!next) {
       clearPolling()
+      stopRealtime()
+      if (!wasInParty) return
       const drawer = useDrawerStore()
       if (drawer.activePanel === 'party') {
         drawer.close()
@@ -75,45 +88,60 @@ export const usePartyStore = defineStore('party', () => {
       return
     }
 
-    if (next) {
-      if (!wasInParty) {
-        emitter.emit('party:joined', {
-          next: async () => {
-            if (canControl.value) {
-              await partyNext(state.value!.inviteCode)
-              return true
-            }
-            return false
-          },
-        })
-      }
-      emitter.emit('party:stateChanged', next)
+    if (!wasInParty) {
+      emitter.emit('party:joined', { next: advanceAfterTrackEnded })
+    }
+    emitter.emit('party:stateChanged', next)
+  }
+
+  async function advanceAfterTrackEnded() {
+    if (!state.value || !canControl.value) return
+    const ended = state.value.playback.queueItemId
+    await control('Failed to advance party queue', (code) => partyNext(code, ended))
+  }
+
+  function enter(party: PartyStateResponse) {
+    applyState(party)
+    startPolling()
+    startRealtime()
+  }
+
+  async function control(
+    fallback: string,
+    request: (inviteCode: string) => Promise<PartyStateResponse>,
+  ): Promise<boolean> {
+    if (!state.value) return false
+    const startedIn = epoch
+    try {
+      const next = await request(state.value.inviteCode)
+      if (startedIn === epoch) applyState(next)
+      return true
+    } catch (error) {
+      if (startedIn !== epoch) return false
+      toast.error(apiErrorMessage(error, fallback))
+      const status = apiStatus(error)
+      if (status === 403 || status === 404) void refreshState()
+      return false
     }
   }
 
   async function fetchMyParty() {
+    const startedIn = epoch
     try {
       const party = await getMyParty()
-      applyState(party)
-      startPolling()
-      startRealtime()
+      if (startedIn === epoch) enter(party)
     } catch {
-      applyState(null)
-      clearPolling()
-      stopRealtime()
+      if (startedIn === epoch) applyState(null)
     }
   }
 
   async function create(name: string, queuePolicy: PartyQueuePolicy) {
     loading.value = true
     try {
-      const party = await createParty(name, queuePolicy)
-      applyState(party)
-      startPolling()
-      startRealtime()
+      enter(await createParty(name, queuePolicy))
       toast.success('Party created')
-    } catch (e: any) {
-      toast.error(e.response?.data?.error ?? 'Failed to create party')
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Failed to create party'))
       throw e
     } finally {
       loading.value = false
@@ -124,12 +152,10 @@ export const usePartyStore = defineStore('party', () => {
     loading.value = true
     try {
       const party = await joinParty(code)
-      applyState(party)
-      startPolling()
-      startRealtime()
+      enter(party)
       toast.success(`Joined party ${party.name}`)
-    } catch (e: any) {
-      toast.error(e.response?.data?.error ?? 'Failed to join party')
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Failed to join party'))
       throw e
     } finally {
       loading.value = false
@@ -138,139 +164,104 @@ export const usePartyStore = defineStore('party', () => {
 
   async function refreshState() {
     if (!state.value || syncing.value) return
+    const startedIn = epoch
     syncing.value = true
     try {
       const next = await getPartyState(state.value.inviteCode)
-      applyState(next)
-    } catch (e: any) {
-      if (e.response?.status === 404 || e.response?.status === 403) {
-        applyState(null)
-        clearPolling()
-        stopRealtime()
-      }
+      if (startedIn === epoch) applyState(next)
+    } catch (e) {
+      const status = apiStatus(e)
+      if (startedIn === epoch && (status === 404 || status === 403)) applyState(null)
     } finally {
       syncing.value = false
     }
   }
 
-  async function leave() {
+  async function exit(request: (inviteCode: string) => Promise<unknown>) {
     if (!state.value) return
-    await leaveParty(state.value.inviteCode)
+    leaving = true
+    try {
+      await request(state.value.inviteCode)
+    } catch (e) {
+      const status = apiStatus(e)
+      if (status !== 404 && status !== 403) throw e
+    } finally {
+      leaving = false
+    }
     applyState(null)
-    clearPolling()
-    stopRealtime()
   }
 
-  async function end() {
-    if (!state.value) return
-    await endParty(state.value.inviteCode)
-    applyState(null)
-    clearPolling()
-    stopRealtime()
-  }
+  const leave = () => exit(leaveParty)
+  const end = () => exit(endParty)
 
-  async function kick(userId: string) {
-    if (!state.value) return
-    const next = await kickPartyMember(state.value.inviteCode, userId)
-    applyState(next)
-  }
+  const kick = (userId: string) =>
+    control('Failed to kick member', (code) => kickPartyMember(code, userId))
 
-  async function setDj(userId: string, dj: boolean) {
-    if (!state.value) return
-    const next = await setPartyMemberDj(state.value.inviteCode, userId, dj)
-    applyState(next)
-  }
+  const setDj = (userId: string, dj: boolean) =>
+    control('Failed to update DJ', (code) => setPartyMemberDj(code, userId, dj))
 
-  async function addTrack(trackId: string) {
-    if (!state.value) return
-    const next = await addPartyQueueTrack(state.value.inviteCode, trackId)
-    applyState(next)
-  }
+  const addTrack = (trackId: string) =>
+    control('Failed to add track to party queue', (code) => addPartyQueueTrack(code, trackId))
 
   async function addTracks(tracks: TrackResponse[]) {
-    if (!state.value || tracks.length === 0) return
-    const next = await addPartyQueueTracks(
-      state.value.inviteCode,
-      tracks.map((track) => track.id),
+    if (tracks.length === 0) return false
+    return control('Failed to add tracks to party queue', (code) =>
+      addPartyQueueTracks(code, tracks.map((track) => track.id)),
     )
-    applyState(next)
   }
 
-  async function removeQueueItem(itemId: string) {
-    if (!state.value) return
-    const next = await removePartyQueueTrack(state.value.inviteCode, itemId)
-    applyState(next)
-  }
+  const removeQueueItem = (itemId: string) =>
+    control('Failed to remove queue item', (code) => removePartyQueueTrack(code, itemId))
 
-  async function reorderQueueByIds(orderedItemIds: string[]) {
-    if (!state.value) return
-    const next = await reorderPartyQueue(state.value.inviteCode, orderedItemIds)
-    applyState(next)
-  }
+  const reorderQueueByIds = (orderedItemIds: string[]) =>
+    control('Failed to reorder party queue', (code) => reorderPartyQueue(code, orderedItemIds))
 
-  async function play(trackId: string, positionSec: number) {
-    if (!state.value) return
-    const next = await partyPlay(state.value.inviteCode, trackId, positionSec)
-    applyState(next)
-  }
+  const play = (trackId: string, positionSec: number, queueItemId?: string | null) =>
+    control('Failed to start playback', (code) => partyPlay(code, trackId, positionSec, queueItemId))
 
-  async function pause(positionSec: number) {
-    if (!state.value) return
-    const next = await partyPause(state.value.inviteCode, positionSec)
-    applyState(next)
-  }
+  const pause = (positionSec: number) =>
+    control('Failed to pause playback', (code) => partyPause(code, positionSec))
 
-  async function seek(positionSec: number) {
-    if (!state.value) return
-    const next = await partySeek(state.value.inviteCode, positionSec)
-    applyState(next)
-  }
+  const seek = (positionSec: number) =>
+    control('Failed to seek', (code) => partySeek(code, positionSec))
 
-  async function next() {
-    if (!state.value) return
-    const nextState = await partyNext(state.value.inviteCode)
-    applyState(nextState)
-  }
+  const next = () => control('Failed to skip track', (code) => partyNext(code))
 
-  async function prev() {
-    if (!state.value) return
-    const nextState = await partyPrev(state.value.inviteCode)
-    applyState(nextState)
-  }
+  const prev = () => control('Failed to restart track', (code) => partyPrev(code))
 
   function startPolling() {
     clearPolling()
-    pollTimer.value = setInterval(() => {
+    pollTimer = setInterval(() => {
       void refreshState()
     }, POLL_INTERVAL_MS)
   }
 
   function clearPolling() {
-    if (!pollTimer.value) return
-    clearInterval(pollTimer.value)
-    pollTimer.value = null
+    if (!pollTimer) return
+    clearInterval(pollTimer)
+    pollTimer = null
   }
 
   function clearReconnectTimer() {
-    if (!reconnectTimer.value) return
-    clearTimeout(reconnectTimer.value)
-    reconnectTimer.value = null
+    if (!reconnectTimer) return
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
   }
 
   function stopRealtime() {
     clearReconnectTimer()
-    if (!eventSource.value) return
-    eventSource.value.close()
-    eventSource.value = null
+    if (!eventSource) return
+    eventSource.close()
+    eventSource = null
   }
 
   function scheduleReconnect() {
-    if (!state.value || reconnectTimer.value) return
-    reconnectTimer.value = setTimeout(() => {
-      reconnectTimer.value = null
+    if (!state.value || reconnectTimer) return
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
       connectRealtime()
-      reconnectDelayMs.value = Math.min(reconnectDelayMs.value * 2, RECONNECT_MAX_DELAY_MS)
-    }, reconnectDelayMs.value)
+      reconnectDelayMs = Math.min(reconnectDelayMs * 2, RECONNECT_MAX_DELAY_MS)
+    }, reconnectDelayMs)
   }
 
   function connectRealtime() {
@@ -281,34 +272,35 @@ export const usePartyStore = defineStore('party', () => {
       `${import.meta.env.VITE_API_URL}/parties/${state.value.inviteCode}/events`,
       { withCredentials: true },
     )
-    eventSource.value = source
+    eventSource = source
 
     source.onopen = () => {
-      reconnectDelayMs.value = 1000
+      reconnectDelayMs = 1000
       clearReconnectTimer()
     }
 
     source.addEventListener('state', (event) => {
-      reconnectDelayMs.value = 1000
+      reconnectDelayMs = 1000
+      if (eventSource !== source) return
       const message = event as MessageEvent<string>
-      const next = JSON.parse(message.data) as PartyStateResponse
-      applyState(next)
+      applyState(JSON.parse(message.data) as PartyStateResponse)
     })
 
     source.addEventListener('ended', () => {
+      if (eventSource !== source) return
+      if (!leaving) toast.info('The party ended or you were removed')
       applyState(null)
-      stopRealtime()
     })
 
     source.onerror = () => {
-      if (eventSource.value !== source) return
+      if (eventSource !== source) return
       stopRealtime()
       scheduleReconnect()
     }
   }
 
   function startRealtime() {
-    reconnectDelayMs.value = 1000
+    reconnectDelayMs = 1000
     clearReconnectTimer()
     connectRealtime()
   }

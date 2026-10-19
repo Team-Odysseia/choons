@@ -18,7 +18,8 @@ export const usePlayerStore = defineStore('player', () => {
   const partyAdvanceInFlight = ref(false)
   const partyInParty = ref(false)
   const partyCanControl = ref(false)
-  const partyNextFn = ref<(() => Promise<boolean>) | null>(null)
+  const partyNextFn = ref<(() => Promise<void>) | null>(null)
+  let loadedTrackId: string | null = null
 
   audioEngine.setVolume(volume.value)
 
@@ -47,7 +48,9 @@ export const usePlayerStore = defineStore('player', () => {
       ? party.playback.anchorPositionSec + elapsedSec
       : party.playback.anchorPositionSec
 
-    syncExternalState(playbackTrack, queueTracks, party.playback.playing, position)
+    const queueItemId = party.playback.queueItemId
+    const index = queueItemId ? party.queue.findIndex((item) => item.id === queueItemId) : -1
+    syncExternalState(playbackTrack, queueTracks, party.playback.playing, position, index)
   })
 
   emitter.on('party:joined', ({ next }) => {
@@ -75,10 +78,11 @@ export const usePlayerStore = defineStore('player', () => {
       if (partyInParty.value && partyNextFn.value) {
         if (partyAdvanceInFlight.value) return
         partyAdvanceInFlight.value = true
-        void partyNextFn.value().then((handled) => {
-          partyAdvanceInFlight.value = false
-          if (!handled) playNext()
-        })
+        partyNextFn.value()
+          .catch(() => {})
+          .finally(() => {
+            partyAdvanceInFlight.value = false
+          })
         return
       }
       playNext()
@@ -109,13 +113,22 @@ export const usePlayerStore = defineStore('player', () => {
   const hasNext = queueManager.hasNext
   const hasPrev = queueManager.hasPrev
 
-  function playTrack(track: TrackResponse, trackQueue?: TrackResponse[], index?: number) {
-    queueManager.playTrack(track, trackQueue, index)
+  function load(track: TrackResponse) {
+    loadedTrackId = track.id
     streamRecorded.value = false
     audioEngine.setSrc(streamUrl(track.id))
+  }
+
+  function startPlayback() {
     audioEngine.play().catch(() => {
       audioEngine.isPlaying.value = false
     })
+  }
+
+  function playTrack(track: TrackResponse, trackQueue?: TrackResponse[], index?: number) {
+    queueManager.playTrack(track, trackQueue, index)
+    load(track)
+    startPlayback()
   }
 
   function playQueue(tracks: TrackResponse[], startIndex = 0) {
@@ -137,11 +150,8 @@ export const usePlayerStore = defineStore('player', () => {
     queueManager.playNext()
     const track = queueManager.currentTrack.value
     if (track) {
-      streamRecorded.value = false
-      audioEngine.setSrc(streamUrl(track.id))
-      audioEngine.play().catch(() => {
-        audioEngine.isPlaying.value = false
-      })
+      load(track)
+      startPlayback()
     }
   }
 
@@ -153,19 +163,14 @@ export const usePlayerStore = defineStore('player', () => {
     queueManager.playPrev()
     const track = queueManager.currentTrack.value
     if (track) {
-      streamRecorded.value = false
-      audioEngine.setSrc(streamUrl(track.id))
-      audioEngine.play().catch(() => {
-        audioEngine.isPlaying.value = false
-      })
+      load(track)
+      startPlayback()
     }
   }
 
   function togglePlay() {
     if (audioEngine.audio.paused) {
-      audioEngine.play().catch(() => {
-        audioEngine.isPlaying.value = false
-      })
+      startPlayback()
     } else {
       audioEngine.pause()
     }
@@ -209,6 +214,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function stop() {
+    loadedTrackId = null
     audioEngine.stop()
     queueManager.reset()
     streamRecorded.value = false
@@ -219,6 +225,7 @@ export const usePlayerStore = defineStore('player', () => {
     queueTracks: TrackResponse[],
     playing: boolean,
     positionSec: number,
+    currentIndex = -1,
   ) {
     queueManager.queue.value = [...queueTracks]
     queueManager.originalQueue.value = [...queueTracks]
@@ -234,12 +241,11 @@ export const usePlayerStore = defineStore('player', () => {
     if (!current || current.id !== track.id) {
       queueManager.currentTrack.value = track
     }
-    const idx = queueTracks.findIndex((t) => t.id === track.id)
+    const idx = currentIndex >= 0 ? currentIndex : queueTracks.findIndex((t) => t.id === track.id)
     queueManager.currentIndex.value = idx >= 0 ? idx : 0
 
-    const nextSrc = streamUrl(track.id)
-    if (audioEngine.audio.src !== nextSrc) {
-      audioEngine.setSrc(nextSrc)
+    if (loadedTrackId !== track.id) {
+      load(track)
     }
 
     const safePos = Number.isFinite(positionSec) ? Math.max(0, positionSec) : 0
@@ -249,9 +255,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     if (playing && audioEngine.audio.paused) {
-      audioEngine.play().catch(() => {
-        audioEngine.isPlaying.value = false
-      })
+      startPlayback()
     }
     if (!playing && !audioEngine.audio.paused) {
       audioEngine.pause()

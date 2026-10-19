@@ -98,6 +98,7 @@ export interface PartyQueueItemResponse {
 
 export interface PartyPlaybackResponse {
   track: TrackResponse | null
+  queueItemId: string | null
   playing: boolean
   anchorPositionSec: number
   anchorEpochMs: number
@@ -105,6 +106,7 @@ export interface PartyPlaybackResponse {
 
 export interface PartyStateResponse {
   id: string
+  revision: number
   inviteCode: string
   name: string
   queuePolicy: PartyQueuePolicy
