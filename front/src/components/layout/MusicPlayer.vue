@@ -132,7 +132,7 @@ function onTogglePlay() {
 
 <template>
   <footer
-    class="faceplate relative col-[1/2] row-start-2 overflow-hidden shadow-[0_-8px_24px_#000000cc] md:col-[1/3]"
+    class="faceplate relative col-[1/2] row-start-2 select-none overflow-hidden shadow-[0_-8px_24px_#000000cc] md:col-[1/3]"
     style="padding-bottom: var(--safe-area-bottom); min-height: var(--player-h)"
   >
     <div class="flex h-full flex-wrap items-center gap-x-2.5 gap-y-2 px-3 py-2.5 md:flex-nowrap md:gap-[22px] md:px-6 md:py-3.5">

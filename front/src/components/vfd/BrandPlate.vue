@@ -3,7 +3,7 @@ withDefaults(defineProps<{ size?: 'md' | 'lg' }>(), { size: 'md' })
 </script>
 
 <template>
-  <div data-testid="brand-plate" class="chrome-plate flex flex-col gap-1 rounded px-3.5 py-3">
+  <div data-testid="brand-plate" class="chrome-plate flex select-none flex-col gap-1 rounded px-3.5 py-3">
     <span
       :class="[
         'font-label leading-none tracking-[0.22em] [text-shadow:0_1px_0_#ffffff80]',

@@ -352,6 +352,11 @@ describe('party mode', () => {
 })
 
 describe('head unit display', () => {
+  it('cannot be text-selected', () => {
+    const { wrapper } = mountPlayer()
+    expect(wrapper.find('footer').classes()).toContain('select-none')
+  })
+
   it('shows NO DISC when no track', () => {
     const { wrapper } = mountPlayer()
     expect(wrapper.find('[data-testid="no-disc"]').text()).toBe('NO DISC')
