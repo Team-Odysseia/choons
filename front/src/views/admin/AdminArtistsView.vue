@@ -3,14 +3,16 @@ import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { apiErrorMessage } from '@/lib/errors'
-import { getAdminArtists, searchArtists, createArtist, deleteArtist } from '@/api/artists'
+import { getAdminArtists, searchArtists, createArtist, deleteArtist, artistImageUrl } from '@/api/artists'
 import type { ArtistResponse } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ImageUpload from '@/components/admin/ImageUpload.vue'
 import BaseDialog from '@/components/ui/dialog/BaseDialog.vue'
-import { Pencil, Trash2 } from 'lucide-vue-next'
+import AdminRow from '@/components/admin/AdminRow.vue'
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
+import { StatePlate, VfdTextarea } from '@/components/vfd'
 
 const router = useRouter()
 const artists = ref<ArtistResponse[]>([])
@@ -23,6 +25,11 @@ const pendingAvatar = ref<File | null>(null)
 const imageUploadRef = ref<InstanceType<typeof ImageUpload> | null>(null)
 const addDialogOpen = ref(false)
 const search = ref('')
+
+function shortBio(bio: string | null) {
+  if (!bio) return undefined
+  return bio.length > 60 ? `${bio.slice(0, 60)}…` : bio
+}
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(load)
@@ -82,128 +89,68 @@ async function submit() {
 </script>
 
 <template>
-  <div>
-    <div class="flex items-center justify-between gap-3 mb-6">
-      <h1 class="text-[28px] font-extrabold">Artists ({{ artists.length }})</h1>
-      <Button @click="addDialogOpen = true">Add Artist</Button>
-    </div>
+  <div class="flex flex-col gap-6">
+    <AdminPageHeader
+      kicker="Admin · Artists"
+      :title="`Artists (${artists.length})`"
+      :total="artists.length"
+      add-label="Add Artist"
+      @add="addDialogOpen = true"
+    />
 
-    <div class="search-row mb-4">
-      <Input v-model="search" placeholder="Search artist by name" />
-    </div>
+    <Input v-model="search" class="sm:max-w-[520px]" placeholder="Search artist by name" />
 
-    <div class="list-section">
-      <div v-if="artists.length === 0" class="text-[13px] text-dimmed">No artists found.</div>
-      <div v-else class="item-list">
-        <div v-for="a in artists" :key="a.id" class="list-item">
-          <div class="flex items-center justify-between gap-3">
-            <span class="item-name">{{ a.name }}</span>
-            <div class="flex items-center gap-1">
-              <button
-                class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
-                title="Edit"
-                @click="router.push(`/admin/artists/${a.id}/edit`)"
-              >
-                <Pencil :size="14" />
-              </button>
-              <button
-                class="shrink-0 size-7 rounded flex items-center justify-center text-dimmed hover:text-destructive hover:bg-muted transition-colors"
-                title="Delete"
-                :disabled="deletingId === a.id"
-                @click="confirmTarget = a"
-              >
-                <Trash2 :size="14" />
-              </button>
-            </div>
-          </div>
-          <span class="text-[13px] text-dimmed">{{ a.bio?.slice(0, 60) }}{{ (a.bio?.length ?? 0) > 60 ? '…' : '' }}</span>
-        </div>
-      </div>
+    <StatePlate v-if="artists.length === 0" code="NO MATCH" message="No artists found." />
+    <div v-else class="flex flex-col gap-2">
+      <AdminRow
+        v-for="a in artists"
+        :key="a.id"
+        :primary="a.name"
+        :secondary="shortBio(a.bio)"
+        :thumb="a.avatarUrl ? artistImageUrl(a.id) : null"
+        round
+        :deleting="deletingId === a.id"
+        @edit="router.push(`/admin/artists/${a.id}/edit`)"
+        @delete="confirmTarget = a"
+      />
     </div>
   </div>
 
-  <BaseDialog
-    :open="addDialogOpen"
-    title="Add Artist"
-    @close="addDialogOpen = false"
-  >
-    <form class="admin-form" @submit.prevent="submit">
-      <div class="form-group">
-        <Label>Name</Label>
-        <Input v-model="name" required />
+  <BaseDialog :open="addDialogOpen" title="Add Artist" max-width-class="max-w-[560px]" @close="addDialogOpen = false">
+    <form data-testid="admin-form" class="flex flex-col gap-4 px-5 pb-5" @submit.prevent="submit">
+      <div class="flex flex-col gap-2">
+        <Label for="artist-name">Name</Label>
+        <Input id="artist-name" v-model="name" required />
       </div>
-      <div class="form-group">
-        <Label>Bio</Label>
-        <textarea
-          v-model="bio"
-          class="flex w-full rounded border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary resize-y"
-          rows="3"
-        />
+      <div class="flex flex-col gap-2">
+        <Label for="artist-bio">Bio</Label>
+        <VfdTextarea id="artist-bio" v-model="bio" placeholder="Write a short bio…" />
       </div>
-      <div class="form-group">
-        <ImageUpload
-          ref="imageUploadRef"
-          label="Avatar"
-          @select="pendingAvatar = $event"
-          @remove="pendingAvatar = null"
-        />
-      </div>
-      <div class="flex justify-end gap-2 mt-1">
-        <Button type="button" variant="outline" @click="addDialogOpen = false">Cancel</Button>
-        <Button type="submit" :disabled="loading">
-          {{ loading ? 'Adding…' : 'Add artist' }}
-        </Button>
+      <ImageUpload
+        ref="imageUploadRef"
+        label="Avatar"
+        @select="pendingAvatar = $event"
+        @remove="pendingAvatar = null"
+      />
+      <div class="mt-1 flex justify-end gap-2">
+        <Button type="button" variant="ghost" @click="addDialogOpen = false">Cancel</Button>
+        <Button type="submit" :disabled="loading">{{ loading ? 'Adding…' : 'Add artist' }}</Button>
       </div>
     </form>
   </BaseDialog>
 
-  <BaseDialog
-    :open="!!confirmTarget"
-    title="Delete Artist"
-    @close="confirmTarget = null"
-  >
-    <div class="px-5 pb-5">
-      <p class="text-sm text-muted-foreground mb-5">
-        Delete <span class="font-semibold text-foreground">{{ confirmTarget?.name }}</span>?
+  <BaseDialog :open="!!confirmTarget" title="Delete Artist" tone="red" @close="confirmTarget = null">
+    <div class="flex flex-col gap-4 px-5 pb-5">
+      <p class="text-sm text-soft">
+        Delete <span class="text-fg">{{ confirmTarget?.name }}</span>?
+      </p>
+      <p class="rounded border border-red bg-red-ghost px-3 py-2.5 text-[13px] text-red">
         This will permanently remove all their albums and tracks from storage.
       </p>
       <div class="flex justify-end gap-2">
-        <Button variant="outline" @click="confirmTarget = null">Cancel</Button>
+        <Button variant="ghost" @click="confirmTarget = null">Cancel</Button>
         <Button variant="destructive" @click="confirmDelete">Delete</Button>
       </div>
     </div>
   </BaseDialog>
 </template>
-
-<style scoped>
-.admin-form {
-  width: 100%;
-  max-width: 760px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 0 20px 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.list-section { margin-top: 8px; }
-.item-list { display: flex; flex-direction: column; gap: 4px; }
-.list-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 12px 16px;
-  background: var(--card);
-  border-radius: 4px;
-}
-.item-name { font-weight: 600; }
-
-.search-row {
-  max-width: 520px;
-}
-</style>

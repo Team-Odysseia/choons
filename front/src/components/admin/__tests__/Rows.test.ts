@@ -16,6 +16,11 @@ describe('AdminRow', () => {
     expect(wrapper.emitted('edit')).toHaveLength(1)
   })
 
+  it('disables the delete key while deleting', () => {
+    const wrapper = mount(AdminRow, { props: { primary: 'x', deleting: true } })
+    expect(wrapper.find('[aria-label="Delete"]').attributes('disabled')).toBeDefined()
+  })
+
   it('shows Blocked badge when blocked', () => {
     expect(mount(AdminRow, { props: { primary: 'x' } }).text()).not.toContain('Blocked')
     expect(mount(AdminRow, { props: { primary: 'x', blocked: true } }).text()).toContain('Blocked')

@@ -82,7 +82,7 @@ describe('AdminArtistsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Artist')!.trigger('click')
-    const form = wrapper.find('form.admin-form')
+    const form = wrapper.find('[data-testid="admin-form"]')
     await form.find('input').setValue('Kode9')
     await form.trigger('submit')
     await flushPromises()
@@ -96,7 +96,7 @@ describe('AdminArtistsView', () => {
     const { wrapper } = await mountView()
 
     await button(wrapper, 'Add Artist')!.trigger('click')
-    const form = wrapper.find('form.admin-form')
+    const form = wrapper.find('[data-testid="admin-form"]')
     await form.find('input').setValue('Burial')
     await form.trigger('submit')
     await flushPromises()
@@ -120,5 +120,12 @@ describe('AdminArtistsView', () => {
     api.getAdminArtists.mockRejectedValue(httpError(500))
     await mountView()
     expect(toastMock.error).toHaveBeenCalledWith('Failed to load artists')
+  })
+
+  it('shows a no match plate when no artists match', async () => {
+    api.getAdminArtists.mockResolvedValue([])
+    const { wrapper } = await mountView()
+    expect(wrapper.text()).toContain('No artists found.')
+    expect(wrapper.find('[data-code]').text()).toBe('NO MATCH')
   })
 })

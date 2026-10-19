@@ -12,6 +12,7 @@ withDefaults(
     editable?: boolean
     editLabel?: string
     deleteLabel?: string
+    deleting?: boolean
   }>(),
   { editable: true, editLabel: 'Edit', deleteLabel: 'Delete' },
 )
@@ -34,6 +35,6 @@ defineEmits<{ edit: []; delete: [] }>()
     <VfdBadge v-if="blocked" tone="red" label="Blocked" />
     <slot name="actions" />
     <IconKey v-if="editable" :icon="Pencil" :label="editLabel" :size="32" @click="$emit('edit')" />
-    <IconKey :icon="Trash2" :label="deleteLabel" :size="32" class="text-red!" @click="$emit('delete')" />
+    <IconKey :icon="Trash2" :label="deleteLabel" :size="32" :disabled="deleting" class="text-red!" @click="$emit('delete')" />
   </div>
 </template>
