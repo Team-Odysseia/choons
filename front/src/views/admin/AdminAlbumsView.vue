@@ -43,7 +43,11 @@ const search = ref('')
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
-  artists.value = await getAdminArtists()
+  try {
+    artists.value = await getAdminArtists()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load artists'))
+  }
   await loadAlbums()
 })
 
@@ -60,7 +64,11 @@ watch(search, () => {
 
 async function loadAlbums() {
   const query = search.value.trim()
-  albums.value = query ? await searchAlbums(query, { page: 0, size: 200 }) : await getAdminAlbums()
+  try {
+    albums.value = query ? await searchAlbums(query, { page: 0, size: 200 }) : await getAdminAlbums()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load albums'))
+  }
 }
 
 function formatDuration(secs: number) {

@@ -39,7 +39,11 @@ watch(search, () => {
 
 async function load() {
   const query = search.value.trim()
-  artists.value = query ? await searchArtists(query, 0, 200) : await getAdminArtists()
+  try {
+    artists.value = query ? await searchArtists(query, 0, 200) : await getAdminArtists()
+  } catch (e) {
+    toast.error(apiErrorMessage(e, 'Failed to load artists'))
+  }
 }
 
 async function confirmDelete() {

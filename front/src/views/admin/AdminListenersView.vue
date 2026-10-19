@@ -131,12 +131,14 @@ async function confirmDelete() {
             >Blocked</span>
             <button
               class="size-8 rounded-full flex items-center justify-center text-dimmed hover:text-foreground hover:bg-muted transition-colors"
+              title="Edit listener"
               @click="openEdit(listener)"
             >
               <Pencil :size="14" />
             </button>
             <button
               class="size-8 rounded-full flex items-center justify-center text-dimmed hover:text-destructive hover:bg-muted transition-colors"
+              title="Delete listener"
               @click="deleteTarget = listener"
             >
               <Trash2 :size="14" />
