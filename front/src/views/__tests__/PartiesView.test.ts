@@ -76,7 +76,8 @@ describe('PartiesView', () => {
     const end = vi.spyOn(party, 'end').mockResolvedValue(undefined)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('Invite code: ABCD2345')
+    expect(wrapper.find('[data-testid="invite-readout"]').text()).toContain('ABCD2345')
+    expect(wrapper.find('[data-testid="active-party"]').text()).toContain('Live')
     await wrapper.findAll('button').find((b) => b.text() === 'End party')!.trigger('click')
     await flushPromises()
 
@@ -95,5 +96,10 @@ describe('PartiesView', () => {
     await flushPromises()
 
     expect(toastMock.error).toHaveBeenCalledWith('boom')
+  })
+
+  it('hides the active party panel when not in a party', () => {
+    const wrapper = mount(PartiesView)
+    expect(wrapper.find('[data-testid="active-party"]').exists()).toBe(false)
   })
 })
