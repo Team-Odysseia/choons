@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import AppSidebar from '../AppSidebar.vue'
+import { dialogStubs } from '@/test-utils/dialog'
 import { useAuthStore } from '@/stores/auth'
 
 // @ts-ignore
@@ -116,5 +117,18 @@ describe('AppSidebar sources', () => {
     const user = wrapper.find('[data-testid="sidebar-user"]')
     expect(user.classes()).toContain('vfd-marquee')
     expect(user.text()).toBe('paulo')
+  })
+
+  it('submitting search with Enter cancels the default key action so focus restore cannot re-click Search', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    useAuthStore().user = { id: 'u-1', username: 'paulo', role: 'LISTENER' }
+    const wrapper = mount(AppSidebar, { global: { plugins: [pinia], stubs: { ...stubs, ...dialogStubs } } })
+    await wrapper.findAll('button').find((b) => b.text().includes('Search'))!.trigger('click')
+    const input = wrapper.find('input')
+    await input.setValue('night')
+    const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true, bubbles: true })
+    input.element.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
   })
 })

@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
       <Input
         v-model="searchQuery"
         placeholder="Search public playlists, songs, albums, artists"
-        @keydown.enter="submitSearch"
+        @keydown.enter.prevent="submitSearch"
       />
       <p class="text-xs text-faint">Press Enter to search songs, albums, artists and playlists.</p>
     </div>
