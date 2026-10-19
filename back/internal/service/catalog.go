@@ -242,11 +242,17 @@ func (s *Catalog) DeleteArtistAvatar(ctx context.Context, id uuid.UUID) error {
 
 // Albums
 
-func (s *Catalog) ListAlbums(ctx context.Context, artistID *uuid.UUID, query string, p *Page) ([]dto.Album, error) {
+func (s *Catalog) ListAlbums(ctx context.Context, artistID *uuid.UUID, query string, recent bool, p *Page) ([]dto.Album, error) {
 	q := s.db.WithContext(ctx).Joins("Artist")
 	if artistID != nil {
-		q = q.Where("albums.artist_id = ?", *artistID).Order("albums.release_year DESC").Order("albums.id ASC")
-	} else {
+		q = q.Where("albums.artist_id = ?", *artistID)
+	}
+	switch {
+	case recent:
+		q = q.Order("albums.created_at DESC").Order("albums.id DESC")
+	case artistID != nil:
+		q = q.Order("albums.release_year DESC").Order("albums.id ASC")
+	default:
 		q = q.Order(`"Artist".name ASC`).Order("albums.title ASC").Order("albums.id ASC")
 	}
 	if strings.TrimSpace(query) != "" {

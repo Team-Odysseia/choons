@@ -80,13 +80,29 @@ func (h *Handler) listAlbums(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
+	recent, err := albumSort(c)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	p, err := page(c)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, c.Query("query"), p)
+	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, c.Query("query"), recent, p)
 	httpx.JSON(c, http.StatusOK, out, err)
+}
+
+func albumSort(c *gin.Context) (bool, error) {
+	switch c.Query("sort") {
+	case "":
+		return false, nil
+	case "recent":
+		return true, nil
+	default:
+		return false, apperr.BadRequest("sort must be one of: recent")
+	}
 }
 
 func (h *Handler) getAlbum(c *gin.Context) {
@@ -255,7 +271,7 @@ func (h *Handler) adminListAlbums(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, "", nil)
+	out, err := h.Catalog.ListAlbums(c.Request.Context(), artistID, "", false, nil)
 	httpx.JSON(c, http.StatusOK, out, err)
 }
 

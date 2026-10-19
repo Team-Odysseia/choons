@@ -238,7 +238,7 @@ func TestListAlbumsOrderingAndSearch(t *testing.T) {
 	e.album(t, a, "Syro", 2014)
 	e.album(t, a, "Drukqs", 2001)
 
-	all, _ := e.catalog.ListAlbums(e.ctx, nil, "", nil)
+	all, _ := e.catalog.ListAlbums(e.ctx, nil, "", false, nil)
 	titles := func(as []dto.Album) []string {
 		out := []string{}
 		for _, x := range as {
@@ -249,16 +249,20 @@ func TestListAlbumsOrderingAndSearch(t *testing.T) {
 	if !slices.Equal(titles(all), []string{"Drukqs", "Syro", "Burial", "Untrue"}) {
 		t.Fatalf("artist name then title: %v", titles(all))
 	}
-	byArtist, _ := e.catalog.ListAlbums(e.ctx, &b.ID, "", nil)
+	byArtist, _ := e.catalog.ListAlbums(e.ctx, &b.ID, "", false, nil)
 	if !slices.Equal(titles(byArtist), []string{"Untrue", "Burial"}) {
 		t.Fatalf("release year desc: %v", titles(byArtist))
 	}
-	search, _ := e.catalog.ListAlbums(e.ctx, nil, "aphex", nil)
+	search, _ := e.catalog.ListAlbums(e.ctx, nil, "aphex", false, nil)
 	if !slices.Equal(titles(search), []string{"Drukqs", "Syro"}) {
 		t.Fatalf("search by artist name: %v", titles(search))
 	}
 	if all[0].Artist.Name != "Aphex" {
 		t.Fatalf("artist not preloaded: %+v", all[0])
+	}
+	recent, _ := e.catalog.ListAlbums(e.ctx, nil, "", true, &Page{Size: 2})
+	if !slices.Equal(titles(recent), []string{"Drukqs", "Syro"}) {
+		t.Fatalf("recent sorts newest first before paging: %v", titles(recent))
 	}
 }
 

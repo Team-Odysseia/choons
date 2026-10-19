@@ -60,6 +60,11 @@ func TestCatalogJSONContract(t *testing.T) {
 	if body := bob.get("/music/tracks?page=5").Body.String(); body != "[]" {
 		t.Fatalf("empty list body %q", body)
 	}
+	bob.get("/music/albums?sort=recent&size=1").status(200).decode(&list)
+	if len(list) != 1 || list[0]["title"] != "Untrue" {
+		t.Fatalf("%v", list)
+	}
+	bob.get("/music/albums?sort=oldest").errorIs(400, "sort must be one of: recent")
 	bob.get("/music/albums?artistId=nope").errorIs(400, "Invalid artistId")
 	bob.get("/music/tracks?size=abc").errorIs(400, "size must be a number")
 	bob.get("/music/artists/"+ids.album).errorIs(404, "Artist not found: "+ids.album)
