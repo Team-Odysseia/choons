@@ -84,7 +84,7 @@
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
   --app-h: 100dvh;
-  --player-base-h: 122px;
+  --player-base-h: 140px;
   --player-h: calc(var(--player-base-h) + var(--safe-area-bottom));
   --content-max-wide: 1320px;
   --content-max-form: 860px;

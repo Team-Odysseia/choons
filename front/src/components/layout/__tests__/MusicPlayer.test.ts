@@ -69,9 +69,7 @@ describe('sem track ativo', () => {
   it('botão play/pause está desabilitado', () => {
     const { wrapper } = mountPlayer()
     // Botão central (Play/Pause) tem :disabled="!player.currentTrack"
-    const playBtn = wrapper.findAll('button').find((b) =>
-      b.classes().includes('rounded-full') && b.classes().includes('bg-foreground'),
-    )
+    const playBtn = wrapper.find('[data-testid="play-btn"]')
     expect(playBtn?.attributes('disabled')).toBeDefined()
   })
 })
@@ -98,9 +96,7 @@ describe('com track ativo', () => {
     player.$patch({ currentTrack: mockTrack })
     await wrapper.vm.$nextTick()
 
-    const playBtn = wrapper.findAll('button').find((b) =>
-      b.classes().includes('rounded-full') && b.classes().includes('bg-foreground'),
-    )
+    const playBtn = wrapper.find('[data-testid="play-btn"]')
     expect(playBtn?.attributes('disabled')).toBeUndefined()
   })
 })
@@ -114,9 +110,7 @@ describe('controles de reprodução', () => {
     vi.spyOn(player, 'togglePlay')
     await wrapper.vm.$nextTick()
 
-    const playBtn = wrapper.findAll('button').find((b) =>
-      b.classes().includes('rounded-full') && b.classes().includes('bg-foreground'),
-    )
+    const playBtn = wrapper.find('[data-testid="play-btn"]')
     await playBtn?.trigger('click')
     expect(player.togglePlay).toHaveBeenCalled()
   })
@@ -151,14 +145,14 @@ describe('controles de reprodução', () => {
 describe('accessibility', () => {
   it('progress range has aria-label', () => {
     const { wrapper } = mountPlayer()
-    const progressInput = wrapper.find('[data-testid="progress-range"]')
-    expect(progressInput.attributes('aria-label')).toBeDefined()
+    const progressInput = wrapper.find('[data-testid="progress-range"] [role="slider"]')
+    expect(progressInput.attributes('aria-label')).toBe('Progress')
   })
 
   it('volume range has aria-label', () => {
     const { wrapper } = mountPlayer()
-    const volumeInput = wrapper.find('[data-testid="volume-range"]')
-    expect(volumeInput.attributes('aria-label')).toBeDefined()
+    const volumeInput = wrapper.find('[data-testid="volume-range"] [role="slider"]')
+    expect(volumeInput.attributes('aria-label')).toBe('Volume')
   })
 })
 
@@ -170,9 +164,8 @@ describe('barra de progresso', () => {
     player.$patch({ currentTime: 60, duration: 240 })
     await wrapper.vm.$nextTick()
 
-    // input[type=range] da barra de progresso (primeiro range input)
-    const progressInput = wrapper.find('[data-testid="progress-range"]')
-    expect(Number((progressInput.element as HTMLInputElement).value)).toBeCloseTo(25) // 60/240 * 100
+    const progressInput = wrapper.find('[data-testid="progress-range"] [role="slider"]')
+    expect(Number(progressInput.attributes('aria-valuenow'))).toBeCloseTo(25)
   })
 
   it('input dispara seek com tempo correto', async () => {
@@ -181,12 +174,9 @@ describe('barra de progresso', () => {
     vi.spyOn(player, 'seek')
     await wrapper.vm.$nextTick()
 
-    const progressInput = wrapper.find('[data-testid="progress-range"]')
-    await progressInput.setValue('50')
-    await progressInput.trigger('input')
+    await wrapper.find('[data-testid="progress-range"] [role="slider"]').trigger('keydown', { key: 'End' })
 
-    // seek(50% * 200) = seek(100)
-    expect(player.seek).toHaveBeenCalledWith(100)
+    expect(player.seek).toHaveBeenCalledWith(200)
   })
 })
 
@@ -198,11 +188,11 @@ describe('volume', () => {
     vi.spyOn(player, 'setVolume')
     await wrapper.vm.$nextTick()
 
-    const volumeInput = wrapper.find('[data-testid="volume-range"]')
-    await volumeInput.setValue('0.5')
-    await volumeInput.trigger('input')
+    player.$patch({ volume: 0.5 })
+    await wrapper.vm.$nextTick()
+    await wrapper.find('[data-testid="volume-range"] [role="slider"]').trigger('keydown', { key: 'ArrowUp' })
 
-    expect(player.setVolume).toHaveBeenCalledWith(0.5)
+    expect(player.setVolume).toHaveBeenCalledWith(0.51)
   })
 
   it('exibe percentual correto de volume', async () => {
@@ -210,7 +200,7 @@ describe('volume', () => {
     player.$patch({ volume: 0.7 })
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('70%')
+    expect(wrapper.find('[data-testid="volume-range"]').text()).toContain('70')
   })
 })
 
@@ -232,7 +222,7 @@ describe('shuffle', () => {
     await wrapper.vm.$nextTick()
 
     const shuffleBtn = wrapper.find('[data-testid="shuffle-btn"]')
-    expect(shuffleBtn.classes()).toContain('text-primary')
+    expect(shuffleBtn.classes()).toContain('text-cyan')
   })
 })
 
@@ -254,7 +244,7 @@ describe('loop', () => {
     await wrapper.vm.$nextTick()
 
     const loopBtn = wrapper.find('[data-testid="loop-btn"]')
-    expect(loopBtn.classes()).toContain('text-primary')
+    expect(loopBtn.classes()).toContain('text-cyan')
   })
 })
 
@@ -264,9 +254,8 @@ describe('formatTime (via template)', () => {
   it('exibe "0:00" quando não há track', () => {
     const { wrapper } = mountPlayer()
     // Dois spans de tempo: currentTime e duration
-    const timeSpans = wrapper.findAll('span.text-\\[11px\\]')
-    expect(timeSpans[0]?.text()).toBe('0:00')
-    expect(timeSpans[1]?.text()).toBe('0:00')
+    expect(wrapper.find('[data-testid="elapsed"]').text()).toBe('0:00')
+    expect(wrapper.find('[data-testid="total"]').text()).toBe('0:00')
   })
 
   it('formata minutos e segundos corretamente', async () => {
@@ -274,9 +263,8 @@ describe('formatTime (via template)', () => {
     player.$patch({ currentTime: 125, duration: 240 }) // 2:05 / 4:00
     await wrapper.vm.$nextTick()
 
-    const timeSpans = wrapper.findAll('span.text-\\[11px\\]')
-    expect(timeSpans[0]?.text()).toBe('2:05')
-    expect(timeSpans[1]?.text()).toBe('4:00')
+    expect(wrapper.find('[data-testid="elapsed"]').text()).toBe('2:05')
+    expect(wrapper.find('[data-testid="total"]').text()).toBe('4:00')
   })
 })
 
@@ -346,8 +334,56 @@ describe('party mode', () => {
     player.$patch({ duration: 200 })
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('[data-testid="progress-range"]').setValue('50')
+    await wrapper.find('[data-testid="progress-range"] [role="slider"]').trigger('keydown', { key: 'End' })
 
-    expect(seek).toHaveBeenCalledWith(100)
+    expect(seek).toHaveBeenCalledWith(200)
+  })
+
+  it('party non-controller seek slider is disabled', async () => {
+    const { wrapper } = await mountInParty('u-member')
+    expect(wrapper.find('[data-testid="progress-range"] [role="slider"]').attributes('data-disabled')).toBeDefined()
+  })
+
+  it('lights the PARTY flag in a party', async () => {
+    const { wrapper } = await mountInParty('u-host')
+    expect(wrapper.find('[data-flag="PARTY"]').attributes('data-on')).toBeDefined()
+  })
+})
+
+describe('head unit display', () => {
+  it('shows NO DISC when no track', () => {
+    const { wrapper } = mountPlayer()
+    expect(wrapper.find('[data-testid="no-disc"]').text()).toBe('NO DISC')
+    expect(wrapper.find('[data-testid="no-disc"]').attributes('aria-hidden')).toBe('true')
+  })
+
+  it('track readout shows queue position', async () => {
+    const { wrapper, player } = mountPlayer()
+    player.$patch({ currentTrack: mockTrack, queue: [mockTrack, { ...mockTrack, id: 't2' }, { ...mockTrack, id: 't3' }], currentIndex: 2 })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="track-readout"]').text()).toContain('03')
+  })
+
+  it('level readout follows the volume', async () => {
+    const { wrapper, player } = mountPlayer()
+    player.$patch({ volume: 0.5 })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="level-readout"]').text()).toContain('-6dB')
+  })
+
+  it('knob ArrowUp calls setVolume', async () => {
+    const { wrapper, player } = mountPlayer()
+    vi.spyOn(player, 'setVolume')
+    player.$patch({ volume: 0.2 })
+    await wrapper.vm.$nextTick()
+    await wrapper.find('[data-testid="volume-range"] [role="slider"]').trigger('keydown', { key: 'ArrowUp' })
+    expect(player.setVolume).toHaveBeenCalledWith(0.21)
+  })
+
+  it('marquee shows title, artist and album', async () => {
+    const { wrapper, player } = mountPlayer()
+    player.$patch({ currentTrack: mockTrack })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Test Song · Test Artist · Test Album')
   })
 })
