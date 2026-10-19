@@ -49,6 +49,14 @@ describe('AlbumCard', () => {
     expect(fresh.text()).toContain('NEW')
   })
 
+  it('lifts above its neighbours while hovered or focused so the disc is not covered', async () => {
+    const wrapper = mount(AlbumCard, { props: { album: makeAlbum() }, ...(await routerPlugin()) })
+    const classes = wrapper.find('a').classes()
+    expect(classes).toContain('relative')
+    expect(classes).toContain('hover:z-10')
+    expect(classes).toContain('focus-visible:z-10')
+  })
+
   it('uses meta when given, otherwise artist name', async () => {
     const def = mount(AlbumCard, { props: { album: makeAlbum() }, ...(await routerPlugin()) })
     expect(def.text()).toContain('Burial')

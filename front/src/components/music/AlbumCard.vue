@@ -15,7 +15,7 @@ const subtitle = computed(() => props.meta ?? props.album.artist.name)
 <template>
   <RouterLink
     :to="`/library/albums/${album.id}`"
-    class="album-card group flex w-[184px] shrink-0 flex-col gap-2.5 focus-visible:outline-none"
+    class="album-card group relative flex w-[184px] shrink-0 flex-col gap-2.5 hover:z-10 focus-visible:z-10 focus-visible:outline-none"
   >
     <div class="relative size-[184px]">
       <span aria-hidden="true" class="album-card__disc" />
