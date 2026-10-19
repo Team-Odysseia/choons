@@ -11,6 +11,8 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { IconKey, Spectrum, VfdBadge } from '@/components/vfd'
 import { formatDuration } from '@/lib/format'
 
+defineOptions({ inheritAttrs: false })
+
 const props = defineProps<{
   track: TrackResponse
   queue?: TrackResponse[]
@@ -49,6 +51,7 @@ const number = computed(() => String((props.index ?? 0) + 1).padStart(2, '0'))
 
 <template>
   <div
+    v-bind="$attrs"
     :class="[
       'group grid items-center gap-3 rounded px-3 py-2.5 transition-colors md:gap-4 md:px-4',
       '[grid-template-columns:28px_minmax(0,1fr)_56px] md:[grid-template-columns:28px_minmax(0,1fr)_minmax(0,240px)_150px_56px]',

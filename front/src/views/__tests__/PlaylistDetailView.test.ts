@@ -60,6 +60,7 @@ describe('PlaylistDetailView', () => {
     api.getPlaylist.mockRejectedValue(httpError(403, 'Access denied'))
     const { wrapper } = await mountView()
     expect(wrapper.text()).toContain('Access denied')
+    expect(wrapper.find('[data-code]').text()).toBe('ERR')
     expect(wrapper.text()).not.toContain('Loading')
   })
 
@@ -115,7 +116,8 @@ describe('PlaylistDetailView', () => {
 
     await wrapper.find('button[title="Remove"]').trigger('click')
     await flushPromises()
-    await button(wrapper, 'Make public')!.trigger('click')
+    const publicOption = wrapper.find('[data-testid="visibility-toggle"]').findAll('button').find((b) => b.text() === 'Public')
+    await publicOption!.trigger('click')
     await flushPromises()
 
     expect(api.removeTrackFromPlaylist).toHaveBeenCalledWith('pl-1', 't-1')
@@ -138,6 +140,14 @@ describe('PlaylistDetailView', () => {
     api.getPlaylist.mockResolvedValue(makePlaylist({ ownerId: 'someone-else', isPublic: true, tracks }))
     const { wrapper } = await mountView()
     expect(wrapper.find('button[title="Remove"]').exists()).toBe(false)
-    expect(button(wrapper, 'Make private')).toBeUndefined()
+    expect(wrapper.find('[data-testid="visibility-toggle"]').exists()).toBe(false)
+    expect(button(wrapper, 'Internal shared')).toBeUndefined()
+  })
+
+  it('shows a blank tape plate when the playlist is empty', async () => {
+    api.getPlaylist.mockResolvedValue(makePlaylist({ tracks: [] }))
+    const { wrapper } = await mountView()
+    expect(wrapper.text()).toContain('No tracks yet. Add some from an album.')
+    expect(wrapper.find('[data-code]').text()).toBe('BLANK TAPE')
   })
 })

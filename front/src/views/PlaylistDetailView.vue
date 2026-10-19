@@ -7,8 +7,11 @@ import { usePlayerStore } from '@/stores/player'
 import { usePartyStore } from '@/stores/party'
 import { useAuthStore } from '@/stores/auth'
 import TrackRow from '@/components/music/TrackRow.vue'
+import TrackListHeader from '@/components/music/TrackListHeader.vue'
+import { IconKey, SegmentedToggle, StatePlate, VfdBadge } from '@/components/vfd'
+import { totalMinutes } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { X, Play, Shuffle, ListPlus, Globe, Lock } from 'lucide-vue-next'
+import { X, Play, Shuffle, ListPlus, Globe, Lock, ListMusic, Share2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { apiErrorMessage } from '@/lib/errors'
 
@@ -72,6 +75,18 @@ async function toggleVisibility() {
   }
 }
 
+const visibilityOptions = [
+  { value: 'public', label: 'Public', icon: Globe },
+  { value: 'private', label: 'Private', icon: Lock },
+]
+
+const visibility = computed(() => (playlist.value?.isPublic ? 'public' : 'private'))
+const minutes = computed(() => totalMinutes(playlist.value?.tracks ?? []))
+
+function onVisibility(value: string) {
+  if (value !== visibility.value && !togglingVisibility.value) void toggleVisibility()
+}
+
 function addAllToQueue() {
   if (!playlists.current) return
   if (party.inParty) {
@@ -87,107 +102,87 @@ function addAllToQueue() {
 </script>
 
 <template>
-  <div v-if="loadError" class="text-[13px] text-dimmed">{{ loadError }}</div>
-  <div v-else-if="!playlists.loading && playlist">
-    <div class="flex items-end gap-6 mb-8">
+  <StatePlate v-if="loadError" kind="error" code="ERR" :message="loadError" />
+  <div v-else-if="!playlists.loading && playlist" class="flex flex-col gap-8">
+    <section class="flex flex-col gap-6 md:flex-row md:items-end md:gap-8">
       <div
-        class="size-[160px] bg-muted rounded-lg flex items-center justify-center text-[64px] shrink-0"
+        class="vfd-well vfd-scanlines flex size-[150px] shrink-0 flex-col items-center justify-center gap-2 rounded md:size-[180px]"
+        aria-hidden="true"
       >
-        ♫
+        <ListMusic :size="52" class="text-cyan drop-shadow-[0_0_12px_#5CF6E899]" />
+        <span class="font-display text-[22px] font-extrabold text-cyan glow-sm">{{ playlist.tracks.length }} TRK</span>
       </div>
-      <div>
-        <div class="text-xs font-bold uppercase tracking-widest text-dimmed mb-1">Playlist</div>
-        <h1 class="text-[28px] font-extrabold mb-2">{{ playlist.name }}</h1>
-        <div class="flex items-center gap-2">
-          <span class="text-[13px] text-dimmed">{{ playlist.tracks.length }} tracks</span>
-          <span
-            v-if="playlist.isPublic"
-            class="flex items-center gap-1 text-[12px] text-primary font-medium"
+      <div class="flex min-w-0 flex-1 flex-col gap-2.5">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <span class="font-label text-[10px] uppercase tracking-[0.3em] text-amber glow-amber">Playlist</span>
+          <VfdBadge :tone="playlist.isPublic ? 'cyan' : 'mute'" :label="playlist.isPublic ? 'Public' : 'Private'" />
+          <span class="flex-1" />
+          <template v-if="isOwner">
+            <Button
+              v-if="playlist.isPublic"
+              variant="ghost"
+              size="sm"
+              class="text-amber"
+              @click="toast.info('This playlist is shared only inside this Choons instance')"
+            >
+              <template #icon><Share2 :size="13" aria-hidden="true" /></template>
+              Internal shared
+            </Button>
+            <SegmentedToggle
+              data-testid="visibility-toggle"
+              :model-value="visibility"
+              :options="visibilityOptions"
+              @update:model-value="onVisibility"
+            />
+          </template>
+        </div>
+        <h1 class="break-words font-display text-[40px] font-extrabold uppercase leading-none text-cyan glow-lg md:text-[56px]">{{ playlist.name }}</h1>
+        <span class="text-[15px] text-soft">
+          {{ playlist.tracks.length }} tracks<template v-if="playlist.tracks.length"> · {{ minutes }} min</template>
+        </span>
+        <div class="flex flex-wrap items-center gap-2.5 pt-2.5">
+          <Button
+            v-if="!party.inParty"
+            :disabled="playlist.tracks.length === 0"
+            @click="player.playQueue(playlist.tracks)"
           >
-            <Globe :size="12" />
-            Public
-          </span>
-          <span v-else class="flex items-center gap-1 text-[12px] text-dimmed">
-            <Lock :size="12" />
-            Private
-          </span>
+            <template #icon><Play :size="14" aria-hidden="true" /></template>
+            Play all
+          </Button>
+          <Button
+            v-if="!party.inParty"
+            variant="outline"
+            :disabled="playlist.tracks.length === 0"
+            @click="player.playQueueShuffled(playlist.tracks)"
+          >
+            <template #icon><Shuffle :size="14" aria-hidden="true" /></template>
+            Shuffle
+          </Button>
+          <Button variant="outline" :disabled="playlist.tracks.length === 0" @click="addAllToQueue">
+            <template #icon><ListPlus :size="14" aria-hidden="true" /></template>
+            {{ party.inParty ? 'Add to party queue' : 'Add to queue' }}
+          </Button>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="flex items-center gap-2 mb-6 flex-wrap">
-      <Button
-        v-if="!party.inParty"
-        :disabled="playlist.tracks.length === 0"
-        @click="player.playQueue(playlist.tracks)"
-      >
-        <Play :size="16" />
-        Play all
-      </Button>
-      <Button
-        v-if="!party.inParty"
-        variant="outline"
-        :disabled="playlist.tracks.length === 0"
-        @click="player.playQueueShuffled(playlist.tracks)"
-      >
-        <Shuffle :size="16" />
-        Shuffle
-      </Button>
-      <Button
-        variant="outline"
-        :disabled="playlist.tracks.length === 0"
-        @click="addAllToQueue"
-      >
-        <ListPlus :size="16" />
-        {{ party.inParty ? 'Add to party queue' : 'Add to queue' }}
-      </Button>
-      <template v-if="isOwner">
-        <Button
-          variant="outline"
-          :disabled="togglingVisibility"
-          @click="toggleVisibility"
-        >
-          <Globe v-if="!playlist.isPublic" :size="16" />
-          <Lock v-else :size="16" />
-          {{ playlist.isPublic ? 'Make private' : 'Make public' }}
-        </Button>
-        <Button
-          v-if="playlist.isPublic"
-          variant="outline"
-          @click="toast.info('This playlist is shared only inside this Choons instance')"
-        >
-          <Globe :size="16" />
-          Internal shared
-        </Button>
-      </template>
-    </div>
+    <StatePlate v-if="playlist.tracks.length === 0" code="BLANK TAPE" message="No tracks yet. Add some from an album." />
 
-    <div v-if="playlist.tracks.length === 0" class="text-[13px] text-dimmed">
-      No tracks yet. Add some from an album.
-    </div>
-
-    <div v-else class="mt-2">
-      <div
-        v-for="(track, i) in playlist.tracks"
-        :key="track.id"
-        class="flex items-center group/row"
-      >
-        <TrackRow
-          class="flex-1"
-          :track="track"
-          :queue="playlist.tracks"
-          :index="i"
-        />
-        <button
+    <section v-else class="flex flex-col gap-1">
+      <TrackListHeader />
+      <div v-for="(track, i) in playlist.tracks" :key="track.id" class="group/row flex items-center gap-1">
+        <TrackRow class="flex-1" :track="track" :queue="playlist.tracks" :index="i" />
+        <IconKey
           v-if="isOwner"
-          class="size-8 rounded-full flex items-center justify-center text-dimmed opacity-0 group-hover/row:opacity-100 hover:text-destructive transition-all shrink-0"
-          title="Remove"
+          bare
+          :icon="X"
+          label="Remove"
+          :size="30"
+          class="opacity-0 transition-opacity hover:text-red! group-hover/row:opacity-100 focus-visible:opacity-100"
           @click="removeTrack(track.id)"
-        >
-          <X :size="14" />
-        </button>
+        />
       </div>
-    </div>
+    </section>
   </div>
-  <div v-else class="text-[13px] text-dimmed">Loading…</div>
+  <StatePlate v-else kind="loading" code="READING…" message="Loading…" />
 </template>
